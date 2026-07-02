@@ -1,0 +1,130 @@
+export const PLATFORMS = ['WhatsApp', 'Email', 'Instagram DM', 'Slack', 'SMS', 'Telegram', 'Other'] as const
+export const PRIORITY = ['High', 'Medium', 'Low'] as const
+export const TONES = ['Casual', 'Friendly', 'Professional', 'Motivational'] as const
+export const STAGES = ['Lead', 'Trial', 'Active', 'At Risk', 'Churned'] as const
+export const AVATAR_COLORS = ['#7c5cbf', '#3d7fbf', '#2a9a6e', '#bf5c7c', '#bf8c3d', '#5c7cbf']
+
+export type Stage = (typeof STAGES)[number]
+export type Priority = (typeof PRIORITY)[number]
+
+export function stageColor(stage: string) {
+  if (stage === 'Lead') return '#9080f0'
+  if (stage === 'Trial') return '#cc9a3c'
+  if (stage === 'Active') return '#2db87a'
+  if (stage === 'At Risk') return '#e05070'
+  if (stage === 'Churned') return '#6060a0'
+  return '#2db87a'
+}
+
+export function getStage(client: { stage?: string | null; status?: string | null }): Stage {
+  return (client.stage as Stage) || (client.status === 'inactive' ? 'Churned' : 'Active')
+}
+
+export function todayKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function getOffsetDate(offset: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return todayKey(d)
+}
+
+export function formatDate(iso?: string | null) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+export function formatTime(t?: string | null) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`
+}
+
+export function getInitials(name = '') {
+  return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+}
+
+export function greeting(d = new Date()) {
+  const h = d.getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+
+export function sortTasks<T extends { priority: string; title: string }>(tasks: T[]): T[] {
+  return [...tasks].sort((a, b) => {
+    const p = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
+    if (p !== 0) return p
+    return a.title.localeCompare(b.title)
+  })
+}
+
+/** green = contacted recently, amber = due for a check-in, red = overdue */
+export function getHealthScore(lastContacted: string | null | undefined, today: string, cadenceDays = 7) {
+  if (!lastContacted) return 'red'
+  const [y, m, d] = lastContacted.split('-').map(Number)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const diff = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000)
+  if (diff <= Math.max(1, Math.floor(cadenceDays / 2))) return 'green'
+  if (diff <= cadenceDays) return 'amber'
+  return 'red'
+}
+
+export function mrrCentsTotal(clients: { stage?: string | null; status?: string | null; retainer_cents?: number | null }[]) {
+  return clients
+    .filter((c) => !['Churned', 'Lead'].includes(getStage(c)))
+    .reduce((sum, c) => sum + (Number(c.retainer_cents) || 0), 0)
+}
+
+export function centsToDollars(cents?: number | null) {
+  return Math.round((cents ?? 0) / 100)
+}
+
+export function dollarsToCents(dollars: number | string) {
+  return Math.round(Number(dollars || 0) * 100)
+}
+
+export function isWeekend(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const day = new Date(y, m - 1, d).getDay()
+  return day === 0 || day === 6
+}
+
+export function dayOfWeek(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).getDay()
+}
+
+/** old app's recurring frequency values: 'daily' | 'weekdays' | 'weekly:0'..'weekly:6' */
+export function recurringMatchesDate(frequency: string, iso: string) {
+  const d = dayOfWeek(iso)
+  if (frequency === 'daily') return true
+  if (frequency === 'weekdays') return d > 0 && d < 6
+  if (frequency.startsWith('weekly:')) return d === parseInt(frequency.split(':')[1], 10)
+  return false
+}
+
+export function recurringFrequencyLabel(frequency: string) {
+  if (frequency === 'daily') return 'Daily'
+  if (frequency === 'weekdays') return 'Weekdays'
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  return `Weekly – ${days[parseInt(frequency.split(':')[1], 10)] ?? ''}`
+}
+
+export function cadenceLabel(days?: number | null) {
+  if (!days) return ''
+  if (days === 1) return 'Every day'
+  if (days === 7) return 'Every week'
+  if (days === 14) return 'Every 2 weeks'
+  if (days === 30) return 'Every month'
+  return `Every ${days} days`
+}
+
+export function formatNoteTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
