@@ -8,7 +8,14 @@ export function isAdminRole(role: Role) {
   return role === 'owner' || role === 'admin'
 }
 
-export async function requireOrgContext() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function hasActiveAccess(org: any) {
+  if (org.subscription_status === 'active' || org.subscription_status === 'past_due') return true
+  if (org.subscription_status === 'trialing') return !org.trial_ends_at || new Date(org.trial_ends_at) > new Date()
+  return false
+}
+
+export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
   const supabase = await createClient()
 
   // Middleware already validated the session with a real network round trip and passed the
@@ -34,6 +41,8 @@ export async function requireOrgContext() {
     .maybeSingle()
 
   if (!membership) redirect('/onboarding')
+
+  if (!opts?.skipPaywall && !hasActiveAccess(membership.orgs)) redirect('/billing')
 
   return {
     supabase,

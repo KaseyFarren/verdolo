@@ -23,6 +23,8 @@ export default async function SettingsPage() {
         initialApiKey={apiKey ?? ''}
         initialDisplayName={membership?.display_name ?? ''}
         initialAvatarUrl={membership?.avatar_url ?? ''}
+        subscriptionStatus={org?.subscription_status ?? null}
+        trialEndsAt={org?.trial_ends_at ?? null}
       />
     </AppShell>
   )

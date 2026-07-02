@@ -11,6 +11,7 @@ const NAV = [
   { href: '/clients', icon: '👥', label: 'Clients' },
   { href: '/time', icon: '⏱️', label: 'Time' },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
+  { href: '/billing', icon: '💳', label: 'Billing', ownerOnly: true },
   { href: '/settings', icon: '⚙️', label: 'Settings' },
 ]
 
@@ -41,7 +42,7 @@ export default function AppShell({
       <div className="fixed inset-y-0 left-0 w-48 border-r border-white/10 bg-neutral-900/60 flex flex-col">
         <div className="px-4 py-4 font-semibold text-sm">{orgName}</div>
         <nav className="flex-1 flex flex-col gap-1 px-2">
-          {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+          {NAV.filter((item) => (!item.adminOnly || isAdmin) && (!item.ownerOnly || role === 'owner')).map((item) => {
             const active = pathname?.startsWith(item.href)
             return (
               <Link
@@ -62,6 +63,10 @@ export default function AppShell({
           <button onClick={logout} className="text-xs text-neutral-400 hover:text-white">
             Log out
           </button>
+          <div className="mt-2 flex gap-2 text-[10px] text-neutral-600">
+            <Link href="/terms" className="hover:text-neutral-400">Terms</Link>
+            <Link href="/privacy" className="hover:text-neutral-400">Privacy</Link>
+          </div>
         </div>
       </div>
       <div className="ml-48 flex-1 min-h-screen">

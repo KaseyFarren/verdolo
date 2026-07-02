@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials, todayKey } from '@/lib/agency'
 
@@ -19,6 +20,8 @@ export default function SettingsClient({
   initialApiKey,
   initialDisplayName,
   initialAvatarUrl,
+  subscriptionStatus,
+  trialEndsAt,
 }: {
   orgId: string
   userId: string
@@ -27,6 +30,8 @@ export default function SettingsClient({
   initialApiKey: string
   initialDisplayName: string
   initialAvatarUrl: string
+  subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled' | null
+  trialEndsAt: string | null
 }) {
   const supabase = useMemo(() => createClient(), [])
   const isAdmin = role === 'admin' || role === 'owner'
@@ -96,6 +101,8 @@ export default function SettingsClient({
       <h1 className="text-xl font-semibold mb-6">Settings</h1>
 
       <ProfileSection orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} initialAvatarUrl={initialAvatarUrl} />
+
+      {role === 'owner' && <BillingSummary subscriptionStatus={subscriptionStatus} trialEndsAt={trialEndsAt} />}
 
       <Section label="AI Messages">
         <div className="text-sm font-medium mb-1">Anthropic API key</div>
@@ -301,6 +308,46 @@ function ProfileSection({
         </div>
       </Row>
       {error && <div className="text-xs text-red-400 mt-2">{error}</div>}
+    </Section>
+  )
+}
+
+function BillingSummary({
+  subscriptionStatus,
+  trialEndsAt,
+}: {
+  subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled' | null
+  trialEndsAt: string | null
+}) {
+  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0
+  const trialExpired = subscriptionStatus === 'trialing' && trialDaysLeft <= 0
+
+  let label = 'No subscription'
+  let color = 'text-neutral-400'
+  if (subscriptionStatus === 'trialing' && !trialExpired) {
+    label = `Free trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left`
+    color = 'text-emerald-400'
+  } else if (subscriptionStatus === 'active') {
+    label = 'Active subscription'
+    color = 'text-emerald-400'
+  } else if (subscriptionStatus === 'past_due') {
+    label = 'Payment past due'
+    color = 'text-amber-400'
+  } else {
+    label = 'Trial ended'
+    color = 'text-amber-400'
+  }
+
+  return (
+    <Section label="Billing">
+      <Row title="Plan" subtitle="£25/seat/month">
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-medium ${color}`}>{label}</span>
+          <Link href="/billing" className="text-xs rounded border border-white/10 px-2 py-1">
+            Manage →
+          </Link>
+        </div>
+      </Row>
     </Section>
   )
 }

@@ -34,6 +34,24 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+
+  // seat cap only applies once billing is live (active/past_due) — trials (local or Stripe)
+  // stay unlimited so a team can fully evaluate the product before paying for seats
+  const { data: org } = await admin.from('orgs').select('subscription_status, seats_purchased').eq('id', orgId).single()
+  if (org && (org.subscription_status === 'active' || org.subscription_status === 'past_due')) {
+    const { count: activeCount } = await admin
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('status', 'active')
+    if ((activeCount || 0) >= org.seats_purchased) {
+      return NextResponse.json(
+        { error: `You've used all ${org.seats_purchased} seat(s) on your plan. Add more seats in Billing to invite another teammate.` },
+        { status: 403 }
+      )
+    }
+  }
+
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/dashboard`,
   })
