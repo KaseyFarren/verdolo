@@ -2,6 +2,12 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
+export type Role = 'owner' | 'admin' | 'member'
+
+export function isAdminRole(role: Role) {
+  return role === 'owner' || role === 'admin'
+}
+
 export async function requireOrgContext() {
   const supabase = await createClient()
 
@@ -33,7 +39,7 @@ export async function requireOrgContext() {
     supabase,
     user,
     orgId: membership.org_id as string,
-    role: membership.role as 'admin' | 'member',
+    role: membership.role as Role,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     org: membership.orgs as any,
   }

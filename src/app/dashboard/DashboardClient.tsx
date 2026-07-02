@@ -32,6 +32,7 @@ type Client = {
 type Task = {
   id: string
   client_id: string | null
+  assigned_to: string | null
   title: string
   due_date: string
   priority: string
@@ -106,8 +107,13 @@ export default function DashboardClient({
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
-  const dashTasks = sortTasks(tasks.filter((t) => t.due_date === dashDate))
+  // Dashboard is everyone's personal "my day" view, not the full org workload (that's the
+  // Tasks page) — scope to tasks assigned to me + unassigned/shared ones, even for admins/owners
+  // who can otherwise fetch the whole org's tasks.
+  const dashTasks = sortTasks(tasks.filter((t) => t.due_date === dashDate && (t.assigned_to === userId || !t.assigned_to)))
   const dashPending = dashTasks.filter((t) => !t.done)
+  const dashPendingMine = dashPending.filter((t) => t.assigned_to !== null)
+  const dashPendingUnassigned = dashPending.filter((t) => t.assigned_to === null)
   const dashCompleted = dashTasks.filter((t) => t.done)
   const ringTotal = dashTasks.length
   const ringDone = dashCompleted.length
@@ -122,7 +128,7 @@ export default function DashboardClient({
     setQuickAddTitle('')
     const { data } = await supabase
       .from('tasks')
-      .insert({ org_id: orgId, title, due_date: dashDate, priority: 'Medium', quick: true, done: false })
+      .insert({ org_id: orgId, title, due_date: dashDate, priority: 'Medium', quick: true, done: false, assigned_to: userId })
       .select()
       .single()
     if (data) setTasks((prev) => [...prev, data as Task])
@@ -343,7 +349,7 @@ export default function DashboardClient({
             </button>
           </div>
         )}
-        {dashPending.map((t) => (
+        {dashPendingMine.map((t) => (
           <SimpleTaskRow
             key={t.id}
             t={t}
@@ -355,6 +361,23 @@ export default function DashboardClient({
             stopTimer={() => timer.stopRunning()}
           />
         ))}
+        {dashPendingUnassigned.length > 0 && (
+          <>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 mt-3 mb-1">Unassigned</div>
+            {dashPendingUnassigned.map((t) => (
+              <SimpleTaskRow
+                key={t.id}
+                t={t}
+                clientName={clients.find((c) => c.id === t.client_id)?.name}
+                onToggle={() => toggleTask(t)}
+                isTimerRunning={timer.running?.task_id === t.id}
+                elapsed={timer.elapsedFor(t.id)}
+                startTimer={() => timer.startForTask(t)}
+                stopTimer={() => timer.stopRunning()}
+              />
+            ))}
+          </>
+        )}
         {dashCompleted.length > 0 && (
           <>
             <div className="text-xs text-emerald-400 font-semibold uppercase mt-4 mb-2">Completed</div>

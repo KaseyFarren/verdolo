@@ -3,7 +3,7 @@ import { requireOrgContext } from '@/lib/org'
 import CalendarClient from './CalendarClient'
 
 export default async function CalendarPage() {
-  const { supabase, user, orgId, org } = await requireOrgContext()
+  const { supabase, user, orgId, role, org } = await requireOrgContext()
 
   const [{ data: clients }, { data: tasks }] = await Promise.all([
     supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),
@@ -11,7 +11,7 @@ export default async function CalendarPage() {
   ])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''}>
+    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
       <CalendarClient orgId={orgId} initialClients={clients ?? []} initialTasks={tasks ?? []} />
     </AppShell>
   )

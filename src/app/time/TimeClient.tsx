@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { todayKey } from '@/lib/agency'
+import { memberName, todayKey } from '@/lib/agency'
 
 type Client = { id: string; name: string }
 type Task = { id: string; title: string; client_id: string | null }
@@ -17,7 +17,7 @@ type Entry = {
   note: string | null
   billable: boolean
 }
-type Member = { user_id: string; invited_email: string | null }
+type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -75,7 +75,7 @@ export default function TimeClient({
 
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || '—'
   const taskTitle = (id: string | null) => tasks.find((t) => t.id === id)?.title || null
-  const memberEmail = (id: string) => members.find((m) => m.user_id === id)?.invited_email || id
+  const memberEmail = (id: string) => memberName(members.find((m) => m.user_id === id))
 
   async function startTimer() {
     if (!timerClientId) return
@@ -334,7 +334,7 @@ export default function TimeClient({
           <div className="rounded-lg border border-white/10 divide-y divide-white/10">
             {totalByMember.map((r) => (
               <div key={r.member.user_id} className="flex items-center justify-between px-3 py-2 text-sm">
-                <span>{r.member.invited_email}</span>
+                <span>{memberName(r.member)}</span>
                 <span className="text-neutral-400">{formatHours(r.seconds)}h</span>
               </div>
             ))}

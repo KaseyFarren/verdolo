@@ -64,6 +64,7 @@ const emptyForm = {
 export default function ClientsClient({
   orgId,
   userId,
+  canEdit,
   initialClients,
   initialNotes,
   completedTasks,
@@ -72,6 +73,7 @@ export default function ClientsClient({
 }: {
   orgId: string
   userId: string
+  canEdit: boolean
   initialClients: Client[]
   initialNotes: Note[]
   completedTasks: CompletedTask[]
@@ -290,40 +292,42 @@ export default function ClientsClient({
                 </div>
                 {selected.notes && <div className="text-xs text-neutral-400 mt-2 italic">{selected.notes}</div>}
               </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  className="text-xs rounded border border-white/10 px-2 py-1"
-                  onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
-                >
-                  {isChurned ? '▶ Activate' : '⏸ Churn'}
-                </button>
-                <button
-                  className="text-xs rounded border border-white/10 px-2 py-1"
-                  onClick={() => {
-                    setEditing(true)
-                    setEditForm({
-                      name: selected.name,
-                      business: selected.business || '',
-                      platform: selected.platform || '',
-                      service: selected.service || '',
-                      notes: selected.notes || '',
-                      tone: selected.tone || 'Friendly',
-                      talking_points: selected.talking_points || '',
-                      cadence_days: selected.cadence_days || 7,
-                      stage,
-                      retainer: selected.retainer_cents ? centsToDollars(selected.retainer_cents) : '',
-                      contract_ends: selected.contract_ends || '',
-                      contact_email: selected.contact_email || '',
-                      contact_domain: selected.contact_domain || '',
-                    })
-                  }}
-                >
-                  Edit
-                </button>
-                <button className="text-xs text-red-400 px-1" onClick={() => deleteClient(selected.id)}>
-                  ✕
-                </button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    className="text-xs rounded border border-white/10 px-2 py-1"
+                    onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
+                  >
+                    {isChurned ? '▶ Activate' : '⏸ Churn'}
+                  </button>
+                  <button
+                    className="text-xs rounded border border-white/10 px-2 py-1"
+                    onClick={() => {
+                      setEditing(true)
+                      setEditForm({
+                        name: selected.name,
+                        business: selected.business || '',
+                        platform: selected.platform || '',
+                        service: selected.service || '',
+                        notes: selected.notes || '',
+                        tone: selected.tone || 'Friendly',
+                        talking_points: selected.talking_points || '',
+                        cadence_days: selected.cadence_days || 7,
+                        stage,
+                        retainer: selected.retainer_cents ? centsToDollars(selected.retainer_cents) : '',
+                        contract_ends: selected.contract_ends || '',
+                        contact_email: selected.contact_email || '',
+                        contact_domain: selected.contact_domain || '',
+                      })
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button className="text-xs text-red-400 px-1" onClick={() => deleteClient(selected.id)}>
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -331,14 +335,15 @@ export default function ClientsClient({
         <div className="mb-5">
           <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Quick note</div>
           <textarea
-            className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm min-h-[70px]"
+            className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
             placeholder="Jot anything down…"
             value={selected.quick_note || ''}
+            disabled={!canEdit}
             onChange={(e) => {
               const val = e.target.value
               setClients((prev) => prev.map((c) => (c.id === selected.id ? { ...c, quick_note: val } : c)))
             }}
-            onBlur={(e) => updateClient(selected.id, { quick_note: e.target.value })}
+            onBlur={(e) => canEdit && updateClient(selected.id, { quick_note: e.target.value })}
           />
         </div>
 
@@ -445,14 +450,14 @@ export default function ClientsClient({
         <h1 className="text-xl font-semibold">
           Clients <span className="text-sm font-normal text-neutral-500">({clients.length})</span>
         </h1>
-        {!showAdd && (
+        {canEdit && !showAdd && (
           <button className="rounded-md bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={() => setShowAdd(true)}>
             + New client
           </button>
         )}
       </div>
 
-      {showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} />}
+      {canEdit && showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} />}
 
       {clients.length === 0 && !showAdd && <div className="text-sm text-neutral-500 py-6">No clients yet.</div>}
       {clients.map((c, i) => {

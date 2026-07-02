@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function InviteForm({ orgId }: { orgId: string }) {
+export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; canInviteOwner: boolean }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'member' | 'admin'>('member')
+  const [role, setRole] = useState<'member' | 'admin' | 'owner'>('member')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'sent'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -47,11 +47,12 @@ export default function InviteForm({ orgId }: { orgId: string }) {
         />
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as 'member' | 'admin')}
+          onChange={(e) => setRole(e.target.value as 'member' | 'admin' | 'owner')}
           className="rounded border px-2 py-2 text-sm"
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
+          {canInviteOwner && <option value="owner">Owner</option>}
         </select>
         <button
           type="submit"

@@ -46,6 +46,10 @@ export function getInitials(name = '') {
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
 }
 
+export function memberName(member?: { display_name?: string | null; invited_email?: string | null } | null) {
+  return member?.display_name || member?.invited_email || '—'
+}
+
 export function greeting(d = new Date()) {
   const h = d.getHours()
   if (h < 12) return 'Good morning'
@@ -78,6 +82,13 @@ export function mrrCentsTotal(clients: { stage?: string | null; status?: string 
   return clients
     .filter((c) => !['Churned', 'Lead'].includes(getStage(c)))
     .reduce((sum, c) => sum + (Number(c.retainer_cents) || 0), 0)
+}
+
+// strips retainer amounts before client rows are sent to a browser session that shouldn't see
+// revenue — server components serialize all props into the RSC payload regardless of what's
+// rendered, so this has to happen before the data leaves the server, not just in the UI
+export function stripRetainer<T extends { retainer_cents?: number | null }>(clients: T[]): T[] {
+  return clients.map((c) => ({ ...c, retainer_cents: null }))
 }
 
 export function centsToDollars(cents?: number | null) {

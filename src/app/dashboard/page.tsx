@@ -1,11 +1,11 @@
 import AppShell from '@/components/AppShell'
 import { requireOrgContext } from '@/lib/org'
 import { getOrgAnthropicKey } from '@/lib/orgSecrets'
-import { getOffsetDate } from '@/lib/agency'
+import { getOffsetDate, stripRetainer } from '@/lib/agency'
 import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage() {
-  const { supabase, user, orgId, org } = await requireOrgContext()
+  const { supabase, user, orgId, role, org } = await requireOrgContext()
 
   const weekStart = getOffsetDate(-7)
   const [{ data: clients }, { data: tasks }, { data: recurring }, { data: timeEntries }, apiKey] = await Promise.all([
@@ -21,12 +21,15 @@ export default async function DashboardPage() {
     getOrgAnthropicKey(orgId),
   ])
 
+  // MRR is revenue — only owners see it, so admins/members never even receive the retainer figures
+  const visibleClients = role === 'owner' ? clients ?? [] : stripRetainer(clients ?? [])
+
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''}>
+    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
       <DashboardClient
         orgId={orgId}
         userId={user.id}
-        initialClients={clients ?? []}
+        initialClients={visibleClients}
         initialTasks={tasks ?? []}
         initialRecurring={recurring ?? []}
         weekTimeEntries={timeEntries ?? []}

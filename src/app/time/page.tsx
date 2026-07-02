@@ -1,5 +1,5 @@
 import AppShell from '@/components/AppShell'
-import { requireOrgContext } from '@/lib/org'
+import { isAdminRole, requireOrgContext } from '@/lib/org'
 import TimeClient from './TimeClient'
 
 export default async function TimePage() {
@@ -14,15 +14,15 @@ export default async function TimePage() {
       .eq('org_id', orgId)
       .order('started_at', { ascending: false })
       .limit(200),
-    supabase.from('org_members').select('user_id, invited_email').eq('org_id', orgId).eq('status', 'active'),
+    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
   ])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''}>
+    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
       <TimeClient
         orgId={orgId}
         userId={user.id}
-        isAdmin={role === 'admin'}
+        isAdmin={isAdminRole(role)}
         clients={clients ?? []}
         tasks={tasks ?? []}
         initialEntries={entries ?? []}

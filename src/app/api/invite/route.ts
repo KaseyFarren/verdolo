@@ -24,8 +24,13 @@ export async function POST(request: Request) {
     .eq('status', 'active')
     .maybeSingle()
 
-  if (membership?.role !== 'admin') {
+  if (membership?.role !== 'admin' && membership?.role !== 'owner') {
     return NextResponse.json({ error: 'Only admins can invite members' }, { status: 403 })
+  }
+
+  const invitedRole = role === 'owner' || role === 'admin' ? role : 'member'
+  if (invitedRole === 'owner' && membership.role !== 'owner') {
+    return NextResponse.json({ error: 'Only an owner can invite another owner' }, { status: 403 })
   }
 
   const admin = createAdminClient()
@@ -40,7 +45,7 @@ export async function POST(request: Request) {
   const { error: memberError } = await admin.from('org_members').insert({
     org_id: orgId,
     user_id: invited.user.id,
-    role: role === 'admin' ? 'admin' : 'member',
+    role: invitedRole,
     status: 'active',
     invited_email: email,
     joined_at: new Date().toISOString(),

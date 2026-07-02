@@ -10,21 +10,24 @@ const NAV = [
   { href: '/calendar', icon: '📅', label: 'Calendar' },
   { href: '/clients', icon: '👥', label: 'Clients' },
   { href: '/time', icon: '⏱️', label: 'Time' },
-  { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team' },
+  { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
   { href: '/settings', icon: '⚙️', label: 'Settings' },
 ]
 
 export default function AppShell({
   orgName,
   userEmail,
+  role,
   children,
 }: {
   orgName: string
   userEmail: string
+  role?: 'owner' | 'admin' | 'member'
   children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const isAdmin = role === 'owner' || role === 'admin'
 
   async function logout() {
     const supabase = createClient()
@@ -38,7 +41,7 @@ export default function AppShell({
       <div className="fixed inset-y-0 left-0 w-48 border-r border-white/10 bg-neutral-900/60 flex flex-col">
         <div className="px-4 py-4 font-semibold text-sm">{orgName}</div>
         <nav className="flex-1 flex flex-col gap-1 px-2">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
             const active = pathname?.startsWith(item.href)
             return (
               <Link

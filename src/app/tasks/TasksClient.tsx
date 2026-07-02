@@ -8,13 +8,14 @@ import {
   PRIORITY,
   formatDate,
   getOffsetDate,
+  memberName,
   recurringFrequencyLabel,
   sortTasks,
   todayKey,
 } from '@/lib/agency'
 
 type Client = { id: string; name: string }
-type Member = { user_id: string; invited_email: string | null }
+type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type Task = {
   id: string
   client_id: string | null
@@ -46,6 +47,7 @@ const emptyRecurringForm = { title: '', clientId: '', assignedTo: '', priority: 
 export default function TasksClient({
   orgId,
   userId,
+  isAdmin,
   initialClients,
   initialTasks,
   initialRecurring,
@@ -54,6 +56,7 @@ export default function TasksClient({
 }: {
   orgId: string
   userId: string
+  isAdmin: boolean
   initialClients: Client[]
   initialTasks: Task[]
   initialRecurring: Recurring[]
@@ -87,7 +90,7 @@ export default function TasksClient({
   }, [])
 
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || ''
-  const memberEmail = (id: string | null) => members.find((m) => m.user_id === id)?.invited_email || ''
+  const memberEmail = (id: string | null) => memberName(members.find((m) => m.user_id === id))
 
   async function addTask() {
     if (!taskForm.title.trim()) return
@@ -97,7 +100,7 @@ export default function TasksClient({
         org_id: orgId,
         title: taskForm.title,
         client_id: taskForm.clientId || null,
-        assigned_to: taskForm.assignedTo || null,
+        assigned_to: taskForm.assignedTo || (taskMode === 'quick' ? userId : null),
         due_date: taskForm.dueDate,
         priority: taskForm.priority,
         notes: taskForm.notes,
@@ -181,6 +184,13 @@ export default function TasksClient({
     if (filter === 'today') return [{ label: 'Today', items: sortTasks(tasks.filter((t) => t.due_date === today && !t.done)) }]
     if (filter === 'completed')
       return [{ label: 'Completed', items: [...tasks.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)) }]
+    if (filter.startsWith('assignee:')) {
+      const key = filter.slice('assignee:'.length)
+      const label = key === 'mine' ? 'Mine' : key === 'unassigned' ? 'Unassigned' : memberEmail(key)
+      const match = (t: Task) => (key === 'mine' ? t.assigned_to === userId : key === 'unassigned' ? !t.assigned_to : t.assigned_to === key)
+      const f = sortTasks(tasks.filter(match)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
+      return [{ label, items: f }]
+    }
     if (filter !== 'all') {
       const f = sortTasks(tasks.filter((t) => t.client_id === filter)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
       return [{ label: clientName(filter), items: f }]
@@ -197,6 +207,44 @@ export default function TasksClient({
   }
 
   const buckets = visibleTasks()
+  // members only ever fetch their own + unassigned tasks (RLS-scoped); split those apart with
+  // a header so "shared/unclaimed" work reads distinctly from "assigned to me". Admins/owners
+  // see everyone's tasks flat (each row already shows its assignee) and use the chips instead.
+  function splitBucket(items: Task[]) {
+    if (isAdmin) return { mine: items, unassigned: [] as Task[] }
+    return { mine: items.filter((t) => t.assigned_to !== null), unassigned: items.filter((t) => t.assigned_to === null) }
+  }
+
+  function renderTaskRow(t: Task) {
+    return (
+      <TaskRow
+        key={t.id}
+        t={t}
+        currentUserId={userId}
+        clientName={clientName}
+        memberEmail={memberEmail}
+        isEditing={editingTaskId === t.id}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        clients={clients}
+        members={members}
+        startEdit={() => {
+          setEditingTaskId(t.id)
+          setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
+        }}
+        cancelEdit={() => setEditingTaskId(null)}
+        save={() => updateTask(t.id, editForm)}
+        complete={() => completeTask(t)}
+        uncomplete={() => uncompleteTask(t)}
+        del={() => deleteTask(t.id)}
+        snooze={() => snoozeTask(t)}
+        isTimerRunning={timer.running?.task_id === t.id}
+        elapsed={timer.elapsedFor(t.id)}
+        startTimer={() => timer.startForTask(t)}
+        stopTimer={() => timer.stopRunning()}
+      />
+    )
+  }
 
   return (
     <div>
@@ -260,7 +308,7 @@ export default function TasksClient({
                 <option value="">Unassigned</option>
                 {members.map((m) => (
                   <option key={m.user_id} value={m.user_id}>
-                    {m.invited_email}
+                    {memberName(m)}
                   </option>
                 ))}
               </select>
@@ -295,6 +343,7 @@ export default function TasksClient({
           ['today', 'Today'],
           ['overdue', overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue'],
           ['completed', 'Done'],
+          ...(isAdmin ? [['assignee:mine', 'Mine'], ['assignee:unassigned', 'Unassigned']] : []),
         ].map(([k, l]) => (
           <button
             key={k}
@@ -306,6 +355,20 @@ export default function TasksClient({
             {l}
           </button>
         ))}
+        {isAdmin &&
+          members
+            .filter((m) => m.user_id !== userId)
+            .map((m) => (
+              <button
+                key={m.user_id}
+                onClick={() => setFilter(`assignee:${m.user_id}`)}
+                className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
+                  filter === `assignee:${m.user_id}` ? 'bg-white text-black border-white' : 'border-white/15 text-neutral-400'
+                }`}
+              >
+                {memberName(m)}
+              </button>
+            ))}
         {clients.map((c) => (
           <button
             key={c.id}
@@ -320,38 +383,21 @@ export default function TasksClient({
       </div>
 
       {buckets.length === 0 && <div className="text-sm text-neutral-500 py-6 text-center">No tasks here.</div>}
-      {buckets.map((b) => (
-        <div key={b.label} className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2 pb-2 border-b border-white/10">{b.label}</div>
-          {b.items.map((t) => (
-            <TaskRow
-              key={t.id}
-              t={t}
-              clientName={clientName}
-              memberEmail={memberEmail}
-              isEditing={editingTaskId === t.id}
-              editForm={editForm}
-              setEditForm={setEditForm}
-              clients={clients}
-              members={members}
-              startEdit={() => {
-                setEditingTaskId(t.id)
-                setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
-              }}
-              cancelEdit={() => setEditingTaskId(null)}
-              save={() => updateTask(t.id, editForm)}
-              complete={() => completeTask(t)}
-              uncomplete={() => uncompleteTask(t)}
-              del={() => deleteTask(t.id)}
-              snooze={() => snoozeTask(t)}
-              isTimerRunning={timer.running?.task_id === t.id}
-              elapsed={timer.elapsedFor(t.id)}
-              startTimer={() => timer.startForTask(t)}
-              stopTimer={() => timer.stopRunning()}
-            />
-          ))}
-        </div>
-      ))}
+      {buckets.map((b) => {
+        const { mine, unassigned } = splitBucket(b.items)
+        return (
+          <div key={b.label} className="mb-5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2 pb-2 border-b border-white/10">{b.label}</div>
+            {mine.map((t) => renderTaskRow(t))}
+            {unassigned.length > 0 && (
+              <>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 mt-3 mb-1">Unassigned</div>
+                {unassigned.map((t) => renderTaskRow(t))}
+              </>
+            )}
+          </div>
+        )
+      })}
 
       <div className="mt-8">
         <div className="flex items-center justify-between mb-2">
@@ -412,7 +458,7 @@ export default function TasksClient({
                 <option value="">Unassigned</option>
                 {members.map((m) => (
                   <option key={m.user_id} value={m.user_id}>
-                    {m.invited_email}
+                    {memberName(m)}
                   </option>
                 ))}
               </select>
@@ -506,6 +552,7 @@ export default function TasksClient({
 
 function TaskRow({
   t,
+  currentUserId,
   clientName,
   memberEmail,
   isEditing,
@@ -526,6 +573,7 @@ function TaskRow({
   stopTimer,
 }: {
   t: Task
+  currentUserId: string
   clientName: (id: string | null) => string
   memberEmail: (id: string | null) => string
   isEditing: boolean
@@ -584,7 +632,7 @@ function TaskRow({
             <option value="">Unassigned</option>
             {members.map((m) => (
               <option key={m.user_id} value={m.user_id}>
-                {m.invited_email}
+                {memberName(m)}
               </option>
             ))}
           </select>
@@ -634,7 +682,7 @@ function TaskRow({
         </div>
         <div className="text-xs text-neutral-500 mt-0.5 flex gap-2 flex-wrap">
           {t.client_id && <span>{clientName(t.client_id)}</span>}
-          {t.assigned_to && <span>→ {memberEmail(t.assigned_to)}</span>}
+          {t.assigned_to && t.assigned_to !== currentUserId && <span>→ {memberEmail(t.assigned_to)}</span>}
           <span>{formatDate(t.due_date)}</span>
           {t.done && t.completed_at && <span className="text-emerald-400">Done {new Date(t.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
         </div>
