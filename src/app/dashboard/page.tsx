@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   const visibleClients = role === 'owner' ? clients ?? [] : stripRetainer(clients ?? [])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <DashboardClient
         orgId={orgId}
         userId={user.id}

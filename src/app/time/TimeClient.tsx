@@ -64,6 +64,13 @@ export default function TimeClient({
   const [manualNote, setManualNote] = useState('')
   const [manualBillable, setManualBillable] = useState(true)
 
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editClientId, setEditClientId] = useState('')
+  const [editTaskId, setEditTaskId] = useState('')
+  const [editHours, setEditHours] = useState('')
+  const [editNote, setEditNote] = useState('')
+  const [editBillable, setEditBillable] = useState(true)
+
   const running = entries.find((e) => e.user_id === userId && e.ended_at === null) || null
 
   useEffect(() => {
@@ -146,6 +153,37 @@ export default function TimeClient({
   async function deleteEntry(id: string) {
     await supabase.from('time_entries').delete().eq('id', id)
     setEntries((prev) => prev.filter((e) => e.id !== id))
+  }
+
+  function startEdit(e: Entry) {
+    setEditingId(e.id)
+    setEditClientId(e.client_id || '')
+    setEditTaskId(e.task_id || '')
+    setEditHours(e.duration_seconds ? (e.duration_seconds / 3600).toFixed(2) : '')
+    setEditNote(e.note || '')
+    setEditBillable(e.billable)
+  }
+
+  async function updateEntry(e: Entry) {
+    const hours = parseFloat(editHours)
+    if (!editClientId || !hours || hours <= 0) return
+    const durationSeconds = Math.round(hours * 3600)
+    const endedAt = new Date(new Date(e.started_at).getTime() + durationSeconds * 1000).toISOString()
+    const { data } = await supabase
+      .from('time_entries')
+      .update({
+        client_id: editClientId,
+        task_id: editTaskId || null,
+        duration_seconds: durationSeconds,
+        ended_at: endedAt,
+        note: editNote || null,
+        billable: editBillable,
+      })
+      .eq('id', e.id)
+      .select()
+      .single()
+    if (data) setEntries((prev) => prev.map((x) => (x.id === e.id ? (data as Entry) : x)))
+    setEditingId(null)
   }
 
   const completed = entries.filter((e) => e.ended_at && e.duration_seconds)
@@ -347,25 +385,97 @@ export default function TimeClient({
       {grouped.map((g) => (
         <div key={g.date} className="mb-4">
           <div className="text-xs text-neutral-500 mb-1">{g.date}</div>
-          {g.items.map((e) => (
-            <div key={e.id} className="flex items-center gap-3 py-2 border-b border-white/10 group">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm">
-                  {clientName(e.client_id)}
-                  {e.task_id && <span className="text-neutral-500"> · {taskTitle(e.task_id)}</span>}
-                  {!e.billable && <span className="ml-2 text-[10px] text-neutral-500">non-billable</span>}
+          {g.items.map((e) => {
+            const canEdit = isAdmin || e.user_id === userId
+            if (editingId === e.id) {
+              const editTasks = tasks.filter((t) => t.client_id === editClientId)
+              return (
+                <div key={e.id} className="rounded-lg border border-white/10 bg-white/5 p-3 mb-2">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <select
+                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      value={editClientId}
+                      onChange={(ev) => {
+                        setEditClientId(ev.target.value)
+                        setEditTaskId('')
+                      }}
+                    >
+                      <option value="">Select client…</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      value={editTaskId}
+                      onChange={(ev) => setEditTaskId(ev.target.value)}
+                      disabled={!editClientId}
+                    >
+                      <option value="">No task</option>
+                      {editTasks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      placeholder="Hours"
+                      value={editHours}
+                      onChange={(ev) => setEditHours(ev.target.value)}
+                    />
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={editBillable} onChange={(ev) => setEditBillable(ev.target.checked)} />
+                      Billable
+                    </label>
+                  </div>
+                  <input
+                    className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+                    placeholder="Note (optional)"
+                    value={editNote}
+                    onChange={(ev) => setEditNote(ev.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </button>
+                    <button className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={() => updateEntry(e)}>
+                      Save
+                    </button>
+                  </div>
                 </div>
-                {e.note && <div className="text-xs text-neutral-500">{e.note}</div>}
-                {isAdmin && <div className="text-xs text-neutral-600">{memberEmail(e.user_id)}</div>}
+              )
+            }
+            return (
+              <div key={e.id} className="flex items-center gap-3 py-2 border-b border-white/10 group">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">
+                    {clientName(e.client_id)}
+                    {e.task_id && <span className="text-neutral-500"> · {taskTitle(e.task_id)}</span>}
+                    {!e.billable && <span className="ml-2 text-[10px] text-neutral-500">non-billable</span>}
+                  </div>
+                  {e.note && <div className="text-xs text-neutral-500">{e.note}</div>}
+                  {isAdmin && <div className="text-xs text-neutral-600">{memberEmail(e.user_id)}</div>}
+                </div>
+                <div className="text-sm text-neutral-400 shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
+                {canEdit && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                    <button className="text-xs text-neutral-400 px-1" onClick={() => startEdit(e)}>
+                      ✏
+                    </button>
+                    <button className="text-xs text-red-400 px-1" onClick={() => deleteEntry(e.id)}>
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="text-sm text-neutral-400 shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
-              {(isAdmin || e.user_id === userId) && (
-                <button className="text-xs text-red-400 opacity-0 group-hover:opacity-100 shrink-0" onClick={() => deleteEntry(e.id)}>
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       ))}
     </div>

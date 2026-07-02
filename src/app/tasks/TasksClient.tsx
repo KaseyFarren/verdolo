@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
@@ -30,6 +31,7 @@ type Task = {
   auto_type: string | null
   recurring_id: string | null
   quick: boolean
+  skipped: boolean
 }
 type Recurring = {
   id: string
@@ -78,6 +80,13 @@ export default function TasksClient({
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null)
   const [editRecurringForm, setEditRecurringForm] = useState<Record<string, unknown>>({})
   const timer = useTaskTimer(supabase, orgId, userId)
+
+  // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
+  // re-runs the server component and gives us a new initialTasks array, but useState's
+  // initializer only runs on mount — without this, the prop update never reaches local state.
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
 
   const today = todayKey()
 
@@ -138,6 +147,9 @@ export default function TasksClient({
   async function snoozeTask(t: Task) {
     await updateTask(t.id, { due_date: getOffsetDate(1), done: false })
   }
+  async function skipTask(t: Task) {
+    await updateTask(t.id, { done: true, skipped: true })
+  }
 
   async function addRecurring() {
     if (!recurringForm.title.trim()) return
@@ -177,32 +189,35 @@ export default function TasksClient({
     setTasks((prev) => prev.filter((t) => t.recurring_id !== id))
   }
 
-  const overdueCount = tasks.filter((t) => t.due_date < today && !t.done).length
+  // skipped instances stay in the DB (so the recurring-instance upsert won't regenerate them)
+  // but are hidden everywhere in the UI — they weren't actually done, just dismissed
+  const visible = tasks.filter((t) => !t.skipped)
+  const overdueCount = visible.filter((t) => t.due_date < today && !t.done).length
 
   function visibleTasks(): { label: string; items: Task[] }[] {
-    if (filter === 'overdue') return [{ label: 'Overdue', items: sortTasks(tasks.filter((t) => t.due_date < today && !t.done)) }]
-    if (filter === 'today') return [{ label: 'Today', items: sortTasks(tasks.filter((t) => t.due_date === today && !t.done)) }]
+    if (filter === 'overdue') return [{ label: 'Overdue', items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)) }]
+    if (filter === 'today') return [{ label: 'Today', items: sortTasks(visible.filter((t) => t.due_date === today && !t.done)) }]
     if (filter === 'completed')
-      return [{ label: 'Completed', items: [...tasks.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)) }]
+      return [{ label: 'Completed', items: [...visible.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)) }]
     if (filter.startsWith('assignee:')) {
       const key = filter.slice('assignee:'.length)
       const label = key === 'mine' ? 'Mine' : key === 'unassigned' ? 'Unassigned' : memberEmail(key)
       const match = (t: Task) => (key === 'mine' ? t.assigned_to === userId : key === 'unassigned' ? !t.assigned_to : t.assigned_to === key)
-      const f = sortTasks(tasks.filter(match)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
+      const f = sortTasks(visible.filter(match)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
       return [{ label, items: f }]
     }
     if (filter !== 'all') {
-      const f = sortTasks(tasks.filter((t) => t.client_id === filter)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
+      const f = sortTasks(visible.filter((t) => t.client_id === filter)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
       return [{ label: clientName(filter), items: f }]
     }
     const tomorrow = getOffsetDate(1)
     const yesterday = getOffsetDate(-1)
     return [
-      { label: 'Overdue', items: sortTasks(tasks.filter((t) => t.due_date < today && !t.done)) },
-      { label: 'Yesterday', items: sortTasks(tasks.filter((t) => t.due_date === yesterday && t.done)) },
-      { label: 'Today', items: sortTasks(tasks.filter((t) => t.due_date === today)) },
-      { label: 'Tomorrow', items: sortTasks(tasks.filter((t) => t.due_date === tomorrow)) },
-      { label: 'Upcoming', items: sortTasks(tasks.filter((t) => t.due_date > tomorrow)) },
+      { label: 'Overdue', items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)) },
+      { label: 'Yesterday', items: sortTasks(visible.filter((t) => t.due_date === yesterday && t.done)) },
+      { label: 'Today', items: sortTasks(visible.filter((t) => t.due_date === today)) },
+      { label: 'Tomorrow', items: sortTasks(visible.filter((t) => t.due_date === tomorrow)) },
+      { label: 'Upcoming', items: sortTasks(visible.filter((t) => t.due_date > tomorrow)) },
     ].filter((b) => b.items.length > 0)
   }
 
@@ -238,6 +253,7 @@ export default function TasksClient({
         uncomplete={() => uncompleteTask(t)}
         del={() => deleteTask(t.id)}
         snooze={() => snoozeTask(t)}
+        skip={t.is_auto || t.recurring_id ? () => skipTask(t) : undefined}
         isTimerRunning={timer.running?.task_id === t.id}
         elapsed={timer.elapsedFor(t.id)}
         startTimer={() => timer.startForTask(t)}
@@ -388,11 +404,11 @@ export default function TasksClient({
         return (
           <div key={b.label} className="mb-5">
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2 pb-2 border-b border-white/10">{b.label}</div>
-            {mine.map((t) => renderTaskRow(t))}
+            <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
             {unassigned.length > 0 && (
               <>
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 mt-3 mb-1">Unassigned</div>
-                {unassigned.map((t) => renderTaskRow(t))}
+                <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
               </>
             )}
           </div>
@@ -567,6 +583,7 @@ function TaskRow({
   uncomplete,
   del,
   snooze,
+  skip,
   isTimerRunning,
   elapsed,
   startTimer,
@@ -588,6 +605,7 @@ function TaskRow({
   uncomplete: () => void
   del: () => void
   snooze: () => void
+  skip?: () => void
   isTimerRunning: boolean
   elapsed: string | null
   startTimer: () => void
@@ -665,7 +683,14 @@ function TaskRow({
   const priorityColor = t.priority === 'High' ? 'text-red-400' : t.priority === 'Medium' ? 'text-amber-400' : 'text-emerald-400'
 
   return (
-    <div className={`flex gap-3 items-start py-2.5 border-b border-white/10 group ${t.done ? 'opacity-45' : ''} ${isTimerRunning ? 'bg-emerald-500/5' : ''}`}>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
+      exit={{ opacity: 0, x: -8 }}
+      transition={{ duration: 0.15 }}
+      className={`flex gap-3 items-start py-2.5 border-b border-white/10 group ${isTimerRunning ? 'bg-emerald-500/5' : ''}`}
+    >
       <button
         onClick={() => (t.done ? uncomplete() : complete())}
         className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-500'}`}
@@ -700,8 +725,13 @@ function TaskRow({
             </button>
           ))}
         {!t.done && (
-          <button title="Snooze" className="text-xs text-neutral-500 px-1" onClick={snooze}>
+          <button title="Snooze — push to tomorrow" className="text-xs text-neutral-500 px-1" onClick={snooze}>
             ⏭
+          </button>
+        )}
+        {!t.done && skip && (
+          <button title="Skip this occurrence" className="text-xs text-neutral-500 px-1" onClick={skip}>
+            ⤼
           </button>
         )}
         <button className="text-xs text-neutral-400 px-1" onClick={startEdit}>
@@ -711,6 +741,6 @@ function TaskRow({
           ✕
         </button>
       </div>
-    </div>
+    </motion.div>
   )
 }

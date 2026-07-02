@@ -1,10 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { clearPin, getIdleMinutes, hasPinSet, setIdleMinutes, setPin } from '@/components/PinLock'
 import { getInitials, todayKey } from '@/lib/agency'
+
+const ACCENT_PRESETS = ['#7c5cbf', '#3d7fbf', '#2a9a6e', '#bf5c7c', '#bf8c3d', '#e0505f']
 
 type Settings = {
   eod_hour?: number
@@ -22,6 +27,7 @@ export default function SettingsClient({
   initialAvatarUrl,
   subscriptionStatus,
   trialEndsAt,
+  initialAccentColor,
 }: {
   orgId: string
   userId: string
@@ -32,8 +38,11 @@ export default function SettingsClient({
   initialAvatarUrl: string
   subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled' | null
   trialEndsAt: string | null
+  initialAccentColor: string
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
+  const confirm = useConfirm()
   const isAdmin = role === 'admin' || role === 'owner'
   const [eodHour, setEodHour] = useState(settings.eod_hour ?? 17)
   const [excludeWeekends, setExcludeWeekends] = useState(settings.exclude_weekends ?? true)
@@ -42,6 +51,7 @@ export default function SettingsClient({
   const [hasKey, setHasKey] = useState(!!initialApiKey)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [accentColor, setAccentColor] = useState(initialAccentColor)
 
   async function saveSettings(next: Partial<Settings>) {
     if (!isAdmin) return
@@ -49,6 +59,14 @@ export default function SettingsClient({
     await supabase.from('orgs').update({ settings: merged }).eq('id', orgId)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
+  }
+
+  async function saveAccentColor(color: string) {
+    if (!isAdmin) return
+    setAccentColor(color)
+    await supabase.from('orgs').update({ accent_color: color }).eq('id', orgId)
+    router.refresh()
+    toast.success('Accent color updated')
   }
 
   async function saveApiKey() {
@@ -84,16 +102,25 @@ export default function SettingsClient({
   }
 
   async function clearCompleted() {
-    if (!window.confirm('Clear all completed tasks?')) return
+    const ok = await confirm({ message: 'Clear all completed tasks?', confirmLabel: 'Clear' })
+    if (!ok) return
     await supabase.from('tasks').delete().eq('org_id', orgId).eq('done', true)
+    toast.success('Completed tasks cleared')
   }
 
   async function resetAll() {
     if (!isAdmin) return
-    if (!window.confirm('Delete ALL clients, tasks, and notes for this org? This cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Delete all org data?',
+      message: 'This permanently deletes every client, task, and note for this org. This cannot be undone.',
+      confirmLabel: 'Delete everything',
+      danger: true,
+    })
+    if (!ok) return
     await supabase.from('tasks').delete().eq('org_id', orgId)
     await supabase.from('client_notes').delete().eq('org_id', orgId)
     await supabase.from('clients').delete().eq('org_id', orgId)
+    toast.success('All org data deleted')
   }
 
   return (
@@ -102,7 +129,33 @@ export default function SettingsClient({
 
       <ProfileSection orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} initialAvatarUrl={initialAvatarUrl} />
 
+      {isAdmin && (
+        <Section label="Appearance">
+          <Row title="Accent color" subtitle="Used for links, focus states, and the active nav highlight">
+            <div className="flex items-center gap-2">
+              {ACCENT_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => saveAccentColor(c)}
+                  className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{ background: c, borderColor: accentColor === c ? '#fff' : 'transparent' }}
+                  aria-label={c}
+                />
+              ))}
+              <input
+                type="color"
+                value={accentColor}
+                onChange={(e) => saveAccentColor(e.target.value)}
+                className="h-6 w-6 rounded-full border-0 bg-transparent p-0 cursor-pointer"
+              />
+            </div>
+          </Row>
+        </Section>
+      )}
+
       {role === 'owner' && <BillingSummary subscriptionStatus={subscriptionStatus} trialEndsAt={trialEndsAt} />}
+
+      <SecuritySection />
 
       <Section label="AI Messages">
         <div className="text-sm font-medium mb-1">Anthropic API key</div>
@@ -308,6 +361,122 @@ function ProfileSection({
         </div>
       </Row>
       {error && <div className="text-xs text-red-400 mt-2">{error}</div>}
+    </Section>
+  )
+}
+
+function SecuritySection() {
+  const confirm = useConfirm()
+  const [hasPin, setHasPin] = useState(false)
+  const [idleMinutes, setIdleMinutesState] = useState(5)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [changing, setChanging] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setHasPin(hasPinSet())
+    setIdleMinutesState(getIdleMinutes())
+  }, [])
+
+  async function savePin() {
+    setError(null)
+    if (!/^\d{4,6}$/.test(newPin)) {
+      setError('PIN must be 4-6 digits')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setError('PINs don’t match')
+      return
+    }
+    await setPin(newPin)
+    setHasPin(true)
+    setChanging(false)
+    setNewPin('')
+    setConfirmPin('')
+    toast.success('PIN set for this device')
+  }
+
+  async function removePin() {
+    const ok = await confirm({ title: 'Remove PIN lock?', message: 'The app will no longer lock on this device.', confirmLabel: 'Remove', danger: true })
+    if (!ok) return
+    clearPin()
+    setHasPin(false)
+    toast.success('PIN removed')
+  }
+
+  function changeIdle(v: number) {
+    setIdleMinutesState(v)
+    setIdleMinutes(v)
+  }
+
+  return (
+    <Section label="Security">
+      <Row title="Device PIN lock" subtitle="Locks this browser after inactivity — a quick deterrent, not a replacement for your login">
+        {hasPin && !changing ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-emerald-400">● PIN set</span>
+            <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={() => setChanging(true)}>
+              Change
+            </button>
+            <button className="text-xs text-red-400" onClick={removePin}>
+              Remove
+            </button>
+          </div>
+        ) : (
+          <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={() => setChanging(true)}>
+            {changing ? 'Cancel' : 'Set PIN'}
+          </button>
+        )}
+      </Row>
+      {changing && (
+        <div className="pt-2.5">
+          <div className="flex gap-2 mb-2">
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="New PIN"
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="Confirm PIN"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+              className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+            />
+          </div>
+          {error && <div className="text-xs text-red-400 mb-2">{error}</div>}
+          <div className="flex gap-2">
+            <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => { setChanging(false); setError(null) }}>
+              Cancel
+            </button>
+            <button className="rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={savePin}>
+              Save PIN
+            </button>
+          </div>
+        </div>
+      )}
+      {hasPin && (
+        <Row title="Lock after" subtitle="Minutes of inactivity before locking">
+          <select
+            value={idleMinutes}
+            onChange={(e) => changeIdle(Number(e.target.value))}
+            className="rounded border border-white/10 bg-black/30 px-2 py-1.5 text-sm"
+          >
+            {[2, 5, 10, 15, 30].map((m) => (
+              <option key={m} value={m}>
+                {m} min
+              </option>
+            ))}
+          </select>
+        </Row>
+      )}
     </Section>
   )
 }

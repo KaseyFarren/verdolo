@@ -18,7 +18,7 @@ export default async function TimePage() {
   ])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <TimeClient
         orgId={orgId}
         userId={user.id}

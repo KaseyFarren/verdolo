@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { getInitials, memberName } from '@/lib/agency'
 
 type Member = {
@@ -26,19 +28,38 @@ export default function MembersList({
   canManageOwners: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const confirm = useConfirm()
   const [rows, setRows] = useState(members)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
+  // router.refresh() after inviting gives a new `members` array, but useState's initializer
+  // only runs on mount — without this, a fresh invite won't show up until a manual reload.
+  useEffect(() => {
+    setRows(members)
+  }, [members])
+
   async function changeRole(m: Member, role: 'owner' | 'admin' | 'member') {
     const { data } = await supabase.from('org_members').update({ role }).eq('id', m.id).select().single()
-    if (data) setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+    if (data) {
+      setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+      toast.success(`${memberName(m)} is now ${role}`)
+    }
   }
 
   async function removeMember(m: Member) {
-    if (!window.confirm(`Remove ${memberName(m)} from the team?`)) return
+    const ok = await confirm({
+      title: `Remove ${memberName(m)}?`,
+      message: 'They will lose access to this organization immediately.',
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     setRemovingId(m.id)
     const { error } = await supabase.from('org_members').delete().eq('id', m.id)
-    if (!error) setRows((prev) => prev.filter((r) => r.id !== m.id))
+    if (!error) {
+      setRows((prev) => prev.filter((r) => r.id !== m.id))
+      toast.success(`${memberName(m)} removed`)
+    }
     setRemovingId(null)
   }
 

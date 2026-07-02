@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, motion } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
@@ -40,6 +41,7 @@ type Task = {
   completed_at: string | null
   is_auto: boolean
   auto_type: string | null
+  skipped: boolean
 }
 type Recurring = { id: string; title: string; client_id: string | null; priority: string; frequency: string; notes: string | null }
 type WeekTimeEntry = { client_id: string | null; duration_seconds: number | null }
@@ -67,6 +69,13 @@ export default function DashboardClient({
   const [clients] = useState<Client[]>(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const timer = useTaskTimer(supabase, orgId, userId)
+
+  // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
+  // re-runs the server component and gives us a new initialTasks array, but useState's
+  // initializer only runs on mount — without this, the prop update never reaches local state.
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
 
   useEffect(() => {
     ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, excludeWeekends).then(async () => {
@@ -110,7 +119,7 @@ export default function DashboardClient({
   // Dashboard is everyone's personal "my day" view, not the full org workload (that's the
   // Tasks page) — scope to tasks assigned to me + unassigned/shared ones, even for admins/owners
   // who can otherwise fetch the whole org's tasks.
-  const dashTasks = sortTasks(tasks.filter((t) => t.due_date === dashDate && (t.assigned_to === userId || !t.assigned_to)))
+  const dashTasks = sortTasks(tasks.filter((t) => t.due_date === dashDate && !t.skipped && (t.assigned_to === userId || !t.assigned_to)))
   const dashPending = dashTasks.filter((t) => !t.done)
   const dashPendingMine = dashPending.filter((t) => t.assigned_to !== null)
   const dashPendingUnassigned = dashPending.filter((t) => t.assigned_to === null)
@@ -349,33 +358,37 @@ export default function DashboardClient({
             </button>
           </div>
         )}
-        {dashPendingMine.map((t) => (
-          <SimpleTaskRow
-            key={t.id}
-            t={t}
-            clientName={clients.find((c) => c.id === t.client_id)?.name}
-            onToggle={() => toggleTask(t)}
-            isTimerRunning={timer.running?.task_id === t.id}
-            elapsed={timer.elapsedFor(t.id)}
-            startTimer={() => timer.startForTask(t)}
-            stopTimer={() => timer.stopRunning()}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {dashPendingMine.map((t) => (
+            <SimpleTaskRow
+              key={t.id}
+              t={t}
+              clientName={clients.find((c) => c.id === t.client_id)?.name}
+              onToggle={() => toggleTask(t)}
+              isTimerRunning={timer.running?.task_id === t.id}
+              elapsed={timer.elapsedFor(t.id)}
+              startTimer={() => timer.startForTask(t)}
+              stopTimer={() => timer.stopRunning()}
+            />
+          ))}
+        </AnimatePresence>
         {dashPendingUnassigned.length > 0 && (
           <>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 mt-3 mb-1">Unassigned</div>
-            {dashPendingUnassigned.map((t) => (
-              <SimpleTaskRow
-                key={t.id}
-                t={t}
-                clientName={clients.find((c) => c.id === t.client_id)?.name}
-                onToggle={() => toggleTask(t)}
-                isTimerRunning={timer.running?.task_id === t.id}
-                elapsed={timer.elapsedFor(t.id)}
-                startTimer={() => timer.startForTask(t)}
-                stopTimer={() => timer.stopRunning()}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {dashPendingUnassigned.map((t) => (
+                <SimpleTaskRow
+                  key={t.id}
+                  t={t}
+                  clientName={clients.find((c) => c.id === t.client_id)?.name}
+                  onToggle={() => toggleTask(t)}
+                  isTimerRunning={timer.running?.task_id === t.id}
+                  elapsed={timer.elapsedFor(t.id)}
+                  startTimer={() => timer.startForTask(t)}
+                  stopTimer={() => timer.stopRunning()}
+                />
+              ))}
+            </AnimatePresence>
           </>
         )}
         {dashCompleted.length > 0 && (
@@ -557,7 +570,14 @@ function SimpleTaskRow({
 }) {
   const priorityColor = t.priority === 'High' ? 'text-red-400' : t.priority === 'Medium' ? 'text-amber-400' : 'text-emerald-400'
   return (
-    <div className={`flex gap-3 items-start py-2 border-b border-white/10 group ${t.done ? 'opacity-45' : ''} ${isTimerRunning ? 'bg-emerald-500/5' : ''}`}>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
+      exit={{ opacity: 0, x: -8 }}
+      transition={{ duration: 0.15 }}
+      className={`flex gap-3 items-start py-2 border-b border-white/10 group ${isTimerRunning ? 'bg-emerald-500/5' : ''}`}
+    >
       <button
         onClick={onToggle}
         className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-500'}`}
@@ -585,6 +605,6 @@ function SimpleTaskRow({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

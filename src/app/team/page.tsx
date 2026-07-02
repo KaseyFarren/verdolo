@@ -16,7 +16,7 @@ export default async function TeamPage() {
     .order('joined_at', { ascending: true })
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Team</h1>
         <p className="text-sm text-neutral-500">{org?.name} · signed in as {user.email} ({role})</p>

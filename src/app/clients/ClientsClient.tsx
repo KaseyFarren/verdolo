@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ConfirmDialog'
+import Button from '@/components/ui/Button'
 import {
   AVATAR_COLORS,
   PLATFORMS,
@@ -81,6 +84,7 @@ export default function ClientsClient({
   timeEntries: { client_id: string | null; duration_seconds: number | null }[]
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const confirm = useConfirm()
   const [clients, setClients] = useState<Client[]>(initialClients)
   const [notes, setNotes] = useState<Note[]>(initialNotes)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -180,7 +184,10 @@ export default function ClientsClient({
       })
       .select()
       .single()
-    if (data) setClients((prev) => [...prev, data as Client].sort((a, b) => a.name.localeCompare(b.name)))
+    if (data) {
+      setClients((prev) => [...prev, data as Client].sort((a, b) => a.name.localeCompare(b.name)))
+      toast.success(`${name} added`)
+    }
     setForm(emptyForm)
     setShowAdd(false)
   }
@@ -192,11 +199,19 @@ export default function ClientsClient({
   }
 
   async function deleteClient(id: string) {
-    if (!window.confirm('Delete this client? This will also remove their tasks.')) return
+    const name = clients.find((c) => c.id === id)?.name ?? 'this client'
+    const ok = await confirm({
+      title: `Delete ${name}?`,
+      message: 'This will also remove their tasks. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     await supabase.from('clients').delete().eq('id', id)
     await supabase.from('tasks').delete().eq('client_id', id)
     setClients((prev) => prev.filter((c) => c.id !== id))
     setSelectedId(null)
+    toast.success(`${name} deleted`)
   }
 
   async function addNote(clientId: string, text: string) {
@@ -451,9 +466,9 @@ export default function ClientsClient({
           Clients <span className="text-sm font-normal text-neutral-500">({clients.length})</span>
         </h1>
         {canEdit && !showAdd && (
-          <button className="rounded-md bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={() => setShowAdd(true)}>
+          <Button variant="primary" onClick={() => setShowAdd(true)}>
             + New client
-          </button>
+          </Button>
         )}
       </div>
 

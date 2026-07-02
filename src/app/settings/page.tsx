@@ -14,7 +14,7 @@ export default async function SettingsPage() {
     .maybeSingle()
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <SettingsClient
         orgId={orgId}
         userId={user.id}
@@ -25,6 +25,7 @@ export default async function SettingsPage() {
         initialAvatarUrl={membership?.avatar_url ?? ''}
         subscriptionStatus={org?.subscription_status ?? null}
         trialEndsAt={org?.trial_ends_at ?? null}
+        initialAccentColor={org?.accent_color ?? '#7c5cbf'}
       />
     </AppShell>
   )

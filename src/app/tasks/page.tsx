@@ -16,7 +16,7 @@ export default async function TasksPage() {
   const visibleClients = isAdminRole(role) ? clients ?? [] : stripRetainer(clients ?? [])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <TasksClient
         orgId={orgId}
         userId={user.id}

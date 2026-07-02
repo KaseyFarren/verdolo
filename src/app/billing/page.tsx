@@ -12,7 +12,7 @@ export default async function BillingPage() {
     .eq('status', 'active')
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <BillingClient
         orgId={orgId}
         role={role}

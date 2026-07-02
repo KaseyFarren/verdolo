@@ -19,7 +19,7 @@ export default async function ClientsPage() {
   const visibleClients = canEdit ? clients ?? [] : stripRetainer(clients ?? [])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <ClientsClient
         orgId={orgId}
         userId={user.id}

@@ -11,7 +11,7 @@ export default async function CalendarPage() {
   ])
 
   return (
-    <AppShell orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role}>
+    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <CalendarClient orgId={orgId} initialClients={clients ?? []} initialTasks={tasks ?? []} />
     </AppShell>
   )
