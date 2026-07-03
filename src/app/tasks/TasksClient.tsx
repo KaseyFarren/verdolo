@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
+import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/ui/CustomSelect'
 import {
   PRIORITY,
   formatDate,
@@ -97,6 +98,13 @@ export default function TasksClient({
   }, [initialTasks])
 
   const today = todayKey()
+
+  // Calendar view defaults to showing today's tasks rather than an empty selection — List
+  // view's default (no date pinned, showing the Overdue/Today/Tomorrow buckets) is untouched.
+  useEffect(() => {
+    if (view === 'calendar' && !selectedDate) setSelectedDate(today)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
 
   useEffect(() => {
     ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, excludeWeekends).then(async () => {
@@ -342,39 +350,26 @@ export default function TasksClient({
     )
   }
 
+  const filterOptions: SelectOption[] = [
+    { value: 'all', label: 'All' },
+    { value: 'today', label: 'Today' },
+    { value: 'overdue', label: overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue' },
+    { value: 'completed', label: 'Done' },
+    ...(isAdmin ? [{ value: 'assignee:mine', label: 'Mine' }, { value: 'assignee:unassigned', label: 'Unassigned' }] : []),
+  ]
+  const filterGroups: SelectGroup[] = [
+    ...(isAdmin && members.filter((m) => m.user_id !== userId).length > 0
+      ? [
+          {
+            label: 'Team',
+            options: members.filter((m) => m.user_id !== userId).map((m) => ({ value: `assignee:${m.user_id}`, label: memberName(m) })),
+          },
+        ]
+      : []),
+    ...(clients.length > 0 ? [{ label: 'Clients', options: clients.map((c) => ({ value: c.id, label: c.name })) }] : []),
+  ]
   const filterSelect = (
-    <select
-      value={filter}
-      onChange={(e) => setFilter(e.target.value)}
-      className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
-    >
-      <option value="all">All</option>
-      <option value="today">Today</option>
-      <option value="overdue">{overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue'}</option>
-      <option value="completed">Done</option>
-      {isAdmin && <option value="assignee:mine">Mine</option>}
-      {isAdmin && <option value="assignee:unassigned">Unassigned</option>}
-      {isAdmin && members.filter((m) => m.user_id !== userId).length > 0 && (
-        <optgroup label="Team">
-          {members
-            .filter((m) => m.user_id !== userId)
-            .map((m) => (
-              <option key={m.user_id} value={`assignee:${m.user_id}`}>
-                {memberName(m)}
-              </option>
-            ))}
-        </optgroup>
-      )}
-      {clients.length > 0 && (
-        <optgroup label="Clients">
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </optgroup>
-      )}
-    </select>
+    <CustomSelect value={filter} onChange={setFilter} options={filterOptions} groups={filterGroups} className="w-36" />
   )
 
   const [calY, calM] = calMonth.split('-').map(Number)
@@ -449,43 +444,25 @@ export default function TasksClient({
               onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))}
             />
             {taskMode === 'detailed' && (
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              <CustomSelect
                 value={taskForm.priority}
-                onChange={(e) => setTaskForm((f) => ({ ...f, priority: e.target.value }))}
-              >
-                {PRIORITY.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
+                onChange={(v) => setTaskForm((f) => ({ ...f, priority: v }))}
+                options={PRIORITY.map((p) => ({ value: p, label: p }))}
+              />
             )}
             {taskMode === 'detailed' && (
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              <CustomSelect
                 value={taskForm.clientId}
-                onChange={(e) => setTaskForm((f) => ({ ...f, clientId: e.target.value }))}
-              >
-                <option value="">No client</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setTaskForm((f) => ({ ...f, clientId: v }))}
+                options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+              />
             )}
             {taskMode === 'detailed' && (
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              <CustomSelect
                 value={taskForm.assignedTo}
-                onChange={(e) => setTaskForm((f) => ({ ...f, assignedTo: e.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {memberName(m)}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setTaskForm((f) => ({ ...f, assignedTo: v }))}
+                options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+              />
             )}
           </div>
           <textarea
@@ -645,52 +622,30 @@ export default function TasksClient({
                   autoFocus
                 />
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <select
-                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                  <CustomSelect
                     value={recurringForm.frequency}
-                    onChange={(e) => setRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekdays">Weekdays</option>
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                      <option key={i} value={`weekly:${(i + 1) % 7}`}>
-                        Weekly – {d}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                    onChange={(v) => setRecurringForm((f) => ({ ...f, frequency: v }))}
+                    options={[
+                      { value: 'daily', label: 'Daily' },
+                      { value: 'weekdays', label: 'Weekdays' },
+                      ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({ value: `weekly:${(i + 1) % 7}`, label: `Weekly – ${d}` })),
+                    ]}
+                  />
+                  <CustomSelect
                     value={recurringForm.priority}
-                    onChange={(e) => setRecurringForm((f) => ({ ...f, priority: e.target.value }))}
-                  >
-                    {PRIORITY.map((p) => (
-                      <option key={p}>{p}</option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                    onChange={(v) => setRecurringForm((f) => ({ ...f, priority: v }))}
+                    options={PRIORITY.map((p) => ({ value: p, label: p }))}
+                  />
+                  <CustomSelect
                     value={recurringForm.clientId}
-                    onChange={(e) => setRecurringForm((f) => ({ ...f, clientId: e.target.value }))}
-                  >
-                    <option value="">No client</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                    onChange={(v) => setRecurringForm((f) => ({ ...f, clientId: v }))}
+                    options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+                  />
+                  <CustomSelect
                     value={recurringForm.assignedTo}
-                    onChange={(e) => setRecurringForm((f) => ({ ...f, assignedTo: e.target.value }))}
-                  >
-                    <option value="">Unassigned</option>
-                    {members.map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {memberName(m)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setRecurringForm((f) => ({ ...f, assignedTo: v }))}
+                    options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+                  />
                 </div>
                 <div className="flex gap-2">
                   <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
@@ -713,28 +668,20 @@ export default function TasksClient({
                       onChange={(e) => setEditRecurringForm((f) => ({ ...f, title: e.target.value }))}
                     />
                     <div className="grid grid-cols-2 gap-2 mb-2">
-                      <select
-                        className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                      <CustomSelect
                         value={(editRecurringForm.frequency as string) || 'daily'}
-                        onChange={(e) => setEditRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="weekdays">Weekdays</option>
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                          <option key={i} value={`weekly:${(i + 1) % 7}`}>
-                            Weekly – {d}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                        onChange={(v) => setEditRecurringForm((f) => ({ ...f, frequency: v }))}
+                        options={[
+                          { value: 'daily', label: 'Daily' },
+                          { value: 'weekdays', label: 'Weekdays' },
+                          ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({ value: `weekly:${(i + 1) % 7}`, label: `Weekly – ${d}` })),
+                        ]}
+                      />
+                      <CustomSelect
                         value={(editRecurringForm.priority as string) || 'Medium'}
-                        onChange={(e) => setEditRecurringForm((f) => ({ ...f, priority: e.target.value }))}
-                      >
-                        {PRIORITY.map((p) => (
-                          <option key={p}>{p}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => setEditRecurringForm((f) => ({ ...f, priority: v }))}
+                        options={PRIORITY.map((p) => ({ value: p, label: p }))}
+                      />
                     </div>
                     <div className="flex gap-2">
                       <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
@@ -842,39 +789,21 @@ function TaskRow({
           autoFocus
         />
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <select
-            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+          <CustomSelect
             value={(editForm.client_id as string) || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, client_id: e.target.value }))}
-          >
-            <option value="">No client</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            onChange={(v) => setEditForm((f) => ({ ...f, client_id: v }))}
+            options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+          />
+          <CustomSelect
             value={(editForm.priority as string) || 'Medium'}
-            onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))}
-          >
-            {PRIORITY.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            onChange={(v) => setEditForm((f) => ({ ...f, priority: v }))}
+            options={PRIORITY.map((p) => ({ value: p, label: p }))}
+          />
+          <CustomSelect
             value={(editForm.assigned_to as string) || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, assigned_to: e.target.value }))}
-          >
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {memberName(m)}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setEditForm((f) => ({ ...f, assigned_to: v }))}
+            options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+          />
           {!t.is_auto && (
             <input
               type="date"
