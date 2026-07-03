@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Button from '@/components/ui/Button'
 
 export default function CreateOrgForm() {
   const router = useRouter()
@@ -36,16 +37,12 @@ export default function CreateOrgForm() {
         value={orgName}
         onChange={(e) => setOrgName(e.target.value)}
         required
-        className="rounded border px-3 py-2"
+        className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-      >
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <Button type="submit" variant="primary" disabled={loading} className="w-full">
         {loading ? 'Creating…' : 'Create agency'}
-      </button>
+      </Button>
     </form>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import Button from '@/components/ui/Button'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -45,12 +46,12 @@ export default function SignupPage() {
 
   if (checkEmail) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4">
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
         <h1 className="text-xl font-semibold">Check your email</h1>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-neutral-500">
           We sent a confirmation link to {email}. Click it, then come back and log in.
         </p>
-        <Link href="/login" className="underline">
+        <Link href="/login" className="underline hover:text-neutral-300">
           Back to login
         </Link>
       </main>
@@ -58,7 +59,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
       <h1 className="text-xl font-semibold">Create your account</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
@@ -67,7 +68,7 @@ export default function SignupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded border px-3 py-2"
+          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <input
           type="password"
@@ -76,9 +77,9 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="rounded border px-3 py-2"
+          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <label className="flex items-start gap-2 text-xs text-gray-600">
+        <label className="flex items-start gap-2 text-xs text-neutral-500">
           <input
             type="checkbox"
             checked={agreed}
@@ -86,21 +87,27 @@ export default function SignupPage() {
             className="mt-0.5"
           />
           <span>
-            I agree to the <Link href="/terms" target="_blank" className="underline">Terms of Service</Link> and{' '}
-            <Link href="/privacy" target="_blank" className="underline">Privacy Policy</Link>.
+            I agree to the{' '}
+            <Link href="/terms" target="_blank" className="underline hover:text-neutral-300">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="underline hover:text-neutral-300">
+              Privacy Policy
+            </Link>
+            .
           </span>
         </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Creating…' : 'Sign up'}
-        </button>
+        </Button>
       </form>
-      <p className="text-sm text-gray-500">
-        Already have an account? <Link href="/login" className="underline">Log in</Link>
+      <p className="text-sm text-neutral-500">
+        Already have an account?{' '}
+        <Link href="/login" className="underline hover:text-neutral-300">
+          Log in
+        </Link>
       </p>
     </main>
   )

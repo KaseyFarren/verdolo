@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { motion } from 'motion/react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { ConfirmProvider } from '@/components/ConfirmDialog'
 import { PinLockProvider, usePinLock } from '@/components/PinLock'
@@ -39,6 +40,11 @@ export default function AppShell({
   const pathname = usePathname()
   const router = useRouter()
   const isAdmin = role === 'owner' || role === 'admin'
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   async function logout() {
     const supabase = createClient()
@@ -54,7 +60,32 @@ export default function AppShell({
           className="flex min-h-screen bg-neutral-950 text-neutral-100"
           style={accentColor ? ({ '--accent': accentColor } as React.CSSProperties) : undefined}
         >
-          <div className="fixed inset-y-0 left-0 w-48 border-r border-white/10 bg-neutral-900/60 flex flex-col">
+          <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-4 border-b border-white/10 bg-neutral-900/90 backdrop-blur">
+            <button onClick={() => setMobileOpen(true)} className="text-xl leading-none" aria-label="Open menu">
+              ☰
+            </button>
+            <div className="font-semibold text-sm">{orgName}</div>
+            <div className="w-6" />
+          </div>
+
+          <AnimatePresence>
+            {mobileOpen && (
+              <motion.div
+                className="md:hidden fixed inset-0 bg-black/60 z-30"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={() => setMobileOpen(false)}
+              />
+            )}
+          </AnimatePresence>
+
+          <div
+            className={`fixed inset-y-0 left-0 w-48 border-r border-white/10 bg-neutral-900 md:bg-neutral-900/60 flex flex-col z-40 transition-transform duration-200 md:translate-x-0 ${
+              mobileOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
             <div className="px-4 py-4 font-semibold text-sm">{orgName}</div>
             <nav className="flex-1 flex flex-col gap-1 px-2">
               {NAV.filter((item) => (!item.adminOnly || isAdmin) && (!item.ownerOnly || role === 'owner')).map((item) => {
@@ -95,10 +126,10 @@ export default function AppShell({
               </div>
             </div>
           </div>
-          <div className="ml-48 flex-1 min-h-screen">
+          <div className="md:ml-48 flex-1 min-h-screen pt-14 md:pt-0">
             <motion.div
               key={pathname}
-              className="max-w-3xl mx-auto px-6 py-8"
+              className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-8"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}

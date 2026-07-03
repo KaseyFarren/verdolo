@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import Button from '@/components/ui/Button'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -31,7 +32,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
       <h1 className="text-xl font-semibold">Log in</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
@@ -40,7 +41,7 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded border px-3 py-2"
+          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <input
           type="password"
@@ -48,19 +49,18 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="rounded border px-3 py-2"
+          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Logging in…' : 'Log in'}
-        </button>
+        </Button>
       </form>
-      <p className="text-sm text-gray-500">
-        No account? <Link href="/signup" className="underline">Create one</Link>
+      <p className="text-sm text-neutral-500">
+        No account?{' '}
+        <Link href="/signup" className="underline hover:text-neutral-300">
+          Create one
+        </Link>
       </p>
     </main>
   )
