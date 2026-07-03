@@ -142,6 +142,11 @@ export default function TasksClient({
   async function uncompleteTask(t: Task) {
     await updateTask(t.id, { done: false, completed_at: null })
   }
+  async function completeAll(items: Task[]) {
+    const pending = items.filter((t) => !t.done)
+    for (const t of pending) await completeTask(t)
+    if (pending.length) toast.success(`${pending.length} task${pending.length === 1 ? '' : 's'} completed`)
+  }
   function deleteTask(id: string) {
     const removed = tasks.find((t) => t.id === id)
     if (!removed) return
@@ -416,9 +421,17 @@ export default function TasksClient({
       {buckets.length === 0 && <div className="text-sm text-neutral-500 py-6 text-center">No tasks here.</div>}
       {buckets.map((b) => {
         const { mine, unassigned } = splitBucket(b.items)
+        const pendingCount = b.items.filter((t) => !t.done).length
         return (
           <div key={b.label} className="mb-5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2 pb-2 border-b border-white/10">{b.label}</div>
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{b.label}</div>
+              {pendingCount > 1 && (
+                <button className="text-xs text-neutral-400 hover:text-white transition-colors" onClick={() => completeAll(b.items)}>
+                  Complete all ({pendingCount})
+                </button>
+              )}
+            </div>
             <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
             {unassigned.length > 0 && (
               <>
