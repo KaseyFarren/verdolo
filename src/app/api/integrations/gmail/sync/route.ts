@@ -77,6 +77,7 @@ export async function POST() {
           thread_id: thread.id,
           direction: outgoing ? 'out' : 'in',
           sender: msg.from,
+          user_id: user.id,
           body: msg.snippet,
           sent_at: msg.date,
           external_message_id: msg.id,

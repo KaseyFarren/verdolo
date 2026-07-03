@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply')
+      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id')
       .eq('org_id', orgId)
       .order('name'),
     supabase.from('tasks').select('*').eq('org_id', orgId),

@@ -30,6 +30,7 @@ type Client = {
   contract_ends: string | null
   tone: string | null
   awaiting_reply: boolean
+  primary_contact_id: string | null
 }
 type Task = {
   id: string

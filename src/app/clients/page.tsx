@@ -7,13 +7,14 @@ export default async function ClientsPage() {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
   const canEdit = isAdminRole(role)
 
-  const [{ data: clients }, { data: notes }, { data: tasks }, { data: aiMessages }, { data: timeEntries }, { data: archivedTimeTotals }] = await Promise.all([
+  const [{ data: clients }, { data: notes }, { data: tasks }, { data: aiMessages }, { data: timeEntries }, { data: archivedTimeTotals }, { data: members }] = await Promise.all([
     supabase.from('clients').select('*').eq('org_id', orgId).order('name'),
     supabase.from('client_notes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
     supabase.from('tasks').select('*').eq('org_id', orgId).eq('done', true).not('completed_at', 'is', null),
     supabase.from('ai_message_log').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(200),
     supabase.from('time_entries').select('client_id, duration_seconds').eq('org_id', orgId).not('duration_seconds', 'is', null),
     supabase.from('time_archived_totals').select('client_id, seconds').eq('org_id', orgId),
+    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
   ])
 
   // retainer amounts are revenue — members (view-only on clients) don't get them, admins/owners do
@@ -31,6 +32,7 @@ export default async function ClientsPage() {
         aiMessages={aiMessages ?? []}
         timeEntries={timeEntries ?? []}
         archivedTimeTotals={archivedTimeTotals ?? []}
+        members={members ?? []}
       />
     </AppShell>
   )

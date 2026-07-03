@@ -18,19 +18,50 @@ export async function POST(request: Request) {
   if (!membership) return NextResponse.json({ error: 'Not a member of an org' }, { status: 403 })
   const orgId = membership.org_id
 
-  const accessToken = await getValidGmailAccessToken(orgId, user.id)
-  if (!accessToken) return NextResponse.json({ error: 'Gmail not connected' }, { status: 400 })
-
   const admin = createAdminClient()
-  const { data: connection } = await admin
-    .from('integration_connections')
-    .select('external_account_id')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .eq('provider', 'gmail')
-    .single()
-  const myEmail = connection?.external_account_id
-  if (!myEmail) return NextResponse.json({ error: 'Gmail not connected' }, { status: 400 })
+
+  const { data: client } = await supabase.from('clients').select('contact_email, primary_contact_id').eq('id', clientId).eq('org_id', orgId).single()
+
+  // Owner-priority sending: reply from the client's assigned point of contact when possible,
+  // so a client's thread doesn't jump between different senders depending on who happens to
+  // click Send. Falls back silently to the clicking user's own mailbox if there's no owner or
+  // the owner hasn't connected Gmail — an owner's broken connection must not block the send.
+  let sendUserId: string | null = null
+  let accessToken: string | null = null
+  let fromEmail: string | undefined
+
+  if (client?.primary_contact_id) {
+    const ownerToken = await getValidGmailAccessToken(orgId, client.primary_contact_id)
+    if (ownerToken) {
+      const { data: ownerConnection } = await admin
+        .from('integration_connections')
+        .select('external_account_id')
+        .eq('org_id', orgId)
+        .eq('user_id', client.primary_contact_id)
+        .eq('provider', 'gmail')
+        .maybeSingle()
+      if (ownerConnection?.external_account_id) {
+        sendUserId = client.primary_contact_id
+        accessToken = ownerToken
+        fromEmail = ownerConnection.external_account_id
+      }
+    }
+  }
+
+  if (!accessToken) {
+    sendUserId = user.id
+    accessToken = await getValidGmailAccessToken(orgId, user.id)
+    if (!accessToken) return NextResponse.json({ error: 'Gmail not connected' }, { status: 400 })
+    const { data: connection } = await admin
+      .from('integration_connections')
+      .select('external_account_id')
+      .eq('org_id', orgId)
+      .eq('user_id', user.id)
+      .eq('provider', 'gmail')
+      .single()
+    fromEmail = connection?.external_account_id
+  }
+  if (!fromEmail || !sendUserId) return NextResponse.json({ error: 'Gmail not connected' }, { status: 400 })
 
   let to: string
   let gmailThreadId: string | undefined
@@ -52,7 +83,6 @@ export async function POST(request: Request) {
       .maybeSingle()
     inReplyTo = lastMsg?.rfc_message_id ?? undefined
   } else {
-    const { data: client } = await supabase.from('clients').select('contact_email').eq('id', clientId).eq('org_id', orgId).single()
     if (!client?.contact_email) return NextResponse.json({ error: 'Client has no contact email' }, { status: 400 })
     to = client.contact_email
   }
@@ -60,7 +90,7 @@ export async function POST(request: Request) {
   try {
     const result = await sendGmailMessage(accessToken, {
       to,
-      from: myEmail,
+      from: fromEmail,
       subject: subject || '(no subject)',
       body,
       threadId: gmailThreadId,
@@ -95,7 +125,8 @@ export async function POST(request: Request) {
         org_id: orgId,
         thread_id: internalThreadId,
         direction: 'out',
-        sender: myEmail,
+        sender: fromEmail,
+        user_id: sendUserId,
         body,
         sent_at: new Date().toISOString(),
         external_message_id: result.id,

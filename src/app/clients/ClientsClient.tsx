@@ -19,6 +19,7 @@ import {
   getHealthScore,
   getInitials,
   getStage,
+  memberName,
   stageColor,
   todayKey,
 } from '@/lib/agency'
@@ -42,11 +43,13 @@ type Client = {
   awaiting_reply: boolean
   contact_email: string | null
   contact_domain: string | null
+  primary_contact_id: string | null
 }
 type Note = { id: string; client_id: string; text: string; created_at: string }
-type InboxMessage = { id: string; thread_id: string; direction: 'in' | 'out'; sender: string | null; body: string | null; sent_at: string }
+type InboxMessage = { id: string; thread_id: string; direction: 'in' | 'out'; sender: string | null; body: string | null; sent_at: string; user_id: string | null }
 type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string }
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string }
+type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
 const emptyForm = {
   name: '',
@@ -62,6 +65,7 @@ const emptyForm = {
   contract_ends: '',
   contact_email: '',
   contact_domain: '',
+  owner: '',
 }
 
 export default function ClientsClient({
@@ -74,6 +78,7 @@ export default function ClientsClient({
   aiMessages,
   timeEntries,
   archivedTimeTotals,
+  members,
 }: {
   orgId: string
   userId: string
@@ -84,6 +89,7 @@ export default function ClientsClient({
   aiMessages: AiMessage[]
   timeEntries: { client_id: string | null; duration_seconds: number | null }[]
   archivedTimeTotals: { client_id: string | null; seconds: number }[]
+  members: Member[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
@@ -114,6 +120,7 @@ export default function ClientsClient({
 
   const today = todayKey()
   const selected = clients.find((c) => c.id === selectedId) || null
+  const memberById = (id: string | null) => members.find((m) => m.user_id === id) || null
 
   // Includes time_archived_totals so a "Clear old entries" sweep on the Time page (which rolls
   // up and deletes raw time_entries rows) never changes a client's lifetime hours shown here.
@@ -196,6 +203,7 @@ export default function ClientsClient({
         contract_ends: (form.contract_ends as string) || null,
         contact_email: (form.contact_email as string) || null,
         contact_domain: (form.contact_domain as string) || null,
+        primary_contact_id: (form.owner as string) || null,
         added_date: today,
       })
       .select()
@@ -287,8 +295,10 @@ export default function ClientsClient({
                 contract_ends: editForm.contract_ends || null,
                 contact_email: editForm.contact_email || null,
                 contact_domain: editForm.contact_domain || null,
+                primary_contact_id: editForm.owner || null,
               })
             }
+            members={members}
           />
         ) : (
           <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
@@ -304,6 +314,9 @@ export default function ClientsClient({
                     {stage}
                   </span>
                   {selected.awaiting_reply && <span className="text-xs text-amber-700 font-medium">⏳ Awaiting reply</span>}
+                  {selected.primary_contact_id && (
+                    <span className="text-xs text-sage bg-ink/5 rounded-full px-2 py-0.5">Owner: {memberName(memberById(selected.primary_contact_id))}</span>
+                  )}
                 </div>
                 <div className="text-sm text-sage mt-1 flex gap-2 flex-wrap items-center">
                   {selected.business && <span>{selected.business}</span>}
@@ -349,6 +362,7 @@ export default function ClientsClient({
                         contract_ends: selected.contract_ends || '',
                         contact_email: selected.contact_email || '',
                         contact_domain: selected.contact_domain || '',
+                        owner: selected.primary_contact_id || '',
                       })
                     }}
                   >
@@ -392,14 +406,21 @@ export default function ClientsClient({
               No matched emails yet. Connect Gmail in Settings, add this client&apos;s contact email/domain, then sync.
             </div>
           )}
-          {inboxMessages.map((m) => (
-            <div key={m.id} className={`rounded-md px-3 py-2 mb-2 text-sm ${m.direction === 'out' ? 'bg-ink/5 ml-6' : 'bg-white mr-6'}`}>
-              <div className="text-xs text-sage mb-1">
-                {m.direction === 'out' ? 'You' : m.sender} · {formatNoteTime(m.sent_at)}
+          {inboxMessages.map((m) => {
+            const sentByMember = m.direction === 'out' ? memberById(m.user_id) : null
+            const outLabel = sentByMember ? (m.user_id === userId ? `${memberName(sentByMember)} (you)` : memberName(sentByMember)) : m.sender || 'You'
+            return (
+              <div key={m.id} className={`rounded-md px-3 py-2 mb-2 text-sm ${m.direction === 'out' ? 'bg-ink/5 ml-6' : 'bg-white mr-6'}`}>
+                <div className="text-xs text-sage mb-1">
+                  {m.direction === 'out' ? outLabel : m.sender} · {formatNoteTime(m.sent_at)}
+                </div>
+                <div className="whitespace-pre-wrap">{m.body}</div>
               </div>
-              <div className="whitespace-pre-wrap">{m.body}</div>
-            </div>
-          ))}
+            )
+          })}
+          {selected.primary_contact_id && selected.primary_contact_id !== userId && (
+            <div className="text-xs text-sage/70 mb-1">Replying as {memberName(memberById(selected.primary_contact_id))}</div>
+          )}
           <div className="flex gap-2 items-end mt-2">
             <textarea
               className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
@@ -488,7 +509,7 @@ export default function ClientsClient({
         )}
       </div>
 
-      {canEdit && showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} />}
+      {canEdit && showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} />}
 
       {clients.length === 0 && !showAdd && <div className="text-sm text-sage py-6">No clients yet.</div>}
       {clients.map((c, i) => {
@@ -513,6 +534,7 @@ export default function ClientsClient({
                 {c.business && <span>{c.business}</span>}
                 {c.platform && <span className="bg-ink/5 rounded px-1.5">{c.platform}</span>}
                 {c.last_contacted && <span>Last: {formatDate(c.last_contacted)}</span>}
+                {c.primary_contact_id && <span>{memberName(memberById(c.primary_contact_id))}</span>}
               </div>
             </div>
             <span className="text-sage/70">›</span>
@@ -546,12 +568,14 @@ function ClientForm({
   setForm,
   onCancel,
   onSave,
+  members,
 }: {
   title: string
   form: Record<string, unknown>
   setForm: (f: (prev: Record<string, unknown>) => Record<string, unknown>) => void
   onCancel: () => void
   onSave: () => void
+  members: Member[]
 }) {
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
@@ -671,11 +695,25 @@ function ClientForm({
       />
       <label className="block text-xs text-sage mb-1">Contact domain</label>
       <input
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-4"
+        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         placeholder="acme.com"
         value={(form.contact_domain as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, contact_domain: e.target.value }))}
       />
+      <label className="block text-xs text-sage mb-1">Owner</label>
+      <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact — check-ins assign to them, and replies default to their connected mailbox</div>
+      <select
+        className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-4"
+        value={(form.owner as string) || ''}
+        onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
+      >
+        <option value="">Unassigned</option>
+        {members.map((m) => (
+          <option key={m.user_id} value={m.user_id}>
+            {memberName(m)}
+          </option>
+        ))}
+      </select>
       <div className="flex gap-2">
         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
           Cancel

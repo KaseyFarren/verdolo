@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getOffsetDate, getStage, isWeekend, recurringMatchesDate, todayKey } from '@/lib/agency'
 
-type Client = { id: string; stage?: string | null; status?: string | null }
+type Client = { id: string; stage?: string | null; status?: string | null; primary_contact_id?: string | null }
 type RecurringTemplate = {
   id: string
   title: string
@@ -38,6 +38,7 @@ export async function ensureAutoAndRecurringTasks(
       checkinRows.push({
         org_id: orgId,
         client_id: c.id,
+        assigned_to: c.primary_contact_id || null,
         title: `Daily check-in`,
         due_date: date,
         priority: 'High',
