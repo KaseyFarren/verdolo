@@ -202,6 +202,21 @@ export default function TasksClient({
     setTasks((prev) => prev.filter((t) => !(t.recurring_id === id && t.due_date >= today && !t.done)))
     setEditingRecurringId(null)
   }
+  async function toggleRecurringPaused(r: Recurring) {
+    const nextPaused = !r.paused
+    const { data } = await supabase.from('recurring_templates').update({ paused: nextPaused }).eq('id', r.id).select().single()
+    if (data) setRecurring((prev) => prev.map((x) => (x.id === r.id ? (data as Recurring) : x)))
+    if (nextPaused) {
+      // pausing hides any not-yet-done instance so it stops showing as pending
+      await supabase.from('tasks').delete().eq('recurring_id', r.id).eq('done', false).gte('due_date', today)
+      setTasks((prev) => prev.filter((t) => !(t.recurring_id === r.id && t.due_date >= today && !t.done)))
+    } else {
+      // resuming: regenerate today's/tomorrow's instance right away instead of waiting for next page load
+      await ensureAutoAndRecurringTasks(supabase, orgId, clients, [{ ...r, paused: false }], excludeWeekends)
+      const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
+      if (fresh) setTasks(fresh as Task[])
+    }
+  }
   async function deleteRecurring(id: string) {
     await supabase.from('recurring_templates').delete().eq('id', id)
     await supabase.from('tasks').delete().eq('recurring_id', id)
@@ -576,7 +591,7 @@ export default function TasksClient({
                     {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
                   </div>
                 </div>
-                <button className="text-xs text-neutral-400" onClick={() => updateRecurring(r.id, { paused: !r.paused })}>
+                <button className="text-xs text-neutral-400" onClick={() => toggleRecurringPaused(r)}>
                   {r.paused ? 'Resume' : 'Pause'}
                 </button>
                 <button
