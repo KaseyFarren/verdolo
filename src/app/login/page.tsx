@@ -32,7 +32,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
       <h1 className="text-xl font-semibold">Log in</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
@@ -41,7 +41,7 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <input
           type="password"
@@ -49,16 +49,16 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Logging in…' : 'Log in'}
         </Button>
       </form>
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-sage">
         No account?{' '}
-        <Link href="/signup" className="underline hover:text-neutral-300">
+        <Link href="/signup" className="underline hover:text-sage">
           Create one
         </Link>
       </p>

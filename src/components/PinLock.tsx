@@ -126,7 +126,7 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
       <AnimatePresence>
         {locked && (
           <motion.div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-950"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-green-deep text-cream"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -138,7 +138,7 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
               className="w-full max-w-xs text-center"
             >
               <div className="text-3xl mb-3">🔒</div>
-              <div className="text-sm text-neutral-400 mb-4">Enter your PIN to continue</div>
+              <div className="text-sm text-cream/70 mb-4">Enter your PIN to continue</div>
               <input
                 autoFocus
                 type="password"
@@ -150,8 +150,8 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
                   setEntry(e.target.value.replace(/\D/g, ''))
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && submit()}
-                className={`w-full text-center text-2xl tracking-[0.5em] rounded border bg-black/30 px-3 py-3 mb-3 focus:outline-none ${
-                  error ? 'border-red-500' : 'border-white/10 focus:ring-1 focus:ring-accent'
+                className={`w-full text-center text-2xl tracking-[0.5em] rounded-lg border bg-white/10 text-cream px-3 py-3 mb-3 focus:outline-none ${
+                  error ? 'border-red-400' : 'border-cream/20 focus:ring-1 focus:ring-accent'
                 }`}
               />
               {error && <div className="text-xs text-red-400 mb-3">Incorrect PIN</div>}

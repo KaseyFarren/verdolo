@@ -72,17 +72,17 @@ export default function QuickCapture({ orgId, userId }: { orgId: string; userId:
             onClick={() => setOpen(false)}
           >
             <motion.div
-              className="w-full max-w-md rounded-lg border border-white/10 bg-neutral-900 p-4 shadow-xl"
+              className="w-full max-w-md rounded-lg border border-ink/10 bg-white p-4 shadow-xl"
               initial={{ opacity: 0, scale: 0.96, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: -8 }}
               transition={{ duration: 0.15 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Quick add task</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Quick add task</div>
               <input
                 autoFocus
-                className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-accent"
+                className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-accent"
                 placeholder="What needs doing?"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}

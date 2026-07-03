@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@/components/ui/Button'
 
 export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; canInviteOwner: boolean }) {
   const router = useRouter()
@@ -35,7 +36,7 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
 
   return (
     <section>
-      <h2 className="mb-2 font-medium">Invite a teammate</h2>
+      <h2 className="mb-2 font-medium text-ink">Invite a teammate</h2>
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="email"
@@ -43,27 +44,23 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="flex-1 rounded border px-3 py-2 text-sm"
+          className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as 'member' | 'admin' | 'owner')}
-          className="rounded border px-2 py-2 text-sm"
+          className="rounded-lg border border-ink/15 bg-white px-2 py-2 text-sm"
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
           {canInviteOwner && <option value="owner">Owner</option>}
         </select>
-        <button
-          type="submit"
-          disabled={status === 'loading'}
-          className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={status === 'loading'}>
           {status === 'loading' ? 'Sending…' : 'Invite'}
-        </button>
+        </Button>
       </form>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {status === 'sent' && <p className="mt-2 text-sm text-green-600">Invite sent.</p>}
+      {status === 'sent' && <p className="mt-2 text-sm text-green">Invite sent.</p>}
     </section>
   )
 }

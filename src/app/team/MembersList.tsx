@@ -64,7 +64,7 @@ export default function MembersList({
   }
 
   return (
-    <ul className="divide-y divide-white/10 rounded border border-white/10">
+    <ul className="divide-y divide-white/10 rounded border border-ink/10">
       {rows.map((m) => {
         const isSelf = m.user_id === currentUserId
         const canTouch = canManage && !isSelf && (m.role !== 'owner' || canManageOwners)
@@ -75,13 +75,13 @@ export default function MembersList({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={m.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="h-6 w-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                <div className="h-6 w-6 rounded-full bg-ink/5 flex items-center justify-center text-[10px] font-semibold shrink-0">
                   {getInitials(memberName(m))}
                 </div>
               )}
               <span className="truncate">
                 {memberName(m)}
-                {isSelf && <span className="text-neutral-500"> (you)</span>}
+                {isSelf && <span className="text-sage"> (you)</span>}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -89,19 +89,19 @@ export default function MembersList({
                 <select
                   value={m.role}
                   onChange={(e) => changeRole(m, e.target.value as 'owner' | 'admin' | 'member')}
-                  className="rounded border border-white/10 bg-black/30 px-1.5 py-1 text-xs"
+                  className="rounded border border-ink/10 bg-white px-1.5 py-1 text-xs"
                 >
                   <option value="member">member</option>
                   <option value="admin">admin</option>
                   {canManageOwners && <option value="owner">owner</option>}
                 </select>
               ) : (
-                <span className="text-neutral-500">{m.role}</span>
+                <span className="text-sage">{m.role}</span>
               )}
-              {m.status === 'invited' && <span className="text-neutral-500 text-xs">invited</span>}
+              {m.status === 'invited' && <span className="text-sage text-xs">invited</span>}
               {canTouch && (
                 <button
-                  className="text-xs text-red-400 disabled:opacity-40"
+                  className="text-xs text-red-600 disabled:opacity-40"
                   onClick={() => removeMember(m)}
                   disabled={removingId === m.id}
                 >

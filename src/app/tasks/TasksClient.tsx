@@ -309,27 +309,27 @@ export default function TasksClient({
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Tasks</h1>
         {!showAddTask && (
-          <button className="rounded-md bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={() => setShowAddTask(true)}>
+          <button className="rounded-md bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => setShowAddTask(true)}>
             + New task
           </button>
         )}
       </div>
 
       {showAddTask && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-4">
-          <div className="flex gap-1 bg-white/5 rounded-md p-1 mb-3 w-fit">
+        <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
+          <div className="flex gap-1 bg-white rounded-md p-1 mb-3 w-fit">
             {(['quick', 'detailed'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setTaskMode(m)}
-                className={`px-3 py-1 rounded text-xs capitalize ${taskMode === m ? 'bg-white/15' : 'text-neutral-400'}`}
+                className={`px-3 py-1 rounded text-xs capitalize ${taskMode === m ? 'bg-ink/5' : 'text-sage'}`}
               >
                 {m}
               </button>
             ))}
           </div>
           <input
-            className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
             placeholder="What needs doing?"
             value={taskForm.title}
             onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
@@ -338,7 +338,7 @@ export default function TasksClient({
           {taskMode === 'detailed' && (
             <div className="grid grid-cols-2 gap-2 mb-2">
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.clientId}
                 onChange={(e) => setTaskForm((f) => ({ ...f, clientId: e.target.value }))}
               >
@@ -350,7 +350,7 @@ export default function TasksClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.priority}
                 onChange={(e) => setTaskForm((f) => ({ ...f, priority: e.target.value }))}
               >
@@ -359,7 +359,7 @@ export default function TasksClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.assignedTo}
                 onChange={(e) => setTaskForm((f) => ({ ...f, assignedTo: e.target.value }))}
               >
@@ -372,23 +372,23 @@ export default function TasksClient({
               </select>
               <input
                 type="date"
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.dueDate}
                 onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))}
               />
             </div>
           )}
           <textarea
-            className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-3 min-h-[50px]"
+            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3 min-h-[50px]"
             placeholder="Notes (optional)"
             value={taskForm.notes}
             onChange={(e) => setTaskForm((f) => ({ ...f, notes: e.target.value }))}
           />
           <div className="flex gap-2">
-            <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => setShowAddTask(false)}>
+            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddTask(false)}>
               Cancel
             </button>
-            <button className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={addTask}>
+            <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addTask}>
               Add task
             </button>
           </div>
@@ -407,7 +407,7 @@ export default function TasksClient({
             key={k}
             onClick={() => setFilter(k)}
             className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-              filter === k ? 'bg-white text-black border-white' : 'border-white/15 text-neutral-400'
+              filter === k ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
             }`}
           >
             {l}
@@ -421,7 +421,7 @@ export default function TasksClient({
                 key={m.user_id}
                 onClick={() => setFilter(`assignee:${m.user_id}`)}
                 className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-                  filter === `assignee:${m.user_id}` ? 'bg-white text-black border-white' : 'border-white/15 text-neutral-400'
+                  filter === `assignee:${m.user_id}` ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
                 }`}
               >
                 {memberName(m)}
@@ -432,7 +432,7 @@ export default function TasksClient({
             key={c.id}
             onClick={() => setFilter(c.id)}
             className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-              filter === c.id ? 'bg-white text-black border-white' : 'border-white/15 text-neutral-400'
+              filter === c.id ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
             }`}
           >
             {c.name}
@@ -440,16 +440,16 @@ export default function TasksClient({
         ))}
       </div>
 
-      {buckets.length === 0 && <div className="text-sm text-neutral-500 py-6 text-center">No tasks here.</div>}
+      {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
       {buckets.map((b) => {
         const { mine, unassigned } = splitBucket(b.items)
         const pendingCount = b.items.filter((t) => !t.done).length
         return (
           <div key={b.label} className="mb-5">
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{b.label}</div>
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
               {pendingCount > 1 && (
-                <button className="text-xs text-neutral-400 hover:text-white transition-colors" onClick={() => completeAll(b.items)}>
+                <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
                   Complete all ({pendingCount})
                 </button>
               )}
@@ -457,7 +457,7 @@ export default function TasksClient({
             <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
             {unassigned.length > 0 && (
               <>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 mt-3 mb-1">Unassigned</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
                 <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
               </>
             )}
@@ -467,15 +467,15 @@ export default function TasksClient({
 
       <div className="mt-8">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Recurring</div>
-          <button className="text-xs text-neutral-400" onClick={() => setShowAddRecurring((v) => !v)}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage">Recurring</div>
+          <button className="text-xs text-sage" onClick={() => setShowAddRecurring((v) => !v)}>
             {showAddRecurring ? 'Cancel' : '+ Add'}
           </button>
         </div>
         {showAddRecurring && (
-          <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-3">
+          <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
             <input
-              className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+              className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
               placeholder="e.g. Check emails"
               value={recurringForm.title}
               onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
@@ -483,7 +483,7 @@ export default function TasksClient({
             />
             <div className="grid grid-cols-2 gap-2 mb-2">
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={recurringForm.frequency}
                 onChange={(e) => setRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
               >
@@ -496,7 +496,7 @@ export default function TasksClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={recurringForm.priority}
                 onChange={(e) => setRecurringForm((f) => ({ ...f, priority: e.target.value }))}
               >
@@ -505,7 +505,7 @@ export default function TasksClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={recurringForm.clientId}
                 onChange={(e) => setRecurringForm((f) => ({ ...f, clientId: e.target.value }))}
               >
@@ -517,7 +517,7 @@ export default function TasksClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={recurringForm.assignedTo}
                 onChange={(e) => setRecurringForm((f) => ({ ...f, assignedTo: e.target.value }))}
               >
@@ -530,28 +530,28 @@ export default function TasksClient({
               </select>
             </div>
             <div className="flex gap-2">
-              <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
+              <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
                 Cancel
               </button>
-              <button className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
+              <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
                 Save
               </button>
             </div>
           </div>
         )}
-        {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-neutral-500 py-3">No recurring tasks.</div>}
+        {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-sage py-3">No recurring tasks.</div>}
         {recurring.map((r) => (
-          <div key={r.id} className="border-b border-white/10 py-2">
+          <div key={r.id} className="border-b border-ink/10 py-2">
             {editingRecurringId === r.id ? (
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-ink/10 bg-white p-4">
                 <input
-                  className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+                  className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                   value={(editRecurringForm.title as string) || ''}
                   onChange={(e) => setEditRecurringForm((f) => ({ ...f, title: e.target.value }))}
                 />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <select
-                    className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                     value={(editRecurringForm.frequency as string) || 'daily'}
                     onChange={(e) => setEditRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
                   >
@@ -564,7 +564,7 @@ export default function TasksClient({
                     ))}
                   </select>
                   <select
-                    className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                     value={(editRecurringForm.priority as string) || 'Medium'}
                     onChange={(e) => setEditRecurringForm((f) => ({ ...f, priority: e.target.value }))}
                   >
@@ -574,11 +574,11 @@ export default function TasksClient({
                   </select>
                 </div>
                 <div className="flex gap-2">
-                  <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
+                  <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
                     Cancel
                   </button>
                   <button
-                    className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium"
+                    className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
                     onClick={() => updateRecurring(r.id, editRecurringForm)}
                   >
                     Save
@@ -588,21 +588,21 @@ export default function TasksClient({
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <div className={`text-sm font-medium ${r.paused ? 'text-neutral-500' : ''}`}>
+                  <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
                     {r.title}
-                    {r.paused && <span className="ml-2 text-[10px] uppercase text-neutral-600">Paused</span>}
+                    {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
                   </div>
-                  <div className="text-xs text-neutral-500 mt-0.5">
+                  <div className="text-xs text-sage mt-0.5">
                     {recurringFrequencyLabel(r.frequency)}
                     {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
                     {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
                   </div>
                 </div>
-                <button className="text-xs text-neutral-400" onClick={() => toggleRecurringPaused(r)}>
+                <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
                   {r.paused ? 'Resume' : 'Pause'}
                 </button>
                 <button
-                  className="text-xs text-neutral-400"
+                  className="text-xs text-sage"
                   onClick={() => {
                     setEditingRecurringId(r.id)
                     setEditRecurringForm({ title: r.title, priority: r.priority, frequency: r.frequency })
@@ -610,7 +610,7 @@ export default function TasksClient({
                 >
                   Edit
                 </button>
-                <button className="text-xs text-red-400" onClick={() => deleteRecurring(r.id)}>
+                <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
                   Delete
                 </button>
               </div>
@@ -669,16 +669,16 @@ function TaskRow({
 }) {
   if (isEditing) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-2">
+      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-2">
         <input
-          className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2 font-medium"
+          className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2 font-medium"
           value={(editForm.title as string) || ''}
           onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
           autoFocus
         />
         <div className="grid grid-cols-2 gap-2 mb-2">
           <select
-            className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
             value={(editForm.client_id as string) || ''}
             onChange={(e) => setEditForm((f) => ({ ...f, client_id: e.target.value }))}
           >
@@ -690,7 +690,7 @@ function TaskRow({
             ))}
           </select>
           <select
-            className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
             value={(editForm.priority as string) || 'Medium'}
             onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))}
           >
@@ -699,7 +699,7 @@ function TaskRow({
             ))}
           </select>
           <select
-            className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
             value={(editForm.assigned_to as string) || ''}
             onChange={(e) => setEditForm((f) => ({ ...f, assigned_to: e.target.value }))}
           >
@@ -713,22 +713,22 @@ function TaskRow({
           {!t.is_auto && (
             <input
               type="date"
-              className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
               value={(editForm.due_date as string) || ''}
               onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
             />
           )}
         </div>
         <textarea
-          className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-3"
+          className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
           value={(editForm.notes as string) || ''}
           onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
         />
         <div className="flex gap-2">
-          <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={cancelEdit}>
+          <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={cancelEdit}>
             Cancel
           </button>
-          <button className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={save}>
+          <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={save}>
             Save
           </button>
         </div>
@@ -736,7 +736,7 @@ function TaskRow({
     )
   }
 
-  const priorityColor = t.priority === 'High' ? 'text-red-400' : t.priority === 'Medium' ? 'text-amber-400' : 'text-emerald-400'
+  const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-amber-700' : 'text-green'
 
   return (
     <motion.div
@@ -745,55 +745,55 @@ function TaskRow({
       animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
       exit={{ opacity: 0, x: -8 }}
       transition={{ duration: 0.15 }}
-      className={`flex gap-3 items-start py-2.5 border-b border-white/10 group ${isTimerRunning ? 'bg-emerald-500/5' : ''}`}
+      className={`flex gap-3 items-start py-2.5 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''}`}
     >
       <button
         onClick={() => (t.done ? uncomplete() : complete())}
-        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-500'}`}
+        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-green border-green' : 'border-ink/25'}`}
       >
-        {t.done && <span className="text-[10px] text-black">✓</span>}
+        {t.done && <span className="text-[10px] text-white">✓</span>}
       </button>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm ${t.done ? 'line-through text-neutral-500' : ''}`}>
+        <div className={`text-sm ${t.done ? 'line-through text-sage' : ''}`}>
           {t.title}
           {!t.quick && <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>}
-          {t.is_auto && <span className="ml-1 text-[10px] text-neutral-500">auto</span>}
-          {t.recurring_id && <span className="ml-1 text-[10px] text-neutral-500">↻</span>}
-          {isTimerRunning && <span className="ml-2 text-xs font-mono text-emerald-400">● {elapsed}</span>}
+          {t.is_auto && <span className="ml-1 text-[10px] text-sage">auto</span>}
+          {t.recurring_id && <span className="ml-1 text-[10px] text-sage">↻</span>}
+          {isTimerRunning && <span className="ml-2 text-xs font-mono text-green">● {elapsed}</span>}
         </div>
-        <div className="text-xs text-neutral-500 mt-0.5 flex gap-2 flex-wrap">
+        <div className="text-xs text-sage mt-0.5 flex gap-2 flex-wrap">
           {t.client_id && <span>{clientName(t.client_id)}</span>}
           {t.assigned_to && t.assigned_to !== currentUserId && <span>→ {memberEmail(t.assigned_to)}</span>}
           <span>{formatDate(t.due_date)}</span>
-          {t.done && t.completed_at && <span className="text-emerald-400">Done {new Date(t.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+          {t.done && t.completed_at && <span className="text-green">Done {new Date(t.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
         </div>
-        {t.notes && !t.done && <div className="text-xs text-neutral-500 mt-1">{t.notes}</div>}
+        {t.notes && !t.done && <div className="text-xs text-sage mt-1">{t.notes}</div>}
       </div>
       <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {!t.done &&
           (isTimerRunning ? (
-            <button title="Stop timer" className="text-xs text-emerald-400 px-1" onClick={stopTimer}>
+            <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>
               ■
             </button>
           ) : (
-            <button title="Start timer" className="text-xs text-neutral-400 px-1" onClick={startTimer}>
+            <button title="Start timer" className="text-xs text-sage px-1" onClick={startTimer}>
               ▶
             </button>
           ))}
         {!t.done && (
-          <button title="Snooze — push to tomorrow" className="text-xs text-neutral-500 px-1" onClick={snooze}>
+          <button title="Snooze — push to tomorrow" className="text-xs text-sage px-1" onClick={snooze}>
             ⏭
           </button>
         )}
         {!t.done && skip && (
-          <button title="Skip this occurrence" className="text-xs text-neutral-500 px-1" onClick={skip}>
+          <button title="Skip this occurrence" className="text-xs text-sage px-1" onClick={skip}>
             ⤼
           </button>
         )}
-        <button className="text-xs text-neutral-400 px-1" onClick={startEdit}>
+        <button className="text-xs text-sage px-1" onClick={startEdit}>
           ✏
         </button>
-        <button className="text-xs text-red-400 px-1" onClick={del}>
+        <button className="text-xs text-red-600 px-1" onClick={del}>
           ✕
         </button>
       </div>

@@ -37,9 +37,9 @@ export default function CreateOrgForm() {
         value={orgName}
         onChange={(e) => setOrgName(e.target.value)}
         required
-        className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+        className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
       />
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" variant="primary" disabled={loading} className="w-full">
         {loading ? 'Creating…' : 'Create agency'}
       </Button>

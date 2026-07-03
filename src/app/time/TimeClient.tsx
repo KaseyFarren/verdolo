@@ -264,27 +264,27 @@ export default function TimeClient({
     <div>
       <h1 className="text-xl font-semibold mb-5">Time</h1>
 
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-6">
+      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
         {running ? (
           <div>
             <div className="text-2xl font-mono font-semibold mb-1">
               {now ? formatDuration(Math.floor((now - new Date(running.started_at).getTime()) / 1000)) : '…'}
             </div>
-            <div className="text-sm text-neutral-400 mb-3">
+            <div className="text-sm text-sage mb-3">
               {clientName(running.client_id)}
               {running.task_id && ` · ${taskTitle(running.task_id)}`}
               {running.note && ` · ${running.note}`}
             </div>
-            <button className="rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={stopTimer}>
+            <button className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={stopTimer}>
               ■ Stop
             </button>
           </div>
         ) : (
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Start a timer</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Start a timer</div>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={timerClientId}
                 onChange={(e) => {
                   setTimerClientId(e.target.value)
@@ -299,7 +299,7 @@ export default function TimeClient({
                 ))}
               </select>
               <select
-                className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={timerTaskId}
                 onChange={(e) => setTimerTaskId(e.target.value)}
                 disabled={!timerClientId}
@@ -313,13 +313,13 @@ export default function TimeClient({
               </select>
             </div>
             <input
-              className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-3"
+              className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
               placeholder="What are you working on? (optional)"
               value={timerNote}
               onChange={(e) => setTimerNote(e.target.value)}
             />
             <button
-              className="rounded bg-white text-black px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+              className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
               onClick={startTimer}
               disabled={!timerClientId || starting}
             >
@@ -330,16 +330,16 @@ export default function TimeClient({
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Log time manually</div>
-        <button className="text-xs text-neutral-400" onClick={() => setShowManual((v) => !v)}>
+        <div className="text-xs font-semibold uppercase tracking-wide text-sage">Log time manually</div>
+        <button className="text-xs text-sage" onClick={() => setShowManual((v) => !v)}>
           {showManual ? 'Cancel' : '+ Add'}
         </button>
       </div>
       {showManual && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-6">
+        <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
           <div className="grid grid-cols-2 gap-2 mb-2">
             <select
-              className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
               value={manualClientId}
               onChange={(e) => {
                 setManualClientId(e.target.value)
@@ -354,7 +354,7 @@ export default function TimeClient({
               ))}
             </select>
             <select
-              className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
               value={manualTaskId}
               onChange={(e) => setManualTaskId(e.target.value)}
               disabled={!manualClientId}
@@ -368,7 +368,7 @@ export default function TimeClient({
             </select>
             <input
               type="date"
-              className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
               value={manualDate}
               onChange={(e) => setManualDate(e.target.value)}
             />
@@ -376,14 +376,14 @@ export default function TimeClient({
               type="number"
               step="0.25"
               min="0"
-              className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
               placeholder="Hours (e.g. 1.5)"
               value={manualHours}
               onChange={(e) => setManualHours(e.target.value)}
             />
           </div>
           <input
-            className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
             placeholder="Note (optional)"
             value={manualNote}
             onChange={(e) => setManualNote(e.target.value)}
@@ -392,7 +392,7 @@ export default function TimeClient({
             <input type="checkbox" checked={manualBillable} onChange={(e) => setManualBillable(e.target.checked)} />
             Billable
           </label>
-          <button className="rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={addManualEntry}>
+          <button className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addManualEntry}>
             Save entry
           </button>
         </div>
@@ -400,12 +400,12 @@ export default function TimeClient({
 
       {totalByClient.length > 0 && (
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Time by client</div>
-          <div className="rounded-lg border border-white/10 divide-y divide-white/10">
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by client</div>
+          <div className="rounded-lg border border-ink/10 divide-y divide-white/10">
             {totalByClient.map((r) => (
               <div key={r.client.id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span>{r.client.name}</span>
-                <span className="text-neutral-400">{formatHours(r.seconds)}h</span>
+                <span className="text-sage">{formatHours(r.seconds)}h</span>
               </div>
             ))}
           </div>
@@ -414,12 +414,12 @@ export default function TimeClient({
 
       {isAdmin && totalByMember.length > 0 && (
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Time by teammate</div>
-          <div className="rounded-lg border border-white/10 divide-y divide-white/10">
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by teammate</div>
+          <div className="rounded-lg border border-ink/10 divide-y divide-white/10">
             {totalByMember.map((r) => (
               <div key={r.member.user_id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span>{memberName(r.member)}</span>
-                <span className="text-neutral-400">{formatHours(r.seconds)}h</span>
+                <span className="text-sage">{formatHours(r.seconds)}h</span>
               </div>
             ))}
           </div>
@@ -427,26 +427,26 @@ export default function TimeClient({
       )}
 
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Entries</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-sage">Entries</div>
         {completed.length > 0 && (
-          <button onClick={exportCsv} className="text-xs text-neutral-400 hover:text-white transition-colors">
+          <button onClick={exportCsv} className="text-xs text-sage hover:text-ink transition-colors">
             Export CSV
           </button>
         )}
       </div>
-      {grouped.length === 0 && <div className="text-sm text-neutral-500 py-3">No time logged yet.</div>}
+      {grouped.length === 0 && <div className="text-sm text-sage py-3">No time logged yet.</div>}
       {grouped.map((g) => (
         <div key={g.date} className="mb-4">
-          <div className="text-xs text-neutral-500 mb-1">{g.date}</div>
+          <div className="text-xs text-sage mb-1">{g.date}</div>
           {g.items.map((e) => {
             const canEdit = isAdmin || e.user_id === userId
             if (editingId === e.id) {
               const editTasks = tasks.filter((t) => t.client_id === editClientId)
               return (
-                <div key={e.id} className="rounded-lg border border-white/10 bg-white/5 p-3 mb-2">
+                <div key={e.id} className="rounded-lg border border-ink/10 bg-white p-3 mb-2">
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <select
-                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                       value={editClientId}
                       onChange={(ev) => {
                         setEditClientId(ev.target.value)
@@ -461,7 +461,7 @@ export default function TimeClient({
                       ))}
                     </select>
                     <select
-                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                       value={editTaskId}
                       onChange={(ev) => setEditTaskId(ev.target.value)}
                       disabled={!editClientId}
@@ -477,7 +477,7 @@ export default function TimeClient({
                       type="number"
                       step="0.25"
                       min="0"
-                      className="rounded border border-white/10 bg-black/30 px-2 py-2 text-sm"
+                      className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                       placeholder="Hours"
                       value={editHours}
                       onChange={(ev) => setEditHours(ev.target.value)}
@@ -488,16 +488,16 @@ export default function TimeClient({
                     </label>
                   </div>
                   <input
-                    className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-sm mb-2"
+                    className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                     placeholder="Note (optional)"
                     value={editNote}
                     onChange={(ev) => setEditNote(ev.target.value)}
                   />
                   <div className="flex gap-2">
-                    <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => setEditingId(null)}>
+                    <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingId(null)}>
                       Cancel
                     </button>
-                    <button className="flex-1 rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={() => updateEntry(e)}>
+                    <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => updateEntry(e)}>
                       Save
                     </button>
                   </div>
@@ -505,23 +505,23 @@ export default function TimeClient({
               )
             }
             return (
-              <div key={e.id} className="flex items-center gap-3 py-2 border-b border-white/10 group">
+              <div key={e.id} className="flex items-center gap-3 py-2 border-b border-ink/10 group">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm">
                     {clientName(e.client_id)}
-                    {e.task_id && <span className="text-neutral-500"> · {taskTitle(e.task_id)}</span>}
-                    {!e.billable && <span className="ml-2 text-[10px] text-neutral-500">non-billable</span>}
+                    {e.task_id && <span className="text-sage"> · {taskTitle(e.task_id)}</span>}
+                    {!e.billable && <span className="ml-2 text-[10px] text-sage">non-billable</span>}
                   </div>
-                  {e.note && <div className="text-xs text-neutral-500">{e.note}</div>}
-                  {isAdmin && <div className="text-xs text-neutral-600">{memberEmail(e.user_id)}</div>}
+                  {e.note && <div className="text-xs text-sage">{e.note}</div>}
+                  {isAdmin && <div className="text-xs text-sage/70">{memberEmail(e.user_id)}</div>}
                 </div>
-                <div className="text-sm text-neutral-400 shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
+                <div className="text-sm text-sage shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
                 {canEdit && (
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 shrink-0">
-                    <button className="text-xs text-neutral-400 px-1" onClick={() => startEdit(e)}>
+                    <button className="text-xs text-sage px-1" onClick={() => startEdit(e)}>
                       ✏
                     </button>
-                    <button className="text-xs text-red-400 px-1" onClick={() => deleteEntry(e.id)}>
+                    <button className="text-xs text-red-600 px-1" onClick={() => deleteEntry(e.id)}>
                       ✕
                     </button>
                   </div>

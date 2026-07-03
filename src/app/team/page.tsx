@@ -19,11 +19,11 @@ export default async function TeamPage() {
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Team</h1>
-        <p className="text-sm text-neutral-500">{org?.name} · signed in as {user.email} ({role})</p>
+        <p className="text-sm text-sage">{org?.name} · signed in as {user.email} ({role})</p>
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-medium text-neutral-400">Members</h2>
+        <h2 className="mb-2 text-sm font-medium text-sage">Members</h2>
         <MembersList members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
       </section>
 

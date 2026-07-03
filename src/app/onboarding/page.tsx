@@ -19,9 +19,9 @@ export default async function OnboardingPage() {
   if (memberships && memberships.length > 0) redirect('/dashboard')
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
       <h1 className="text-xl font-semibold">Set up your agency</h1>
-      <p className="text-sm text-neutral-500">You&apos;re not part of an org yet — create one to get started.</p>
+      <p className="text-sm text-sage">You&apos;re not part of an org yet — create one to get started.</p>
       <CreateOrgForm />
     </main>
   )

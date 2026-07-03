@@ -94,19 +94,19 @@ export default function CalendarClient({
     <div>
       <h1 className="text-xl font-semibold mb-5">Calendar</h1>
 
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-4">
+      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <button onClick={prevMonth} className="text-neutral-400 px-2">
+          <button onClick={prevMonth} className="text-sage px-2">
             ‹
           </button>
           <div className="text-sm font-medium">{new Date(calY, calM).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
-          <button onClick={nextMonth} className="text-neutral-400 px-2">
+          <button onClick={nextMonth} className="text-sage px-2">
             ›
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 mb-1">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <div key={i} className="text-center text-[11px] text-neutral-500 py-1">
+            <div key={i} className="text-center text-[11px] text-sage py-1">
               {d}
             </div>
           ))}
@@ -129,10 +129,10 @@ export default function CalendarClient({
                 <div
                   key={d}
                   onClick={() => selectDay(d)}
-                  className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-white text-black' : isToday ? 'bg-white/10' : ''}`}
+                  className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}
                 >
-                  <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-white font-medium' : ''}`}>{d}</div>
-                  {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-black/60' : 'bg-white/60'}`} />}
+                  <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-accent font-medium' : ''}`}>{d}</div>
+                  {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-white/80' : 'bg-ink/40'}`} />}
                 </div>
               )
             })}
@@ -144,33 +144,33 @@ export default function CalendarClient({
       </div>
       <div className="flex gap-2 mb-4">
         <input
-          className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
           placeholder="Add a task for this day…"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addTask()}
         />
-        <button className="rounded bg-white text-black px-3 py-2 text-sm font-medium" onClick={addTask}>
+        <button className="rounded bg-accent text-white px-3 py-2 text-sm font-medium shadow-md" onClick={addTask}>
           Add
         </button>
       </div>
 
       {calTasks.length === 0 ? (
-        <div className="text-sm text-neutral-500 py-4">No tasks scheduled.</div>
+        <div className="text-sm text-sage py-4">No tasks scheduled.</div>
       ) : (
         calTasks.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 py-2 border-b border-white/10 group">
+          <div key={t.id} className="flex items-center gap-3 py-2 border-b border-ink/10 group">
             <button
               onClick={() => toggleTask(t)}
-              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-500'}`}
+              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-green border-green' : 'border-ink/25'}`}
             >
-              {t.done && <span className="text-[10px] text-black">✓</span>}
+              {t.done && <span className="text-[10px] text-white">✓</span>}
             </button>
             <div className="flex-1 min-w-0">
-              <div className={`text-sm ${t.done ? 'line-through text-neutral-500' : ''}`}>{t.title}</div>
-              {t.client_id && <div className="text-xs text-neutral-500">{clientName(t.client_id)}</div>}
+              <div className={`text-sm ${t.done ? 'line-through text-sage' : ''}`}>{t.title}</div>
+              {t.client_id && <div className="text-xs text-sage">{clientName(t.client_id)}</div>}
             </div>
-            <button className="text-xs text-red-400 opacity-0 group-hover:opacity-100" onClick={() => deleteTask(t.id)}>
+            <button className="text-xs text-red-600 opacity-0 group-hover:opacity-100" onClick={() => deleteTask(t.id)}>
               ✕
             </button>
           </div>

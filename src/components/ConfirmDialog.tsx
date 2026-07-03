@@ -52,7 +52,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             onClick={() => respond(false)}
           >
             <motion.div
-              className="w-full max-w-sm rounded-lg border border-white/10 bg-neutral-900 p-5 shadow-xl"
+              className="w-full max-w-sm rounded-lg border border-ink/10 bg-white p-5 shadow-xl"
               initial={{ opacity: 0, scale: 0.96, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -60,14 +60,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               onClick={(e) => e.stopPropagation()}
             >
               {options.title && <div className="text-sm font-semibold mb-1.5">{options.title}</div>}
-              <div className="text-sm text-neutral-300 mb-5">{options.message}</div>
+              <div className="text-sm text-sage mb-5">{options.message}</div>
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => respond(false)}>
                   {options.cancelLabel ?? 'Cancel'}
                 </Button>
                 <Button
                   variant={options.danger ? 'primary' : 'primary'}
-                  className={options.danger ? '!bg-red-500 !text-white hover:!bg-red-400' : ''}
+                  className={options.danger ? '!bg-red-600 !text-white hover:!bg-red-600' : ''}
                   onClick={() => respond(true)}
                 >
                   {options.confirmLabel ?? 'Confirm'}

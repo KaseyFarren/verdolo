@@ -159,21 +159,21 @@ export default function SettingsClient({
 
       <Section label="AI Messages">
         <div className="text-sm font-medium mb-1">Anthropic API key</div>
-        <div className="text-xs text-neutral-500 mb-3">Shared across your org, used to generate daily client messages. {!isAdmin && 'Only admins can view or change it.'}</div>
+        <div className="text-xs text-sage mb-3">Shared across your org, used to generate daily client messages. {!isAdmin && 'Only admins can view or change it.'}</div>
         {isAdmin ? (
           <div className="flex items-center gap-2">
             <input
               type="password"
-              className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
               placeholder="sk-ant-…"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
             />
-            <button className="rounded bg-white text-black px-3 py-2 text-sm font-medium" onClick={saveApiKey} disabled={saving}>
+            <button className="rounded bg-accent text-white shadow-md px-3 py-2 text-sm font-medium" onClick={saveApiKey} disabled={saving}>
               Save
             </button>
             {hasKey && (
-              <button className="text-xs text-red-400 shrink-0" onClick={removeApiKey}>
+              <button className="text-xs text-red-600 shrink-0" onClick={removeApiKey}>
                 Remove
               </button>
             )}
@@ -193,7 +193,7 @@ export default function SettingsClient({
         </Row>
         <Row title="EOD reminder hour" subtitle="Show banner after this hour">
           <select
-            className="rounded border border-white/10 bg-black/30 px-2 py-1.5 text-sm"
+            className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
             value={eodHour}
             disabled={!isAdmin}
             onChange={(e) => { const v = Number(e.target.value); setEodHour(v); saveSettings({ eod_hour: v }) }}
@@ -208,28 +208,28 @@ export default function SettingsClient({
         <Row title="Desktop notifications" subtitle="EOD alert + morning summary">
           <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
         </Row>
-        {saved && <div className="text-xs text-emerald-400 mt-2">Saved</div>}
+        {saved && <div className="text-xs text-green mt-2">Saved</div>}
       </Section>
 
       <Section label="Data">
         <Row title="Export all data (JSON)" subtitle="Full backup — clients, tasks, notes">
-          <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={exportJSON}>
+          <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={exportJSON}>
             Export
           </button>
         </Row>
         <Row title="Export clients (CSV)" subtitle="Spreadsheet-ready client list">
-          <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={exportCSV}>
+          <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={exportCSV}>
             Export
           </button>
         </Row>
         <Row title="Clear completed tasks" subtitle="Remove all tasks marked as done">
-          <button className="text-xs text-red-400" onClick={clearCompleted}>
+          <button className="text-xs text-red-600" onClick={clearCompleted}>
             Clear
           </button>
         </Row>
         {isAdmin && (
           <Row title="Reset all data" subtitle="Delete tasks, clients, and notes for this org">
-            <button className="text-xs text-red-400" onClick={resetAll}>
+            <button className="text-xs text-red-600" onClick={resetAll}>
               Reset
             </button>
           </Row>
@@ -252,18 +252,18 @@ function triggerDownload(content: string, filename: string, type: string) {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">{label}</div>
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4">{children}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">{label}</div>
+      <div className="rounded-lg border border-ink/10 bg-white p-4">{children}</div>
     </div>
   )
 }
 
 function Row({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/10 last:border-b-0 last:pb-0 first:pt-0">
+    <div className="flex items-center justify-between py-2.5 border-b border-ink/10 last:border-b-0 last:pb-0 first:pt-0">
       <div>
         <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-neutral-500 mt-0.5">{subtitle}</div>
+        <div className="text-xs text-sage mt-0.5">{subtitle}</div>
       </div>
       {children}
     </div>
@@ -274,7 +274,7 @@ function Toggle({ checked, disabled, onChange }: { checked: boolean; disabled?: 
   return (
     <div
       onClick={() => !disabled && onChange(!checked)}
-      className={`w-10 h-[22px] rounded-full relative shrink-0 transition-colors ${checked ? 'bg-white' : 'bg-white/15'} ${disabled ? 'opacity-40' : 'cursor-pointer'}`}
+      className={`w-10 h-[22px] rounded-full relative shrink-0 transition-colors ${checked ? 'bg-white' : 'bg-ink/5'} ${disabled ? 'opacity-40' : 'cursor-pointer'}`}
     >
       <div className={`absolute top-[3px] h-4 w-4 rounded-full bg-black transition-all ${checked ? 'left-[20px]' : 'left-[3px]'}`} />
     </div>
@@ -328,13 +328,13 @@ function ProfileSection({
       <Row title="Nickname" subtitle="Shown instead of your email across the app">
         <div className="flex items-center gap-2">
           <input
-            className="rounded border border-white/10 bg-black/30 px-2 py-1.5 text-sm w-40"
+            className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm w-40"
             placeholder="Your name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             onBlur={saveDisplayName}
           />
-          {saved && <span className="text-xs text-emerald-400">Saved</span>}
+          {saved && <span className="text-xs text-green">Saved</span>}
         </div>
       </Row>
       <Row title="Profile picture" subtitle="JPG or PNG, shown on Team and task assignments">
@@ -343,9 +343,9 @@ function ProfileSection({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold">{getInitials(displayName)}</div>
+            <div className="h-8 w-8 rounded-full bg-ink/5 flex items-center justify-center text-xs font-semibold">{getInitials(displayName)}</div>
           )}
-          <label className="text-xs rounded border border-white/10 px-2 py-1 cursor-pointer">
+          <label className="text-xs rounded border border-ink/10 px-2 py-1 cursor-pointer">
             {uploading ? 'Uploading…' : 'Upload'}
             <input
               type="file"
@@ -360,7 +360,7 @@ function ProfileSection({
           </label>
         </div>
       </Row>
-      {error && <div className="text-xs text-red-400 mt-2">{error}</div>}
+      {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
     </Section>
   )
 }
@@ -415,16 +415,16 @@ function SecuritySection() {
       <Row title="Device PIN lock" subtitle="Locks this browser after inactivity — a quick deterrent, not a replacement for your login">
         {hasPin && !changing ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-emerald-400">● PIN set</span>
-            <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={() => setChanging(true)}>
+            <span className="text-xs text-green">● PIN set</span>
+            <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={() => setChanging(true)}>
               Change
             </button>
-            <button className="text-xs text-red-400" onClick={removePin}>
+            <button className="text-xs text-red-600" onClick={removePin}>
               Remove
             </button>
           </div>
         ) : (
-          <button className="text-xs rounded border border-white/10 px-2 py-1" onClick={() => setChanging(true)}>
+          <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={() => setChanging(true)}>
             {changing ? 'Cancel' : 'Set PIN'}
           </button>
         )}
@@ -439,7 +439,7 @@ function SecuritySection() {
               placeholder="New PIN"
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-              className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
             />
             <input
               type="password"
@@ -448,15 +448,15 @@ function SecuritySection() {
               placeholder="Confirm PIN"
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-              className="flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 text-sm"
+              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
             />
           </div>
-          {error && <div className="text-xs text-red-400 mb-2">{error}</div>}
+          {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
           <div className="flex gap-2">
-            <button className="rounded border border-white/10 px-3 py-1.5 text-sm" onClick={() => { setChanging(false); setError(null) }}>
+            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => { setChanging(false); setError(null) }}>
               Cancel
             </button>
-            <button className="rounded bg-white text-black px-3 py-1.5 text-sm font-medium" onClick={savePin}>
+            <button className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={savePin}>
               Save PIN
             </button>
           </div>
@@ -467,7 +467,7 @@ function SecuritySection() {
           <select
             value={idleMinutes}
             onChange={(e) => changeIdle(Number(e.target.value))}
-            className="rounded border border-white/10 bg-black/30 px-2 py-1.5 text-sm"
+            className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
           >
             {[2, 5, 10, 15, 30].map((m) => (
               <option key={m} value={m}>
@@ -492,19 +492,19 @@ function BillingSummary({
   const trialExpired = subscriptionStatus === 'trialing' && trialDaysLeft <= 0
 
   let label = 'No subscription'
-  let color = 'text-neutral-400'
+  let color = 'text-sage'
   if (subscriptionStatus === 'trialing' && !trialExpired) {
     label = `Free trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left`
-    color = 'text-emerald-400'
+    color = 'text-green'
   } else if (subscriptionStatus === 'active') {
     label = 'Active subscription'
-    color = 'text-emerald-400'
+    color = 'text-green'
   } else if (subscriptionStatus === 'past_due') {
     label = 'Payment past due'
-    color = 'text-amber-400'
+    color = 'text-amber-700'
   } else {
     label = 'Trial ended'
-    color = 'text-amber-400'
+    color = 'text-amber-700'
   }
 
   return (
@@ -512,7 +512,7 @@ function BillingSummary({
       <Row title="Plan" subtitle="£25/seat/month">
         <div className="flex items-center gap-3">
           <span className={`text-sm font-medium ${color}`}>{label}</span>
-          <Link href="/billing" className="text-xs rounded border border-white/10 px-2 py-1">
+          <Link href="/billing" className="text-xs rounded border border-ink/10 px-2 py-1">
             Manage →
           </Link>
         </div>
@@ -541,17 +541,17 @@ function GmailConnect() {
     <Row title="Gmail" subtitle="Connect your own inbox to read and reply to client emails from inside Agency Hub">
       {status?.connected ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-emerald-400">● {status.email}</span>
-          <button className="text-xs text-red-400" onClick={disconnect}>
+          <span className="text-xs text-green">● {status.email}</span>
+          <button className="text-xs text-red-600" onClick={disconnect}>
             Disconnect
           </button>
         </div>
       ) : (
-        <a href="/api/integrations/google/connect" className="text-xs rounded border border-white/10 px-2 py-1">
+        <a href="/api/integrations/google/connect" className="text-xs rounded border border-ink/10 px-2 py-1">
           Connect Gmail
         </a>
       )}
-      {feedback === 'error' && <span className="text-xs text-red-400 ml-2">Connection failed — try again</span>}
+      {feedback === 'error' && <span className="text-xs text-red-600 ml-2">Connection failed — try again</span>}
     </Row>
   )
 }

@@ -46,12 +46,12 @@ export default function SignupPage() {
 
   if (checkEmail) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
         <h1 className="text-xl font-semibold">Check your email</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-sage">
           We sent a confirmation link to {email}. Click it, then come back and log in.
         </p>
-        <Link href="/login" className="underline hover:text-neutral-300">
+        <Link href="/login" className="underline hover:text-sage">
           Back to login
         </Link>
       </main>
@@ -59,7 +59,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-neutral-950 text-neutral-100">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
       <h1 className="text-xl font-semibold">Create your account</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
@@ -68,7 +68,7 @@ export default function SignupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <input
           type="password"
@@ -77,9 +77,9 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <label className="flex items-start gap-2 text-xs text-neutral-500">
+        <label className="flex items-start gap-2 text-xs text-sage">
           <input
             type="checkbox"
             checked={agreed}
@@ -88,24 +88,24 @@ export default function SignupPage() {
           />
           <span>
             I agree to the{' '}
-            <Link href="/terms" target="_blank" className="underline hover:text-neutral-300">
+            <Link href="/terms" target="_blank" className="underline hover:text-sage">
               Terms of Service
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" target="_blank" className="underline hover:text-neutral-300">
+            <Link href="/privacy" target="_blank" className="underline hover:text-sage">
               Privacy Policy
             </Link>
             .
           </span>
         </label>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Creating…' : 'Sign up'}
         </Button>
       </form>
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-sage">
         Already have an account?{' '}
-        <Link href="/login" className="underline hover:text-neutral-300">
+        <Link href="/login" className="underline hover:text-sage">
           Log in
         </Link>
       </p>
