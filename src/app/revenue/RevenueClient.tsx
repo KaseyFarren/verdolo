@@ -44,20 +44,26 @@ function fmtMoney(cents: number) {
   return `$${centsToDollars(cents).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
+type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
+
 export default function RevenueClient({
   orgId,
   month,
+  today,
   clients,
   initialCharges,
   entries,
   members,
+  tasks,
 }: {
   orgId: string
   month: string
+  today: string
   clients: Client[]
   initialCharges: Charge[]
   entries: Entry[]
   members: Member[]
+  tasks: TaskRow[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
@@ -122,12 +128,29 @@ export default function RevenueClient({
         }
         return { member: m, seconds, revenue }
       })
-      .filter((r) => r.seconds > 0)
+      .filter((r) => r.seconds > 0 || tasks.some((t) => t.assigned_to === r.member.user_id))
       .sort((a, b) => b.revenue - a.revenue)
-  }, [members, clientRows, entries])
+  }, [members, clientRows, entries, tasks])
 
   const maxMemberSeconds = Math.max(1, ...memberRows.map((r) => r.seconds))
   const maxMemberRevenue = Math.max(1, ...memberRows.map((r) => r.revenue))
+
+  // original_due_date is frozen at task creation (migration 0020) and never changes even if
+  // due_date is edited later, so these counts can't be gamed by pushing a due date forward.
+  const taskStatsByMember = useMemo(() => {
+    const map = new Map<string, { completed: number; completedLate: number; overdueIncomplete: number }>()
+    for (const t of tasks) {
+      const stats = map.get(t.assigned_to) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
+      if (t.done) {
+        stats.completed++
+        if (t.completed_at && t.original_due_date && t.completed_at.slice(0, 10) > t.original_due_date) stats.completedLate++
+      } else if (t.original_due_date && t.original_due_date < today) {
+        stats.overdueIncomplete++
+      }
+      map.set(t.assigned_to, stats)
+    }
+    return map
+  }, [tasks, today])
 
   const totals = useMemo(() => {
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
@@ -282,28 +305,46 @@ export default function RevenueClient({
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">By teammate</div>
       {memberRows.length === 0 ? (
-        <div className="text-sm text-sage py-4">No time logged this month.</div>
+        <div className="text-sm text-sage py-4">No time logged or tasks assigned this month.</div>
       ) : (
         <div className="space-y-3">
-          {memberRows.map((r, i) => (
-            <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4 flex items-center gap-4">
-              <Avatar member={r.member} index={i} />
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">{memberName(r.member)}</div>
-                {r.member.role && <div className="text-xs text-sage capitalize">{r.member.role}</div>}
-              </div>
-              <div className="ml-auto flex gap-2 shrink-0">
-                <div className="w-28">
-                  <div className="text-[10px] text-sage mb-1">Hours</div>
-                  <MetricBar value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
+          {memberRows.map((r, i) => {
+            const stats = taskStatsByMember.get(r.member.user_id) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
+            return (
+              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
+                <div className="flex items-center gap-4">
+                  <Avatar member={r.member} index={i} />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{memberName(r.member)}</div>
+                    {r.member.role && <div className="text-xs text-sage capitalize">{r.member.role}</div>}
+                  </div>
+                  <div className="ml-auto flex gap-2 shrink-0">
+                    <div className="w-28">
+                      <div className="text-[10px] text-sage mb-1">Hours</div>
+                      <MetricBar value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
+                    </div>
+                    <div className="w-28">
+                      <div className="text-[10px] text-sage mb-1">Revenue</div>
+                      <MetricBar value={r.revenue} max={maxMemberRevenue} display={fmtMoney(Math.round(r.revenue))} />
+                    </div>
+                  </div>
                 </div>
-                <div className="w-28">
-                  <div className="text-[10px] text-sage mb-1">Revenue</div>
-                  <MetricBar value={r.revenue} max={maxMemberRevenue} display={fmtMoney(Math.round(r.revenue))} />
+                <div className="flex gap-2 mt-3 pl-12">
+                  <div className="rounded-lg bg-sand px-3 py-1.5 text-xs">
+                    <span className="font-semibold">{stats.completed}</span> <span className="text-sage">completed</span>
+                  </div>
+                  <div className={`rounded-lg px-3 py-1.5 text-xs ${stats.overdueIncomplete > 0 ? 'bg-red-100' : 'bg-sand'}`}>
+                    <span className={`font-semibold ${stats.overdueIncomplete > 0 ? 'text-red-600' : ''}`}>{stats.overdueIncomplete}</span>{' '}
+                    <span className={stats.overdueIncomplete > 0 ? 'text-red-600' : 'text-sage'}>overdue</span>
+                  </div>
+                  <div className={`rounded-lg px-3 py-1.5 text-xs ${stats.completedLate > 0 ? 'bg-amber-100' : 'bg-sand'}`}>
+                    <span className={`font-semibold ${stats.completedLate > 0 ? 'text-amber-700' : ''}`}>{stats.completedLate}</span>{' '}
+                    <span className={stats.completedLate > 0 ? 'text-amber-700' : 'text-sage'}>completed late</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
