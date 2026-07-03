@@ -35,7 +35,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .eq('org_id', orgId)
       .gte('started_at', monthStart)
       .lt('started_at', monthEnd),
-    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role').eq('org_id', orgId).eq('status', 'active'),
+    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role, title').eq('org_id', orgId).eq('status', 'active'),
     // original_due_date is frozen at creation (see migration 0020) so this can't be gamed by
     // pushing due_date forward — completed/overdue/late counters always reflect the original commitment
     supabase

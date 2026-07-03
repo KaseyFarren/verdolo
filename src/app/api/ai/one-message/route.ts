@@ -14,12 +14,14 @@ export async function POST(request: Request) {
 
   const { data: membership } = await supabase
     .from('org_members')
-    .select('org_id')
+    .select('org_id, orgs(settings)')
     .eq('org_id', orgId)
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'Not a member of this org' }, { status: 403 })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const brandVoice = (membership.orgs as any)?.settings?.brand_voice as string | undefined
 
   const apiKey = await getOrgAnthropicKey(orgId)
   if (!apiKey) return NextResponse.json({ error: 'No Anthropic API key set for this org' }, { status: 400 })
@@ -29,15 +31,14 @@ export async function POST(request: Request) {
 
   const today = todayKey()
   const cutoff = getOffsetDate(-7)
-  const { data: lastMsgRow } = await supabase
+  const { data: lastMsgRows } = await supabase
     .from('ai_message_log')
     .select('message, created_at')
     .eq('org_id', orgId)
     .eq('client_id', clientId)
     .lt('created_at', today)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(3)
   const { data: recentTasks } = await supabase
     .from('tasks')
     .select('title')
@@ -52,10 +53,11 @@ export async function POST(request: Request) {
     const prompt = buildSingleMessagePrompt(
       client,
       {
-        lastMessage: lastMsgRow ? { date: lastMsgRow.created_at.slice(0, 10), message: lastMsgRow.message } : null,
+        recentMessages: (lastMsgRows || []).map((m) => ({ date: m.created_at.slice(0, 10), message: m.message })),
         recentlyCompleted: (recentTasks || []).map((t) => t.title),
       },
-      todaysFocus
+      todaysFocus,
+      brandVoice
     )
     const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ message: extractText(result) })

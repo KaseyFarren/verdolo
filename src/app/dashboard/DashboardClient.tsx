@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
+import Button from '@/components/ui/Button'
 import {
   AVATAR_COLORS,
   formatDate,
@@ -42,7 +43,6 @@ type Task = {
   skipped: boolean
 }
 type Recurring = { id: string; title: string; client_id: string | null; priority: string; frequency: string; notes: string | null }
-type WeekTimeEntry = { client_id: string | null; duration_seconds: number | null }
 type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seconds: number | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
@@ -60,12 +60,14 @@ export default function DashboardClient({
   initialClients,
   initialTasks,
   initialRecurring,
-  weekTimeEntries,
   todayTimeEntries,
   members,
   initialNote,
   hasApiKey,
   excludeWeekends,
+  initialRecap,
+  pastReports,
+  initialSentToday,
 }: {
   orgId: string
   userId: string
@@ -73,12 +75,14 @@ export default function DashboardClient({
   initialClients: Client[]
   initialTasks: Task[]
   initialRecurring: Recurring[]
-  weekTimeEntries: WeekTimeEntry[]
   todayTimeEntries: TodayTimeEntry[]
   members: Member[]
   initialNote: string
   hasApiKey: boolean
   excludeWeekends: boolean
+  initialRecap: string | null
+  pastReports: { week_start: string; content: string }[]
+  initialSentToday: string[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [clients] = useState<Client[]>(initialClients)
@@ -105,8 +109,10 @@ export default function DashboardClient({
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingOne, setLoadingOne] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [recap, setRecap] = useState<string | null>(null)
+  const [recap, setRecap] = useState<string | null>(initialRecap)
   const [loadingRecap, setLoadingRecap] = useState(false)
+  const [showPastReports, setShowPastReports] = useState(false)
+  const [sentClientIds, setSentClientIds] = useState<Set<string>>(new Set(initialSentToday))
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
 
@@ -136,16 +142,6 @@ export default function DashboardClient({
   const dashLabel = dashIsToday ? 'Today' : dashDate === yesterday ? 'Yesterday' : 'Tomorrow'
 
   const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
-  const weekSeconds = weekTimeEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
-  const weekHours = (weekSeconds / 3600).toFixed(1)
-  const topTimeClients = clients
-    .map((c) => ({
-      name: c.name,
-      seconds: weekTimeEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0),
-    }))
-    .filter((r) => r.seconds > 0)
-    .sort((a, b) => b.seconds - a.seconds)
-    .slice(0, 3)
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
@@ -182,7 +178,7 @@ export default function DashboardClient({
   const ringDone = dashCompleted.length
 
   function isSentToday(clientId: string) {
-    return tasks.some((t) => t.client_id === clientId && t.is_auto && t.auto_type === 'checkin' && t.due_date === today && t.done)
+    return sentClientIds.has(clientId) || tasks.some((t) => t.client_id === clientId && t.is_auto && t.auto_type === 'checkin' && t.due_date === today && t.done)
   }
 
   async function addQuickTask() {
@@ -258,9 +254,13 @@ export default function DashboardClient({
     setCopiedId(client.id)
     setTimeout(() => setCopiedId(null), 2000)
 
-    await supabase.from('ai_message_log').insert({ org_id: orgId, client_id: client.id, message })
+    const { error } = await supabase.from('ai_message_log').insert({ org_id: orgId, client_id: client.id, message })
+    if (error) return
+    setSentClientIds((prev) => new Set(prev).add(client.id))
     await supabase.from('clients').update({ last_contacted: today, awaiting_reply: true }).eq('id', client.id)
 
+    // Best-effort: also close out today's auto-checkin task if one exists, so it drops off
+    // the Tasks list — the "Sent" UI above no longer depends on this succeeding.
     const checkin = tasks.find((t) => t.client_id === client.id && t.is_auto && t.auto_type === 'checkin' && (t.due_date === today || (t.due_date < today && !t.done)))
     if (checkin) {
       const { data } = await supabase.from('tasks').update({ done: true, completed_at: new Date().toISOString() }).eq('id', checkin.id).select().single()
@@ -269,6 +269,11 @@ export default function DashboardClient({
   }
 
   async function undoSent(client: Client) {
+    setSentClientIds((prev) => {
+      const next = new Set(prev)
+      next.delete(client.id)
+      return next
+    })
     const checkin = tasks.find((t) => t.client_id === client.id && t.is_auto && t.auto_type === 'checkin' && t.due_date === today)
     if (checkin) {
       const { data } = await supabase.from('tasks').update({ done: false, completed_at: null }).eq('id', checkin.id).select().single()
@@ -306,16 +311,6 @@ export default function DashboardClient({
           {activeClients.length > 0 && (
             <div className="text-sm text-sage mt-1">
               {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
-            </div>
-          )}
-          {weekSeconds > 0 && (
-            <div className="text-xs text-sage mt-1">
-              {weekHours}h logged this week
-              {topTimeClients.length > 0 && ` · ${topTimeClients.map((c) => c.name).join(', ')}`}
-              {' · '}
-              <Link href="/time" className="underline text-accent">
-                Time
-              </Link>
             </div>
           )}
         </div>
@@ -371,6 +366,23 @@ export default function DashboardClient({
             >
               {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'Add an Anthropic key in Settings to enable AI'}
             </button>
+          )}
+          {pastReports.length > 0 && (
+            <div className="mt-2">
+              <button className="text-xs text-sage hover:text-ink" onClick={() => setShowPastReports((v) => !v)}>
+                {showPastReports ? '▾' : '▸'} Past reports ({pastReports.length})
+              </button>
+              {showPastReports && (
+                <div className="mt-2 space-y-2">
+                  {pastReports.map((r) => (
+                    <div key={r.week_start} className="rounded-xl bg-white shadow-md p-3">
+                      <div className="text-xs font-semibold text-sage mb-1">Week of {formatDate(r.week_start)}</div>
+                      <div className="text-sm leading-relaxed text-ink">{r.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -505,9 +517,9 @@ export default function DashboardClient({
               {msgTasksDone}/{activeClients.length} sent
             </span>
             {hasApiKey && (
-              <button className="text-xs text-sage hover:text-ink border border-ink/15 rounded-lg px-2 py-1" onClick={generateAll} disabled={loadingAll}>
+              <Button variant="secondary" size="sm" className="text-sage hover:text-ink" onClick={generateAll} disabled={loadingAll}>
                 {loadingAll ? 'Writing…' : '✨ Generate all'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -559,6 +571,12 @@ export default function DashboardClient({
                     placeholder="What to cover today… (optional)"
                     value={focusInputs[c.id] || ''}
                     onChange={(e) => setFocusInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isGen && hasApiKey) {
+                        e.preventDefault()
+                        generateOne(c.id)
+                      }
+                    }}
                   />
                   {draftMessages[c.id] !== undefined && (
                     <textarea
@@ -568,17 +586,13 @@ export default function DashboardClient({
                     />
                   )}
                   <div className="flex gap-2">
-                    <button
-                      className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs text-sage hover:text-ink"
-                      onClick={() => generateOne(c.id)}
-                      disabled={isGen || !hasApiKey}
-                    >
+                    <Button variant="secondary" size="md" className="text-xs text-sage hover:text-ink" onClick={() => generateOne(c.id)} disabled={isGen || !hasApiKey}>
                       {isGen ? 'Writing…' : draftMessages[c.id] !== undefined ? '↺' : '✨ Generate'}
-                    </button>
+                    </Button>
                     {draftMessages[c.id] !== undefined && (
-                      <button className="flex-1 rounded-lg bg-accent text-white px-3 py-1.5 text-xs font-medium shadow-md" onClick={() => markSent(c)}>
+                      <Button variant="primary" size="md" className="flex-1 text-xs" onClick={() => markSent(c)}>
                         {copiedId === c.id ? '✓ Copied' : 'Copy & mark sent'}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </>

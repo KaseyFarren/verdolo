@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion } from 'motion/react'
 
 const NAV = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Profile' },
   { href: '/settings/appearance', label: 'Appearance', adminOnly: true },
+  { href: '/settings/voice', label: 'Voice & Tone', adminOnly: true },
   { href: '/settings/integrations', label: 'Integrations' },
   { href: '/settings/security', label: 'Security' },
   { href: '/settings/data', label: 'Data' },
@@ -25,11 +27,18 @@ export default function SettingsNav({ role }: { role: 'owner' | 'admin' | 'membe
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors ${
-              active ? 'bg-white shadow-md font-medium text-ink' : 'text-sage hover:text-ink hover:bg-sand'
+            className={`relative rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+              active ? 'font-medium text-ink' : 'text-sage hover:text-ink hover:bg-sand'
             }`}
           >
-            {item.label}
+            {active && (
+              <motion.div
+                layoutId="settings-nav-active"
+                className="absolute inset-0 rounded-lg bg-white shadow-md"
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span className="relative">{item.label}</span>
           </Link>
         )
       })}

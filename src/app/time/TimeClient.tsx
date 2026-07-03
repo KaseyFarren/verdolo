@@ -19,7 +19,7 @@ type Entry = {
   note: string | null
   billable: boolean
 }
-type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null; role?: string }
+type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null; role?: string; title?: string | null }
 
 function Avatar({ member, index }: { member: Member; index: number }) {
   const name = memberName(member)
@@ -436,7 +436,12 @@ export default function TimeClient({
                   <Avatar member={r.member} index={i} />
                   <div>
                     <div className="text-sm font-semibold">{memberName(r.member)}</div>
-                    {r.member.role && <div className="text-xs text-sage capitalize">{r.member.role}</div>}
+                    {r.member.role && (
+                      <div className="text-xs text-sage capitalize">
+                        {r.member.role}
+                        {r.member.title && ` · ${r.member.title}`}
+                      </div>
+                    )}
                   </div>
                   <div className="ml-auto text-sm font-semibold">{formatHours(r.seconds)}h total</div>
                 </div>

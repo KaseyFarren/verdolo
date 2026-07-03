@@ -14,12 +14,14 @@ export async function POST(request: Request) {
 
   const { data: membership } = await supabase
     .from('org_members')
-    .select('org_id')
+    .select('org_id, orgs(settings)')
     .eq('org_id', orgId)
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'Not a member of this org' }, { status: 403 })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const brandVoice = (membership.orgs as any)?.settings?.brand_voice as string | undefined
 
   const apiKey = await getOrgAnthropicKey(orgId)
   if (!apiKey) return NextResponse.json({ error: 'No Anthropic API key set for this org' }, { status: 400 })
@@ -45,7 +47,10 @@ export async function POST(request: Request) {
     .gte('completed_at', cutoff)
 
   const clientsWithContext = active.map((c) => {
-    const lastMsg = (history || []).find((h) => h.client_id === c.id)
+    const recentMsgs = (history || [])
+      .filter((h) => h.client_id === c.id)
+      .slice(0, 3)
+      .map((h) => ({ date: h.created_at.slice(0, 10), message: h.message }))
     const done = (recentTasks || []).filter((t) => t.client_id === c.id).map((t) => t.title).slice(0, 5)
     return {
       name: c.name,
@@ -57,14 +62,14 @@ export async function POST(request: Request) {
       talking_points: c.talking_points,
       last_contacted: c.last_contacted,
       priorContext: {
-        lastMessage: lastMsg ? { date: lastMsg.created_at.slice(0, 10), message: lastMsg.message } : null,
+        recentMessages: recentMsgs,
         recentlyCompleted: done,
       },
     }
   })
 
   try {
-    const prompt = buildDailyMessagesPrompt(clientsWithContext)
+    const prompt = buildDailyMessagesPrompt(clientsWithContext, brandVoice)
     const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] })
     const txt = extractText(result)
     const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim())

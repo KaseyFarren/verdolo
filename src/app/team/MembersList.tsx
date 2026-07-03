@@ -10,6 +10,7 @@ type Member = {
   id: string
   user_id: string
   role: 'owner' | 'admin' | 'member'
+  title: string | null
   status: string
   invited_email: string | null
   display_name: string | null
@@ -46,6 +47,13 @@ export default function MembersList({
     }
   }
 
+  async function saveTitle(m: Member, title: string) {
+    const trimmed = title.trim() || null
+    if (trimmed === m.title) return
+    const { data } = await supabase.from('org_members').update({ title: trimmed }).eq('id', m.id).select().single()
+    if (data) setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+  }
+
   async function removeMember(m: Member) {
     const ok = await confirm({
       title: `Remove ${memberName(m)}?`,
@@ -79,10 +87,22 @@ export default function MembersList({
                   {getInitials(memberName(m))}
                 </div>
               )}
-              <span className="truncate">
-                {memberName(m)}
-                {isSelf && <span className="text-sage"> (you)</span>}
-              </span>
+              <div className="min-w-0">
+                <span className="truncate">
+                  {memberName(m)}
+                  {isSelf && <span className="text-sage"> (you)</span>}
+                </span>
+                {canManage ? (
+                  <input
+                    defaultValue={m.title ?? ''}
+                    placeholder="Add role/title…"
+                    onBlur={(e) => saveTitle(m, e.target.value)}
+                    className="block w-32 rounded border border-transparent hover:border-ink/10 focus:border-ink/10 bg-transparent px-1 -mx-1 text-xs text-sage focus:bg-white outline-none"
+                  />
+                ) : (
+                  m.title && <span className="block text-xs text-sage">{m.title}</span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {canTouch ? (

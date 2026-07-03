@@ -13,7 +13,7 @@ import MetricBar from '@/components/ui/MetricBar'
 type Client = { id: string; name: string; retainer_cents: number | null; stage: string | null; status: string | null }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type Entry = { user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string }
-type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string }
+type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string; title?: string | null }
 
 function Avatar({ member, index }: { member: Member; index: number }) {
   const name = memberName(member)
@@ -316,7 +316,12 @@ export default function RevenueClient({
                   <Avatar member={r.member} index={i} />
                   <div className="min-w-0">
                     <div className="text-sm font-semibold">{memberName(r.member)}</div>
-                    {r.member.role && <div className="text-xs text-sage capitalize">{r.member.role}</div>}
+                    {r.member.role && (
+                      <div className="text-xs text-sage capitalize">
+                        {r.member.role}
+                        {r.member.title && ` · ${r.member.title}`}
+                      </div>
+                    )}
                   </div>
                   <div className="ml-auto flex gap-2 shrink-0">
                     <div className="w-28">

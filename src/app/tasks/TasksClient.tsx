@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/ui/CustomSelect'
+import Button from '@/components/ui/Button'
 import {
   PRIORITY,
   formatDate,
@@ -396,24 +397,34 @@ export default function TasksClient({
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1 rounded text-xs capitalize ${view === v ? 'bg-white shadow-sm' : 'text-sage'}`}
+                className={`relative px-3 py-1 rounded text-xs capitalize ${view === v ? 'text-ink' : 'text-sage'}`}
               >
-                {v}
+                {view === v && (
+                  <motion.div
+                    layoutId="tasks-view-toggle"
+                    className="absolute inset-0 rounded bg-white shadow-sm"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <span className="relative">{v}</span>
               </button>
             ))}
           </div>
         </div>
-        {view === 'list' && !showAddTask && (
-          <button
-            className="rounded-md bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
+        {/* invisible (not unmounted) when hidden so the header row height stays constant across view/showAddTask changes */}
+        <div className={view === 'list' && !showAddTask ? '' : 'invisible pointer-events-none'}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="rounded-md"
             onClick={() => {
               setShowAddTask(true)
               setTaskForm((f) => ({ ...emptyTaskForm, dueDate: selectedDate || todayKey(), title: f.title }))
             }}
           >
             + New task
-          </button>
-        )}
+          </Button>
+        </div>
       </div>
 
       {view === 'list' && showAddTask && (

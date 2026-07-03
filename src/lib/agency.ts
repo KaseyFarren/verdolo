@@ -30,6 +30,17 @@ export function getOffsetDate(offset: number) {
   return todayKey(d)
 }
 
+/** Monday of the current week, stable across all 7 days of that week — unlike getOffsetDate(-7)
+ * (a rolling "today minus 7" that shifts daily), this is safe to use as a storage key for
+ * once-per-week data like weekly_reports. */
+export function getWeekAnchor(d = new Date()) {
+  const day = d.getDay()
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diffToMonday)
+  return todayKey(monday)
+}
+
 export function formatDate(iso?: string | null) {
   if (!iso) return ''
   const [y, m, d] = iso.split('-').map(Number)

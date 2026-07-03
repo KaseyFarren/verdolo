@@ -10,7 +10,7 @@ type ClientCtx = {
 }
 
 type PriorContext = {
-  lastMessage?: { date: string; message: string } | null
+  recentMessages?: { date: string; message: string }[]
   recentlyCompleted?: string[]
 }
 
@@ -42,36 +42,43 @@ function ctxLine(c: ClientCtx, prior?: PriorContext) {
     c.tone ? `Tone: ${c.tone}` : '',
     c.talking_points ? `Must mention: ${c.talking_points}` : '',
     c.last_contacted ? `Last contacted: ${c.last_contacted}` : '',
-    prior?.lastMessage ? `Previous message (${prior.lastMessage.date}): "${prior.lastMessage.message}"` : '',
+    prior?.recentMessages?.length
+      ? `Recent messages sent: ${prior.recentMessages.map((m) => `(${m.date}) "${m.message}"`).join('; ')}`
+      : '',
     prior?.recentlyCompleted?.length ? `Recently completed tasks: ${prior.recentlyCompleted.join('; ')}` : '',
   ]
     .filter(Boolean)
     .join(', ')
 }
 
-export function buildDailyMessagesPrompt(clients: (ClientCtx & { priorContext?: PriorContext })[]) {
+function voiceLine(brandVoice?: string | null) {
+  return brandVoice?.trim() ? `Brand voice — write in this voice: ${brandVoice.trim()}\n` : ''
+}
+
+export function buildDailyMessagesPrompt(clients: (ClientCtx & { priorContext?: PriorContext })[], brandVoice?: string | null) {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return `You are a professional agency assistant. Today is ${dateStr}.
-For each client, write a short friendly daily check-in message (3-5 sentences), ready to send as-is. Match tone to their platform. Sound human, not corporate.
+${voiceLine(brandVoice)}For each client, write a short friendly daily check-in message (3-5 sentences), ready to send as-is. Match tone to their platform. Sound human, not corporate.
 Clients:
 ${clients.map((c, i) => `${i + 1}. ${ctxLine(c, c.priorContext)}`).join('\n')}
 Return ONLY valid JSON, no markdown:
 {"messages":[{"client":"name","message":"text"}]}`
 }
 
-export function buildSingleMessagePrompt(client: ClientCtx, prior: PriorContext, todaysFocus?: string) {
+export function buildSingleMessagePrompt(client: ClientCtx, prior: PriorContext, todaysFocus?: string, brandVoice?: string | null) {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const focus = todaysFocus ? `Today specifically cover: ${todaysFocus}. ` : ''
-  return `Write one short friendly check-in message (3-5 sentences) for today (${dateStr}). ${focus}${ctxLine(client, prior)}. Return ONLY the message text, nothing else.`
+  return `Write one short friendly check-in message (3-5 sentences) for today (${dateStr}). ${voiceLine(brandVoice)}${focus}${ctxLine(client, prior)}. Return ONLY the message text, nothing else.`
 }
 
 export function buildWeeklyRecapPrompt(params: {
   today: string
   weekStart: string
   clientSummaries: string[]
+  brandVoice?: string | null
 }) {
   return `You are an agency operations assistant. Write a concise weekly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers.
-
+${voiceLine(params.brandVoice)}
 Today: ${params.today} | Week: ${params.weekStart}–${params.today}
 ${params.clientSummaries.join('\n')}`
 }
