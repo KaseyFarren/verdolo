@@ -42,7 +42,7 @@ export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
 
   if (!membership) redirect('/onboarding')
 
-  if (!opts?.skipPaywall && !hasActiveAccess(membership.orgs)) redirect('/billing')
+  if (!opts?.skipPaywall && !hasActiveAccess(membership.orgs)) redirect('/settings/billing')
 
   return {
     supabase,

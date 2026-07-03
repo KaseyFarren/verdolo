@@ -17,7 +17,6 @@ const NAV = [
   { href: '/time', icon: '⏱️', label: 'Time' },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
   { href: '/revenue', icon: '💰', label: 'Revenue', ownerOnly: true },
-  { href: '/billing', icon: '💳', label: 'Billing', ownerOnly: true },
   { href: '/settings', icon: '⚙️', label: 'Settings' },
 ]
 
