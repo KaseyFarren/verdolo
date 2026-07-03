@@ -188,18 +188,27 @@ export default function TasksClient({
       .single()
     if (data) {
       setRecurring((prev) => [...prev, data as Recurring])
-      await ensureAutoAndRecurringTasks(supabase, orgId, clients, [data as Recurring], excludeWeekends)
-      const { data: t } = await supabase.from('tasks').select('*').eq('org_id', orgId).order('due_date')
-      if (t) setTasks(t as Task[])
+      await regenerateRecurringInstance(data as Recurring)
     }
     setRecurringForm(emptyRecurringForm)
     setShowAddRecurring(false)
+  }
+  // Regenerates this template's today/tomorrow instance right away (via the same idempotent
+  // upsert used on mount) instead of leaving it missing until the next page load.
+  async function regenerateRecurringInstance(r: Recurring) {
+    await ensureAutoAndRecurringTasks(supabase, orgId, clients, [r], excludeWeekends)
+    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
+    if (fresh) setTasks(fresh as Task[])
   }
   async function updateRecurring(id: string, fields: Record<string, unknown>) {
     const { data } = await supabase.from('recurring_templates').update(fields).eq('id', id).select().single()
     if (data) setRecurring((prev) => prev.map((r) => (r.id === id ? (data as Recurring) : r)))
     await supabase.from('tasks').delete().eq('recurring_id', id).eq('done', false).gte('due_date', today)
-    setTasks((prev) => prev.filter((t) => !(t.recurring_id === id && t.due_date >= today && !t.done)))
+    if (data && !(data as Recurring).paused) {
+      await regenerateRecurringInstance(data as Recurring)
+    } else {
+      setTasks((prev) => prev.filter((t) => !(t.recurring_id === id && t.due_date >= today && !t.done)))
+    }
     setEditingRecurringId(null)
   }
   async function toggleRecurringPaused(r: Recurring) {
@@ -212,9 +221,7 @@ export default function TasksClient({
       setTasks((prev) => prev.filter((t) => !(t.recurring_id === r.id && t.due_date >= today && !t.done)))
     } else {
       // resuming: regenerate today's/tomorrow's instance right away instead of waiting for next page load
-      await ensureAutoAndRecurringTasks(supabase, orgId, clients, [{ ...r, paused: false }], excludeWeekends)
-      const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
-      if (fresh) setTasks(fresh as Task[])
+      await regenerateRecurringInstance({ ...r, paused: false })
     }
   }
   async function deleteRecurring(id: string) {
