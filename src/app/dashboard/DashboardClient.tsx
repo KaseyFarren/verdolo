@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import Button from '@/components/ui/Button'
+import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
+import TaskEditForm from '@/components/tasks/TaskEditForm'
 import {
   AVATAR_COLORS,
   formatDate,
@@ -36,6 +38,7 @@ type Task = {
   title: string
   due_date: string
   priority: string
+  notes: string | null
   done: boolean
   completed_at: string | null
   is_auto: boolean
@@ -112,9 +115,13 @@ export default function DashboardClient({
   const [recap, setRecap] = useState<string | null>(initialRecap)
   const [loadingRecap, setLoadingRecap] = useState(false)
   const [showPastReports, setShowPastReports] = useState(false)
+  const [showMessages, setShowMessages] = useState(true)
   const [sentClientIds, setSentClientIds] = useState<Set<string>>(new Set(initialSentToday))
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
-  const [quickAddTitle, setQuickAddTitle] = useState('')
+  const [showAddTask, setShowAddTask] = useState(false)
+  const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
+  const [taskForm, setTaskForm] = useState<TaskFormState>({ title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: 'Medium', notes: '' })
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, unknown>>({})
 
   const [note, setNote] = useState(initialNote)
   const [noteSaved, setNoteSaved] = useState(true)
@@ -181,16 +188,32 @@ export default function DashboardClient({
     return sentClientIds.has(clientId) || tasks.some((t) => t.client_id === clientId && t.is_auto && t.auto_type === 'checkin' && t.due_date === today && t.done)
   }
 
-  async function addQuickTask() {
-    const title = quickAddTitle.trim()
-    if (!title) return
-    setQuickAddTitle('')
+  async function addTask() {
+    if (!taskForm.title.trim()) return
     const { data } = await supabase
       .from('tasks')
-      .insert({ org_id: orgId, title, due_date: dashDate, priority: 'Medium', quick: true, done: false, assigned_to: userId })
+      .insert({
+        org_id: orgId,
+        title: taskForm.title,
+        client_id: taskForm.clientId || null,
+        assigned_to: taskForm.assignedTo || (taskMode === 'quick' ? userId : null),
+        due_date: taskForm.dueDate,
+        priority: taskForm.priority,
+        notes: taskForm.notes,
+        quick: taskMode === 'quick',
+        done: false,
+      })
       .select()
       .single()
     if (data) setTasks((prev) => [...prev, data as Task])
+    setTaskForm((f) => ({ ...f, title: '', notes: '' }))
+    setShowAddTask(false)
+  }
+
+  async function updateTask(id: string, fields: Record<string, unknown>) {
+    const { data } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
+    if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
+    setEditingTaskId(null)
   }
 
   async function toggleTask(t: Task) {
@@ -317,7 +340,7 @@ export default function DashboardClient({
         <ProgressRing done={ringDone} total={ringTotal} />
       </div>
 
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 pt-5 border-t border-ink/10">
         {[
           ['Yesterday', yesterday],
           ['Today', today],
@@ -342,7 +365,7 @@ export default function DashboardClient({
       )}
 
       {dashIsToday && (
-        <div className="mb-6">
+        <div className="mb-6 pt-6 border-t border-ink/10">
           {recap ? (
             <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
               <div className="flex justify-between items-center mb-2">
@@ -387,42 +410,42 @@ export default function DashboardClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-6 items-start">
-        <div>
+      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-6 items-start pt-6 border-t border-ink/10">
+        <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-sage">{dashLabel}&apos;s tasks</div>
             <button
               className="text-xs text-sage hover:text-ink"
               onClick={() => {
-                setShowQuickAdd((v) => !v)
-                setQuickAddTitle('')
+                setShowAddTask((v) => !v)
+                if (!showAddTask) setTaskForm((f) => ({ ...f, title: '', notes: '', dueDate: dashDate }))
               }}
             >
-              {showQuickAdd ? 'Cancel' : '+ Add'}
+              {showAddTask ? 'Cancel' : '+ Add'}
             </button>
           </div>
-          {showQuickAdd && (
-            <div className="flex gap-2 mb-2">
-              <input
-                autoFocus
-                className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
-                placeholder="What needs doing?"
-                value={quickAddTitle}
-                onChange={(e) => setQuickAddTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') addQuickTask()
-                  if (e.key === 'Escape') setShowQuickAdd(false)
-                }}
-              />
-              <button className="rounded-lg bg-accent text-white px-3 py-2 text-sm font-medium shadow-md" onClick={addQuickTask}>
-                Add
-              </button>
-            </div>
+          {showAddTask && (
+            <AddTaskForm
+              mode={taskMode}
+              setMode={setTaskMode}
+              form={taskForm}
+              setForm={setTaskForm}
+              clients={clients}
+              members={members}
+              onSubmit={addTask}
+              onCancel={() => setShowAddTask(false)}
+            />
           )}
-          {dashPending.length === 0 && dashCompleted.length === 0 && !showQuickAdd && (
+          {dashPending.length === 0 && dashCompleted.length === 0 && !showAddTask && (
             <div className="text-sm text-sage py-3">
               No tasks for {dashLabel.toLowerCase()}.{' '}
-              <button className="text-accent underline" onClick={() => setShowQuickAdd(true)}>
+              <button
+                className="text-accent underline"
+                onClick={() => {
+                  setShowAddTask(true)
+                  setTaskForm((f) => ({ ...f, title: '', notes: '', dueDate: dashDate }))
+                }}
+              >
                 Add one →
               </button>
             </div>
@@ -438,6 +461,17 @@ export default function DashboardClient({
                 elapsed={timer.elapsedFor(t.id)}
                 startTimer={() => timer.startForTask(t)}
                 stopTimer={() => timer.stopRunning()}
+                isEditing={editingTaskId === t.id}
+                editForm={editForm}
+                setEditForm={setEditForm}
+                clients={clients}
+                members={members}
+                startEdit={() => {
+                  setEditingTaskId(t.id)
+                  setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
+                }}
+                cancelEdit={() => setEditingTaskId(null)}
+                save={() => updateTask(t.id, editForm)}
               />
             ))}
           </AnimatePresence>
@@ -455,6 +489,17 @@ export default function DashboardClient({
                     elapsed={timer.elapsedFor(t.id)}
                     startTimer={() => timer.startForTask(t)}
                     stopTimer={() => timer.stopRunning()}
+                    isEditing={editingTaskId === t.id}
+                    editForm={editForm}
+                    setEditForm={setEditForm}
+                    clients={clients}
+                    members={members}
+                    startEdit={() => {
+                      setEditingTaskId(t.id)
+                      setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
+                    }}
+                    cancelEdit={() => setEditingTaskId(null)}
+                    save={() => updateTask(t.id, editForm)}
                   />
                 ))}
               </AnimatePresence>
@@ -473,6 +518,17 @@ export default function DashboardClient({
                   elapsed={null}
                   startTimer={() => {}}
                   stopTimer={() => {}}
+                  isEditing={editingTaskId === t.id}
+                  editForm={editForm}
+                  setEditForm={setEditForm}
+                  clients={clients}
+                  members={members}
+                  startEdit={() => {
+                    setEditingTaskId(t.id)
+                    setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
+                  }}
+                  cancelEdit={() => setEditingTaskId(null)}
+                  save={() => updateTask(t.id, editForm)}
                 />
               ))}
             </>
@@ -509,26 +565,28 @@ export default function DashboardClient({
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 pt-6 border-t border-ink/10">
         <div className="flex justify-between items-center mb-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage">Client messages</div>
+          <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sage hover:text-ink" onClick={() => setShowMessages((v) => !v)}>
+            <span className="text-[10px]">{showMessages ? '▾' : '▸'}</span> Client messages
+          </button>
           <div className="flex items-center gap-3">
             <span className="text-xs text-sage">
               {msgTasksDone}/{activeClients.length} sent
             </span>
-            {hasApiKey && (
+            {showMessages && hasApiKey && (
               <Button variant="secondary" size="sm" className="text-sage hover:text-ink" onClick={generateAll} disabled={loadingAll}>
                 {loadingAll ? 'Writing…' : '✨ Generate all'}
               </Button>
             )}
           </div>
         </div>
-        {!hasApiKey && (
+        {showMessages && !hasApiKey && (
           <div className="text-sm text-sage py-2">
             Add an Anthropic API key in <Link href="/settings" className="underline text-accent">Settings</Link> to generate AI check-ins.
           </div>
         )}
-        {activeClients.map((c, i) => {
+        {showMessages && activeClients.map((c, i) => {
           const sent = isSentToday(c.id)
           const isGen = loadingOne === c.id
           return (
@@ -543,14 +601,14 @@ export default function DashboardClient({
                   </div>
                 </div>
                 {sent && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-green font-semibold">✓ Sent</span>
-                    <button className="text-xs text-sage border border-ink/15 rounded-lg px-2 py-0.5" onClick={() => undoSent(c)}>
+                  <div className="flex items-center gap-2 text-xs shrink-0">
+                    <span className="text-green font-semibold">✓ Sent</span>
+                    <button className="text-sage hover:text-ink hover:underline" onClick={() => undoSent(c)}>
                       Undo
                     </button>
                     {!c.awaiting_reply && (
-                      <button className="text-xs text-amber-700 border border-ink/15 rounded-lg px-2 py-0.5" onClick={() => clearAwaitingReply(c)}>
-                        ⏳ Awaiting reply
+                      <button title="Mark awaiting reply" className="text-amber-700 hover:text-amber-800" onClick={() => clearAwaitingReply(c)}>
+                        ⏳
                       </button>
                     )}
                   </div>
@@ -660,6 +718,14 @@ function SimpleTaskRow({
   elapsed,
   startTimer,
   stopTimer,
+  isEditing,
+  editForm,
+  setEditForm,
+  clients,
+  members,
+  startEdit,
+  cancelEdit,
+  save,
 }: {
   t: Task
   clientName?: string
@@ -668,7 +734,29 @@ function SimpleTaskRow({
   elapsed: string | null
   startTimer: () => void
   stopTimer: () => void
+  isEditing: boolean
+  editForm: Record<string, unknown>
+  setEditForm: (f: (prev: Record<string, unknown>) => Record<string, unknown>) => void
+  clients: Client[]
+  members: Member[]
+  startEdit: () => void
+  cancelEdit: () => void
+  save: () => void
 }) {
+  if (isEditing) {
+    return (
+      <TaskEditForm
+        editForm={editForm}
+        setEditForm={setEditForm}
+        clients={clients}
+        members={members}
+        showDueDate={!t.is_auto}
+        onCancel={cancelEdit}
+        onSave={save}
+      />
+    )
+  }
+
   const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-accent' : 'text-green'
   return (
     <motion.div
@@ -681,7 +769,10 @@ function SimpleTaskRow({
     >
       <button
         onClick={onToggle}
-        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-accent border-accent' : 'border-ink/25'}`}
+        title={isTimerRunning ? 'Mark done — stops the running timer' : undefined}
+        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+          t.done ? 'bg-accent border-accent' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
+        }`}
       >
         {t.done && <span className="text-[10px] text-white">✓</span>}
       </button>
@@ -689,13 +780,17 @@ function SimpleTaskRow({
         <div className={`text-sm ${t.done ? 'line-through text-sage' : 'text-ink'}`}>
           {t.title}
           <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>
-          {isTimerRunning && <span className="ml-2 text-xs font-mono text-green">● {elapsed}</span>}
+          {isTimerRunning && (
+            <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
+            </span>
+          )}
         </div>
         {clientName && <div className="text-xs text-sage mt-0.5">{clientName}</div>}
       </div>
-      {!t.done && (
-        <div className={`shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-          {isTimerRunning ? (
+      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        {!t.done &&
+          (isTimerRunning ? (
             <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>
               ■
             </button>
@@ -703,9 +798,11 @@ function SimpleTaskRow({
             <button title="Start timer" className="text-xs text-sage px-1" onClick={startTimer}>
               ▶
             </button>
-          )}
-        </div>
-      )}
+          ))}
+        <button title="Edit" className="text-xs text-sage px-1" onClick={startEdit}>
+          ✏
+        </button>
+      </div>
     </motion.div>
   )
 }

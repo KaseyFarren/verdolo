@@ -73,6 +73,7 @@ export default function ClientsClient({
   completedTasks,
   aiMessages,
   timeEntries,
+  archivedTimeTotals,
 }: {
   orgId: string
   userId: string
@@ -82,6 +83,7 @@ export default function ClientsClient({
   completedTasks: CompletedTask[]
   aiMessages: AiMessage[]
   timeEntries: { client_id: string | null; duration_seconds: number | null }[]
+  archivedTimeTotals: { client_id: string | null; seconds: number }[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
@@ -113,8 +115,12 @@ export default function ClientsClient({
   const today = todayKey()
   const selected = clients.find((c) => c.id === selectedId) || null
 
+  // Includes time_archived_totals so a "Clear old entries" sweep on the Time page (which rolls
+  // up and deletes raw time_entries rows) never changes a client's lifetime hours shown here.
   function clientHoursSeconds(clientId: string) {
-    return timeEntries.filter((e) => e.client_id === clientId).reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    const live = timeEntries.filter((e) => e.client_id === clientId).reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    const archived = archivedTimeTotals.filter((e) => e.client_id === clientId).reduce((s, e) => s + e.seconds, 0)
+    return live + archived
   }
 
   async function loadInbox(clientId: string) {

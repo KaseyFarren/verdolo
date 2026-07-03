@@ -8,6 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
+import AddTaskForm from '@/components/tasks/AddTaskForm'
+import TaskEditForm from '@/components/tasks/TaskEditForm'
 import Button from '@/components/ui/Button'
 import {
   PRIORITY,
@@ -79,7 +82,6 @@ export default function TasksClient({
   const [filter, setFilter] = useState('all')
   const [selectedDate, setSelectedDate] = useState('')
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
-  const [calNewTitle, setCalNewTitle] = useState('')
   const [showAddTask, setShowAddTask] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
@@ -143,17 +145,6 @@ export default function TasksClient({
     if (data) setTasks((prev) => [...prev, data as Task])
     setTaskForm(emptyTaskForm)
     setShowAddTask(false)
-  }
-
-  async function addCalendarTask() {
-    if (!calNewTitle.trim() || !selectedDate) return
-    const { data } = await supabase
-      .from('tasks')
-      .insert({ org_id: orgId, title: calNewTitle, due_date: selectedDate, priority: 'Medium', done: false, quick: true, assigned_to: userId })
-      .select()
-      .single()
-    if (data) setTasks((prev) => [...prev, data as Task])
-    setCalNewTitle('')
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
@@ -396,7 +387,10 @@ export default function TasksClient({
             {(['list', 'calendar'] as const).map((v) => (
               <button
                 key={v}
-                onClick={() => setView(v)}
+                onClick={() => {
+                  setView(v)
+                  setShowAddTask(false)
+                }}
                 className={`relative px-3 py-1 rounded text-xs capitalize ${view === v ? 'text-ink' : 'text-sage'}`}
               >
                 {view === v && (
@@ -428,86 +422,21 @@ export default function TasksClient({
       </div>
 
       {view === 'list' && showAddTask && (
-        <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
-          <div className="flex gap-1 bg-white rounded-md p-1 mb-3 w-fit">
-            {(['quick', 'detailed'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setTaskMode(m)}
-                className={`px-3 py-1 rounded text-xs capitalize ${taskMode === m ? 'bg-ink/5' : 'text-sage'}`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <input
-            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-            placeholder="What needs doing?"
-            value={taskForm.title}
-            onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
-            autoFocus
-          />
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <input
-              type="date"
-              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-              value={taskForm.dueDate}
-              onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))}
-            />
-            {taskMode === 'detailed' && (
-              <CustomSelect
-                value={taskForm.priority}
-                onChange={(v) => setTaskForm((f) => ({ ...f, priority: v }))}
-                options={PRIORITY.map((p) => ({ value: p, label: p }))}
-              />
-            )}
-            {taskMode === 'detailed' && (
-              <CustomSelect
-                value={taskForm.clientId}
-                onChange={(v) => setTaskForm((f) => ({ ...f, clientId: v }))}
-                options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
-              />
-            )}
-            {taskMode === 'detailed' && (
-              <CustomSelect
-                value={taskForm.assignedTo}
-                onChange={(v) => setTaskForm((f) => ({ ...f, assignedTo: v }))}
-                options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
-              />
-            )}
-          </div>
-          <textarea
-            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3 min-h-[50px]"
-            placeholder="Notes (optional)"
-            value={taskForm.notes}
-            onChange={(e) => setTaskForm((f) => ({ ...f, notes: e.target.value }))}
-          />
-          <div className="flex gap-2">
-            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddTask(false)}>
-              Cancel
-            </button>
-            <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addTask}>
-              Add task
-            </button>
-          </div>
-        </div>
+        <AddTaskForm
+          mode={taskMode}
+          setMode={setTaskMode}
+          form={taskForm}
+          setForm={setTaskForm}
+          clients={clients}
+          members={members}
+          onSubmit={addTask}
+          onCancel={() => setShowAddTask(false)}
+        />
       )}
 
       {view === 'list' ? (
         <div className="flex items-center gap-2 mb-4">
-          <div className="flex items-center gap-1">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => selectDate(e.target.value)}
-              className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
-            />
-            {selectedDate && (
-              <button className="text-xs text-sage px-1" onClick={() => setSelectedDate('')}>
-                ✕
-              </button>
-            )}
-          </div>
+          <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />
           {filterSelect}
         </div>
       ) : (
@@ -565,19 +494,33 @@ export default function TasksClient({
             <>
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-medium">{formatDate(selectedDate)}</div>
-              </div>
-              <div className="flex gap-2 mb-4">
-                <input
-                  className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
-                  placeholder="Add a task for this day…"
-                  value={calNewTitle}
-                  onChange={(e) => setCalNewTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addCalendarTask()}
-                />
-                <button className="rounded bg-accent text-white px-3 py-2 text-sm font-medium shadow-md" onClick={addCalendarTask}>
-                  Add
+                <button
+                  className="text-xs text-sage hover:text-ink"
+                  onClick={() => {
+                    if (showAddTask) {
+                      setShowAddTask(false)
+                    } else {
+                      setShowAddTask(true)
+                      setTaskForm((f) => ({ ...emptyTaskForm, dueDate: selectedDate, title: f.title }))
+                    }
+                  }}
+                >
+                  {showAddTask ? 'Cancel' : '+ Add task'}
                 </button>
               </div>
+
+              {showAddTask && (
+                <AddTaskForm
+                  mode={taskMode}
+                  setMode={setTaskMode}
+                  form={taskForm}
+                  setForm={setTaskForm}
+                  clients={clients}
+                  members={members}
+                  onSubmit={addTask}
+                  onCancel={() => setShowAddTask(false)}
+                />
+              )}
 
               {tasksForDate(selectedDate).length === 0 ? (
                 <div className="text-sm text-sage py-4">No tasks scheduled.</div>
@@ -792,52 +735,15 @@ function TaskRow({
 }) {
   if (isEditing) {
     return (
-      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-2">
-        <input
-          className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2 font-medium"
-          value={(editForm.title as string) || ''}
-          onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-          autoFocus
-        />
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <CustomSelect
-            value={(editForm.client_id as string) || ''}
-            onChange={(v) => setEditForm((f) => ({ ...f, client_id: v }))}
-            options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
-          />
-          <CustomSelect
-            value={(editForm.priority as string) || 'Medium'}
-            onChange={(v) => setEditForm((f) => ({ ...f, priority: v }))}
-            options={PRIORITY.map((p) => ({ value: p, label: p }))}
-          />
-          <CustomSelect
-            value={(editForm.assigned_to as string) || ''}
-            onChange={(v) => setEditForm((f) => ({ ...f, assigned_to: v }))}
-            options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
-          />
-          {!t.is_auto && (
-            <input
-              type="date"
-              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-              value={(editForm.due_date as string) || ''}
-              onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
-            />
-          )}
-        </div>
-        <textarea
-          className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
-          value={(editForm.notes as string) || ''}
-          onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
-        />
-        <div className="flex gap-2">
-          <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={cancelEdit}>
-            Cancel
-          </button>
-          <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={save}>
-            Save
-          </button>
-        </div>
-      </div>
+      <TaskEditForm
+        editForm={editForm}
+        setEditForm={setEditForm}
+        clients={clients}
+        members={members}
+        showDueDate={!t.is_auto}
+        onCancel={cancelEdit}
+        onSave={save}
+      />
     )
   }
 
@@ -854,7 +760,10 @@ function TaskRow({
     >
       <button
         onClick={() => (t.done ? uncomplete() : complete())}
-        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${t.done ? 'bg-green border-green' : 'border-ink/25'}`}
+        title={isTimerRunning ? 'Mark done — stops the running timer' : undefined}
+        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+          t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
+        }`}
       >
         {t.done && <span className="text-[10px] text-white">✓</span>}
       </button>
@@ -864,7 +773,11 @@ function TaskRow({
           {!t.quick && <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>}
           {t.is_auto && <span className="ml-1 text-[10px] text-sage">auto</span>}
           {t.recurring_id && <span className="ml-1 text-[10px] text-sage">↻</span>}
-          {isTimerRunning && <span className="ml-2 text-xs font-mono text-green">● {elapsed}</span>}
+          {isTimerRunning && (
+            <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
+            </span>
+          )}
         </div>
         <div className="text-xs text-sage mt-0.5 flex gap-2 flex-wrap">
           {t.client_id && <span>{clientName(t.client_id)}</span>}
