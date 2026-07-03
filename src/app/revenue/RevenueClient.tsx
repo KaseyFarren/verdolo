@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -59,8 +60,15 @@ export default function RevenueClient({
   members: Member[]
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
   const confirm = useConfirm()
   const [charges, setCharges] = useState<Charge[]>(initialCharges)
+  // router.push to a different ?month= re-runs the server component and gives a new
+  // initialCharges array, but useState's initializer only runs on mount — without this,
+  // switching months would keep showing the previous month's charges.
+  useEffect(() => {
+    setCharges(initialCharges)
+  }, [initialCharges])
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
   const [chargeDesc, setChargeDesc] = useState('')
   const [chargeAmount, setChargeAmount] = useState('')
@@ -163,7 +171,15 @@ export default function RevenueClient({
           <Link href={`/revenue?month=${adjacentMonth(month, -1)}`} className="text-sage px-1">
             ‹
           </Link>
-          <div className="text-sm font-medium w-32 text-center">{monthLabel(month)}</div>
+          <label className="relative text-sm font-medium w-32 text-center cursor-pointer hover:text-accent">
+            {monthLabel(month)}
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && router.push(`/revenue?month=${e.target.value}`)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </label>
           <Link href={`/revenue?month=${adjacentMonth(month, 1)}`} className="text-sage px-1">
             ›
           </Link>
