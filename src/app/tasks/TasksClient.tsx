@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -68,10 +69,15 @@ export default function TasksClient({
   excludeWeekends: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const searchParams = useSearchParams()
+  const [view, setView] = useState<'list' | 'calendar'>(searchParams.get('view') === 'calendar' ? 'calendar' : 'list')
   const [clients] = useState(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [recurring, setRecurring] = useState<Recurring[]>(initialRecurring)
   const [filter, setFilter] = useState('all')
+  const [selectedDate, setSelectedDate] = useState('')
+  const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
+  const [calNewTitle, setCalNewTitle] = useState('')
   const [showAddTask, setShowAddTask] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
@@ -103,6 +109,11 @@ export default function TasksClient({
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || ''
   const memberEmail = (id: string | null) => memberName(members.find((m) => m.user_id === id))
 
+  function selectDate(d: string) {
+    setSelectedDate(d)
+    if (d) setCalMonth(d.slice(0, 7))
+  }
+
   async function addTask() {
     if (!taskForm.title.trim()) return
     const { data } = await supabase
@@ -123,6 +134,17 @@ export default function TasksClient({
     if (data) setTasks((prev) => [...prev, data as Task])
     setTaskForm(emptyTaskForm)
     setShowAddTask(false)
+  }
+
+  async function addCalendarTask() {
+    if (!calNewTitle.trim() || !selectedDate) return
+    const { data } = await supabase
+      .from('tasks')
+      .insert({ org_id: orgId, title: calNewTitle, due_date: selectedDate, priority: 'Medium', done: false, quick: true, assigned_to: userId })
+      .select()
+      .single()
+    if (data) setTasks((prev) => [...prev, data as Task])
+    setCalNewTitle('')
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
@@ -236,7 +258,24 @@ export default function TasksClient({
   const visible = tasks.filter((t) => !t.skipped)
   const overdueCount = visible.filter((t) => t.due_date < today && !t.done).length
 
-  function visibleTasks(): { label: string; items: Task[] }[] {
+  // captures the assignee/client dimension of the current filter selection only — the
+  // date/done-status dimension (today/overdue/completed/all) is handled separately by
+  // visibleBuckets() and tasksForDate() below, since those two dimensions compose independently
+  // (e.g. a pinned date + an assignee filter) in a way the old single-bucket-per-chip model never needed to
+  function matchesFilter(t: Task): boolean {
+    if (filter === 'assignee:mine') return t.assigned_to === userId
+    if (filter === 'assignee:unassigned') return !t.assigned_to
+    if (filter.startsWith('assignee:')) return t.assigned_to === filter.slice('assignee:'.length)
+    if (filter !== 'all' && filter !== 'today' && filter !== 'overdue' && filter !== 'completed') return t.client_id === filter
+    return true
+  }
+
+  function tasksForDate(date: string) {
+    return sortTasks(visible.filter((t) => t.due_date === date && matchesFilter(t) && (filter !== 'completed' || t.done)))
+  }
+
+  function visibleBuckets(): { label: string; items: Task[] }[] {
+    if (selectedDate) return [{ label: `Tasks for ${formatDate(selectedDate)}`, items: tasksForDate(selectedDate) }]
     if (filter === 'overdue') return [{ label: 'Overdue', items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)) }]
     if (filter === 'today') return [{ label: 'Today', items: sortTasks(visible.filter((t) => t.due_date === today && !t.done)) }]
     if (filter === 'completed')
@@ -244,12 +283,11 @@ export default function TasksClient({
     if (filter.startsWith('assignee:')) {
       const key = filter.slice('assignee:'.length)
       const label = key === 'mine' ? 'Mine' : key === 'unassigned' ? 'Unassigned' : memberEmail(key)
-      const match = (t: Task) => (key === 'mine' ? t.assigned_to === userId : key === 'unassigned' ? !t.assigned_to : t.assigned_to === key)
-      const f = sortTasks(visible.filter(match)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
+      const f = sortTasks(visible.filter((t) => matchesFilter(t))).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
       return [{ label, items: f }]
     }
     if (filter !== 'all') {
-      const f = sortTasks(visible.filter((t) => t.client_id === filter)).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
+      const f = sortTasks(visible.filter((t) => matchesFilter(t))).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
       return [{ label: clientName(filter), items: f }]
     }
     const tomorrow = getOffsetDate(1)
@@ -263,7 +301,7 @@ export default function TasksClient({
     ].filter((b) => b.items.length > 0)
   }
 
-  const buckets = visibleTasks()
+  const buckets = visibleBuckets()
   // members only ever fetch their own + unassigned tasks (RLS-scoped); split those apart with
   // a header so "shared/unclaimed" work reads distinctly from "assigned to me". Admins/owners
   // see everyone's tasks flat (each row already shows its assignee) and use the chips instead.
@@ -304,18 +342,86 @@ export default function TasksClient({
     )
   }
 
+  const filterSelect = (
+    <select
+      value={filter}
+      onChange={(e) => setFilter(e.target.value)}
+      className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
+    >
+      <option value="all">All</option>
+      <option value="today">Today</option>
+      <option value="overdue">{overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue'}</option>
+      <option value="completed">Done</option>
+      {isAdmin && <option value="assignee:mine">Mine</option>}
+      {isAdmin && <option value="assignee:unassigned">Unassigned</option>}
+      {isAdmin && members.filter((m) => m.user_id !== userId).length > 0 && (
+        <optgroup label="Team">
+          {members
+            .filter((m) => m.user_id !== userId)
+            .map((m) => (
+              <option key={m.user_id} value={`assignee:${m.user_id}`}>
+                {memberName(m)}
+              </option>
+            ))}
+        </optgroup>
+      )}
+      {clients.length > 0 && (
+        <optgroup label="Clients">
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  )
+
+  const [calY, calM] = calMonth.split('-').map(Number)
+  const jsMonth = calM - 1
+  const firstDay = new Date(calY, jsMonth, 1).getDay()
+  const daysInMonth = new Date(calY, jsMonth + 1, 0).getDate()
+
+  function prevMonth() {
+    const d = new Date(calY, jsMonth - 1, 1)
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  function nextMonth() {
+    const d = new Date(calY, jsMonth + 1, 1)
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-semibold">Tasks</h1>
-        {!showAddTask && (
-          <button className="rounded-md bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => setShowAddTask(true)}>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Tasks</h1>
+          <div className="flex gap-1 bg-sand rounded-md p-1">
+            {(['list', 'calendar'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1 rounded text-xs capitalize ${view === v ? 'bg-white shadow-sm' : 'text-sage'}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+        {view === 'list' && !showAddTask && (
+          <button
+            className="rounded-md bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
+            onClick={() => {
+              setShowAddTask(true)
+              setTaskForm((f) => ({ ...emptyTaskForm, dueDate: selectedDate || todayKey(), title: f.title }))
+            }}
+          >
             + New task
           </button>
         )}
       </div>
 
-      {showAddTask && (
+      {view === 'list' && showAddTask && (
         <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
           <div className="flex gap-1 bg-white rounded-md p-1 mb-3 w-fit">
             {(['quick', 'detailed'] as const).map((m) => (
@@ -335,8 +441,25 @@ export default function TasksClient({
             onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
             autoFocus
           />
-          {taskMode === 'detailed' && (
-            <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input
+              type="date"
+              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              value={taskForm.dueDate}
+              onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))}
+            />
+            {taskMode === 'detailed' && (
+              <select
+                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                value={taskForm.priority}
+                onChange={(e) => setTaskForm((f) => ({ ...f, priority: e.target.value }))}
+              >
+                {PRIORITY.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            )}
+            {taskMode === 'detailed' && (
               <select
                 className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.clientId}
@@ -349,15 +472,8 @@ export default function TasksClient({
                   </option>
                 ))}
               </select>
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={taskForm.priority}
-                onChange={(e) => setTaskForm((f) => ({ ...f, priority: e.target.value }))}
-              >
-                {PRIORITY.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
+            )}
+            {taskMode === 'detailed' && (
               <select
                 className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
                 value={taskForm.assignedTo}
@@ -370,14 +486,8 @@ export default function TasksClient({
                   </option>
                 ))}
               </select>
-              <input
-                type="date"
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={taskForm.dueDate}
-                onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))}
-              />
-            </div>
-          )}
+            )}
+          </div>
           <textarea
             className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3 min-h-[50px]"
             placeholder="Notes (optional)"
@@ -395,165 +505,150 @@ export default function TasksClient({
         </div>
       )}
 
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        {[
-          ['all', 'All'],
-          ['today', 'Today'],
-          ['overdue', overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue'],
-          ['completed', 'Done'],
-          ...(isAdmin ? [['assignee:mine', 'Mine'], ['assignee:unassigned', 'Unassigned']] : []),
-        ].map(([k, l]) => (
-          <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-              filter === k ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-        {isAdmin &&
-          members
-            .filter((m) => m.user_id !== userId)
-            .map((m) => (
-              <button
-                key={m.user_id}
-                onClick={() => setFilter(`assignee:${m.user_id}`)}
-                className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-                  filter === `assignee:${m.user_id}` ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
-                }`}
-              >
-                {memberName(m)}
+      {view === 'list' ? (
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-1">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => selectDate(e.target.value)}
+              className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
+            />
+            {selectedDate && (
+              <button className="text-xs text-sage px-1" onClick={() => setSelectedDate('')}>
+                ✕
               </button>
-            ))}
-        {clients.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setFilter(c.id)}
-            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs border ${
-              filter === c.id ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
-            }`}
-          >
-            {c.name}
-          </button>
-        ))}
-      </div>
-
-      {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
-      {buckets.map((b) => {
-        const { mine, unassigned } = splitBucket(b.items)
-        const pendingCount = b.items.filter((t) => !t.done).length
-        return (
-          <div key={b.label} className="mb-5">
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
-              {pendingCount > 1 && (
-                <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
-                  Complete all ({pendingCount})
-                </button>
-              )}
-            </div>
-            <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
-            {unassigned.length > 0 && (
-              <>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
-                <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
-              </>
             )}
           </div>
-        )
-      })}
-
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage">Recurring</div>
-          <button className="text-xs text-sage" onClick={() => setShowAddRecurring((v) => !v)}>
-            {showAddRecurring ? 'Cancel' : '+ Add'}
-          </button>
+          {filterSelect}
         </div>
-        {showAddRecurring && (
-          <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
-            <input
-              className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-              placeholder="e.g. Check emails"
-              value={recurringForm.title}
-              onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
-              autoFocus
-            />
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={recurringForm.frequency}
-                onChange={(e) => setRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekdays">Weekdays</option>
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                  <option key={i} value={`weekly:${(i + 1) % 7}`}>
-                    Weekly – {d}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={recurringForm.priority}
-                onChange={(e) => setRecurringForm((f) => ({ ...f, priority: e.target.value }))}
-              >
-                {PRIORITY.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={recurringForm.clientId}
-                onChange={(e) => setRecurringForm((f) => ({ ...f, clientId: e.target.value }))}
-              >
-                <option value="">No client</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                value={recurringForm.assignedTo}
-                onChange={(e) => setRecurringForm((f) => ({ ...f, assignedTo: e.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {memberName(m)}
-                  </option>
-                ))}
-              </select>
+      ) : (
+        <div className="mb-4">{filterSelect}</div>
+      )}
+
+      {view === 'calendar' && (
+        <>
+          <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={prevMonth} className="text-sage px-2">
+                ‹
+              </button>
+              <div className="text-sm font-medium">{new Date(calY, jsMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+              <button onClick={nextMonth} className="text-sage px-2">
+                ›
+              </button>
             </div>
-            <div className="flex gap-2">
-              <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
-                Cancel
-              </button>
-              <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
-                Save
-              </button>
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i} className="text-center text-[11px] text-sage py-1">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array(firstDay)
+                .fill(null)
+                .map((_, i) => (
+                  <div key={'e' + i} />
+                ))}
+              {Array(daysInMonth)
+                .fill(null)
+                .map((_, i) => {
+                  const d = i + 1
+                  const k = `${calY}-${String(jsMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+                  const isToday = k === today
+                  const isSel = k === selectedDate
+                  const cnt = tasksForDate(k).filter((t) => !t.done).length
+                  return (
+                    <div
+                      key={d}
+                      onClick={() => selectDate(k)}
+                      className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}
+                    >
+                      <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-accent font-medium' : ''}`}>{d}</div>
+                      {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-white/80' : 'bg-ink/40'}`} />}
+                    </div>
+                  )
+                })}
             </div>
           </div>
-        )}
-        {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-sage py-3">No recurring tasks.</div>}
-        {recurring.map((r) => (
-          <div key={r.id} className="border-b border-ink/10 py-2">
-            {editingRecurringId === r.id ? (
-              <div className="rounded-lg border border-ink/10 bg-white p-4">
+
+          {selectedDate && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium">{formatDate(selectedDate)}</div>
+              </div>
+              <div className="flex gap-2 mb-4">
+                <input
+                  className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
+                  placeholder="Add a task for this day…"
+                  value={calNewTitle}
+                  onChange={(e) => setCalNewTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCalendarTask()}
+                />
+                <button className="rounded bg-accent text-white px-3 py-2 text-sm font-medium shadow-md" onClick={addCalendarTask}>
+                  Add
+                </button>
+              </div>
+
+              {tasksForDate(selectedDate).length === 0 ? (
+                <div className="text-sm text-sage py-4">No tasks scheduled.</div>
+              ) : (
+                <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {view === 'list' && (
+        <>
+          {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
+          {buckets.map((b) => {
+            const { mine, unassigned } = splitBucket(b.items)
+            const pendingCount = b.items.filter((t) => !t.done).length
+            return (
+              <div key={b.label} className="mb-5">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
+                  {pendingCount > 1 && (
+                    <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
+                      Complete all ({pendingCount})
+                    </button>
+                  )}
+                </div>
+                <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
+                {unassigned.length > 0 && (
+                  <>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                    <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
+                  </>
+                )}
+              </div>
+            )
+          })}
+
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Recurring</div>
+              <button className="text-xs text-sage" onClick={() => setShowAddRecurring((v) => !v)}>
+                {showAddRecurring ? 'Cancel' : '+ Add'}
+              </button>
+            </div>
+            {showAddRecurring && (
+              <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
                 <input
                   className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-                  value={(editRecurringForm.title as string) || ''}
-                  onChange={(e) => setEditRecurringForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. Check emails"
+                  value={recurringForm.title}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
+                  autoFocus
                 />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <select
                     className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                    value={(editRecurringForm.frequency as string) || 'daily'}
-                    onChange={(e) => setEditRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
+                    value={recurringForm.frequency}
+                    onChange={(e) => setRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
                   >
                     <option value="daily">Daily</option>
                     <option value="weekdays">Weekdays</option>
@@ -565,59 +660,129 @@ export default function TasksClient({
                   </select>
                   <select
                     className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                    value={(editRecurringForm.priority as string) || 'Medium'}
-                    onChange={(e) => setEditRecurringForm((f) => ({ ...f, priority: e.target.value }))}
+                    value={recurringForm.priority}
+                    onChange={(e) => setRecurringForm((f) => ({ ...f, priority: e.target.value }))}
                   >
                     {PRIORITY.map((p) => (
                       <option key={p}>{p}</option>
                     ))}
                   </select>
+                  <select
+                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                    value={recurringForm.clientId}
+                    onChange={(e) => setRecurringForm((f) => ({ ...f, clientId: e.target.value }))}
+                  >
+                    <option value="">No client</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                    value={recurringForm.assignedTo}
+                    onChange={(e) => setRecurringForm((f) => ({ ...f, assignedTo: e.target.value }))}
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {memberName(m)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex gap-2">
-                  <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
+                  <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
                     Cancel
                   </button>
-                  <button
-                    className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
-                    onClick={() => updateRecurring(r.id, editRecurringForm)}
-                  >
+                  <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
                     Save
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
-                    {r.title}
-                    {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
-                  </div>
-                  <div className="text-xs text-sage mt-0.5">
-                    {recurringFrequencyLabel(r.frequency)}
-                    {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
-                    {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
-                  </div>
-                </div>
-                <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
-                  {r.paused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  className="text-xs text-sage"
-                  onClick={() => {
-                    setEditingRecurringId(r.id)
-                    setEditRecurringForm({ title: r.title, priority: r.priority, frequency: r.frequency })
-                  }}
-                >
-                  Edit
-                </button>
-                <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
-                  Delete
-                </button>
-              </div>
             )}
+            {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-sage py-3">No recurring tasks.</div>}
+            {recurring.map((r) => (
+              <div key={r.id} className="border-b border-ink/10 py-2">
+                {editingRecurringId === r.id ? (
+                  <div className="rounded-lg border border-ink/10 bg-white p-4">
+                    <input
+                      className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                      value={(editRecurringForm.title as string) || ''}
+                      onChange={(e) => setEditRecurringForm((f) => ({ ...f, title: e.target.value }))}
+                    />
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <select
+                        className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                        value={(editRecurringForm.frequency as string) || 'daily'}
+                        onChange={(e) => setEditRecurringForm((f) => ({ ...f, frequency: e.target.value }))}
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekdays">Weekdays</option>
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                          <option key={i} value={`weekly:${(i + 1) % 7}`}>
+                            Weekly – {d}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                        value={(editRecurringForm.priority as string) || 'Medium'}
+                        onChange={(e) => setEditRecurringForm((f) => ({ ...f, priority: e.target.value }))}
+                      >
+                        {PRIORITY.map((p) => (
+                          <option key={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
+                        Cancel
+                      </button>
+                      <button
+                        className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
+                        onClick={() => updateRecurring(r.id, editRecurringForm)}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
+                        {r.title}
+                        {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                      </div>
+                      <div className="text-xs text-sage mt-0.5">
+                        {recurringFrequencyLabel(r.frequency)}
+                        {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
+                        {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
+                      </div>
+                    </div>
+                    <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
+                      {r.paused ? 'Resume' : 'Pause'}
+                    </button>
+                    <button
+                      className="text-xs text-sage"
+                      onClick={() => {
+                        setEditingRecurringId(r.id)
+                        setEditRecurringForm({ title: r.title, priority: r.priority, frequency: r.frequency })
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   )
 }

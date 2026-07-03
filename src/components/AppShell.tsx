@@ -12,7 +12,6 @@ import QuickCapture from '@/components/QuickCapture'
 const NAV = [
   { href: '/dashboard', icon: '🏠', label: 'Dashboard' },
   { href: '/tasks', icon: '✅', label: 'Tasks' },
-  { href: '/calendar', icon: '📅', label: 'Calendar' },
   { href: '/clients', icon: '👥', label: 'Clients' },
   { href: '/time', icon: '⏱️', label: 'Time' },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
