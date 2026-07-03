@@ -57,14 +57,14 @@ export default function AppShell({
     <PinLockProvider>
       <ConfirmProvider>
         <div
-          className="flex min-h-screen bg-neutral-950 text-neutral-100"
+          className="flex min-h-screen bg-cream text-ink"
           style={accentColor ? ({ '--accent': accentColor } as React.CSSProperties) : undefined}
         >
-          <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-4 border-b border-white/10 bg-neutral-900/90 backdrop-blur">
+          <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-4 bg-green text-cream shadow-md">
             <button onClick={() => setMobileOpen(true)} className="text-xl leading-none" aria-label="Open menu">
               ☰
             </button>
-            <div className="font-semibold text-sm">{orgName}</div>
+            <div className="font-heading font-bold text-sm">{orgName}</div>
             <div className="w-6" />
           </div>
 
@@ -82,26 +82,26 @@ export default function AppShell({
           </AnimatePresence>
 
           <div
-            className={`fixed inset-y-0 left-0 w-48 border-r border-white/10 bg-neutral-900 md:bg-neutral-900/60 flex flex-col z-40 transition-transform duration-200 md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 w-52 bg-green text-cream flex flex-col z-40 transition-transform duration-200 md:translate-x-0 ${
               mobileOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
-            <div className="px-4 py-4 font-semibold text-sm">{orgName}</div>
-            <nav className="flex-1 flex flex-col gap-1 px-2">
+            <div className="px-5 py-5 font-heading font-bold text-sm">{orgName}</div>
+            <nav className="flex-1 flex flex-col gap-1 px-3">
               {NAV.filter((item) => (!item.adminOnly || isAdmin) && (!item.ownerOnly || role === 'owner')).map((item) => {
                 const active = pathname?.startsWith(item.href)
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`relative flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                      active ? 'text-white font-medium' : 'text-neutral-400 hover:text-white'
+                    className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                      active ? 'text-white font-medium' : 'text-cream/70 hover:text-white'
                     }`}
                   >
                     {active && (
                       <motion.div
                         layoutId="nav-active"
-                        className="absolute inset-0 rounded-md bg-white/10"
+                        className="absolute inset-0 rounded-lg bg-white/10"
                         style={{ boxShadow: 'inset 2px 0 0 0 var(--accent)' }}
                         transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                       />
@@ -112,21 +112,21 @@ export default function AppShell({
                 )
               })}
             </nav>
-            <div className="px-3 py-3 border-t border-white/10">
-              <div className="text-xs text-neutral-500 truncate mb-2">{userEmail}</div>
+            <div className="px-4 py-4 border-t border-cream/10">
+              <div className="text-xs text-cream/50 truncate mb-2">{userEmail}</div>
               <div className="flex items-center gap-3">
-                <button onClick={logout} className="text-xs text-neutral-400 hover:text-white transition-colors">
+                <button onClick={logout} className="text-xs text-cream/70 hover:text-white transition-colors">
                   Log out
                 </button>
                 <LockButton />
               </div>
-              <div className="mt-2 flex gap-2 text-[10px] text-neutral-600">
-                <Link href="/terms" className="hover:text-neutral-400">Terms</Link>
-                <Link href="/privacy" className="hover:text-neutral-400">Privacy</Link>
+              <div className="mt-2 flex gap-2 text-[10px] text-cream/40">
+                <Link href="/terms" className="hover:text-cream/70">Terms</Link>
+                <Link href="/privacy" className="hover:text-cream/70">Privacy</Link>
               </div>
             </div>
           </div>
-          <div className="md:ml-48 flex-1 min-h-screen pt-14 md:pt-0">
+          <div className="md:ml-52 flex-1 min-h-screen pt-14 md:pt-0">
             <motion.div
               key={pathname}
               className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-8"
@@ -148,7 +148,7 @@ function LockButton() {
   const { hasPin, lock } = usePinLock()
   if (!hasPin) return null
   return (
-    <button onClick={lock} title="Lock now" className="text-xs text-neutral-400 hover:text-white transition-colors">
+    <button onClick={lock} title="Lock now" className="text-xs text-cream/70 hover:text-white transition-colors">
       🔒 Lock
     </button>
   )

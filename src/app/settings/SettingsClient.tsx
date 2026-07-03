@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { clearPin, getIdleMinutes, hasPinSet, setIdleMinutes, setPin } from '@/components/PinLock'
 import { getInitials, todayKey } from '@/lib/agency'
 
-const ACCENT_PRESETS = ['#7c5cbf', '#3d7fbf', '#2a9a6e', '#bf5c7c', '#bf8c3d', '#e0505f']
+const ACCENT_PRESETS = ['#dd6b2c', '#1f3320', '#e98a4f', '#5d6b5c', '#c9973c', '#8a6a3c']
 
 type Settings = {
   eod_hour?: number

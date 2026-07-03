@@ -3,10 +3,10 @@
 import { motion, type HTMLMotionProps } from 'motion/react'
 
 const VARIANTS = {
-  primary: 'bg-white text-black font-medium hover:bg-white/90',
-  secondary: 'border border-white/10 text-neutral-200 hover:bg-white/5 hover:border-white/20',
-  ghost: 'text-neutral-400 hover:text-white',
-  danger: 'text-red-400 hover:text-red-300',
+  primary: 'bg-accent text-white font-medium shadow-md hover:brightness-110',
+  secondary: 'border border-ink/15 text-ink hover:bg-sand',
+  ghost: 'text-sage hover:text-ink',
+  danger: 'text-red-600 hover:text-red-700',
 } as const
 
 const SIZES = {
@@ -32,7 +32,7 @@ export default function Button({
       whileTap={{ scale: 0.96 }}
       whileHover={{ scale: 1.015 }}
       transition={{ duration: 0.12 }}
-      className={`rounded-md transition-colors disabled:opacity-40 disabled:pointer-events-none ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...props}
     >
       {children}

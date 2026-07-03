@@ -2,17 +2,17 @@ export const PLATFORMS = ['WhatsApp', 'Email', 'Instagram DM', 'Slack', 'SMS', '
 export const PRIORITY = ['High', 'Medium', 'Low'] as const
 export const TONES = ['Casual', 'Friendly', 'Professional', 'Motivational'] as const
 export const STAGES = ['Lead', 'Trial', 'Active', 'At Risk', 'Churned'] as const
-export const AVATAR_COLORS = ['#7c5cbf', '#3d7fbf', '#2a9a6e', '#bf5c7c', '#bf8c3d', '#5c7cbf']
+export const AVATAR_COLORS = ['#1f3320', '#dd6b2c', '#e98a4f', '#5d6b5c', '#8a6a3c', '#6b8a6e']
 
 export type Stage = (typeof STAGES)[number]
 export type Priority = (typeof PRIORITY)[number]
 
 export function stageColor(stage: string) {
-  if (stage === 'Lead') return '#9080f0'
+  if (stage === 'Lead') return '#c9973c'
   if (stage === 'Trial') return '#cc9a3c'
   if (stage === 'Active') return '#2db87a'
   if (stage === 'At Risk') return '#e05070'
-  if (stage === 'Churned') return '#6060a0'
+  if (stage === 'Churned') return '#5d6b5c'
   return '#2db87a'
 }
 

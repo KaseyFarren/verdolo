@@ -25,7 +25,7 @@ export default async function SettingsPage() {
         initialAvatarUrl={membership?.avatar_url ?? ''}
         subscriptionStatus={org?.subscription_status ?? null}
         trialEndsAt={org?.trial_ends_at ?? null}
-        initialAccentColor={org?.accent_color ?? '#7c5cbf'}
+        initialAccentColor={org?.accent_color ?? '#dd6b2c'}
       />
     </AppShell>
   )
