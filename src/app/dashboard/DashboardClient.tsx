@@ -8,13 +8,11 @@ import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import {
   AVATAR_COLORS,
-  centsToDollars,
   formatDate,
   getInitials,
   getOffsetDate,
   getStage,
   memberName,
-  mrrCentsTotal,
   sortTasks,
   todayKey,
 } from '@/lib/agency'
@@ -26,7 +24,6 @@ type Client = {
   platform: string | null
   stage: string | null
   status: string | null
-  retainer_cents: number | null
   contract_ends: string | null
   tone: string | null
   awaiting_reply: boolean
@@ -139,7 +136,6 @@ export default function DashboardClient({
   const dashLabel = dashIsToday ? 'Today' : dashDate === yesterday ? 'Yesterday' : 'Tomorrow'
 
   const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
-  const mrr = centsToDollars(mrrCentsTotal(clients))
   const weekSeconds = weekTimeEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
   const weekHours = (weekSeconds / 3600).toFixed(1)
   const topTimeClients = clients
@@ -307,9 +303,9 @@ export default function DashboardClient({
         <div>
           <div className="font-heading text-2xl font-bold text-ink">Dashboard</div>
           <div className="text-sm text-sage mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
-          {mrr > 0 && (
-            <div className="text-sm text-green font-semibold mt-1">
-              ${mrr.toLocaleString()}/mo MRR · {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
+          {activeClients.length > 0 && (
+            <div className="text-sm text-sage mt-1">
+              {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
             </div>
           )}
           {weekSeconds > 0 && (

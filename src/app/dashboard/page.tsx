@@ -1,7 +1,7 @@
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOrgAnthropicKey } from '@/lib/orgSecrets'
-import { getOffsetDate, stripRetainer, todayKey } from '@/lib/agency'
+import { getOffsetDate, todayKey } from '@/lib/agency'
 import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage() {
@@ -12,7 +12,11 @@ export default async function DashboardPage() {
   const tomorrow = getOffsetDate(1)
   const [{ data: clients }, { data: tasks }, { data: recurring }, { data: timeEntries }, { data: todayTimeEntries }, { data: members }, { data: noteRow }, apiKey] =
     await Promise.all([
-      supabase.from('clients').select('*').eq('org_id', orgId).order('name'),
+      supabase
+        .from('clients')
+        .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply')
+        .eq('org_id', orgId)
+        .order('name'),
       supabase.from('tasks').select('*').eq('org_id', orgId),
       supabase.from('recurring_templates').select('*').eq('org_id', orgId),
       supabase
@@ -34,16 +38,13 @@ export default async function DashboardPage() {
       getOrgAnthropicKey(orgId),
     ])
 
-  // MRR is revenue — only owners see it, so admins/members never even receive the retainer figures
-  const visibleClients = role === 'owner' ? clients ?? [] : stripRetainer(clients ?? [])
-
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <DashboardClient
         orgId={orgId}
         userId={user.id}
         isAdmin={isAdminRole(role)}
-        initialClients={visibleClients}
+        initialClients={clients ?? []}
         initialTasks={tasks ?? []}
         initialRecurring={recurring ?? []}
         weekTimeEntries={timeEntries ?? []}

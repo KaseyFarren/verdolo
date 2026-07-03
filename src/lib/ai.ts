@@ -68,11 +68,10 @@ export function buildSingleMessagePrompt(client: ClientCtx, prior: PriorContext,
 export function buildWeeklyRecapPrompt(params: {
   today: string
   weekStart: string
-  mrrDollars: number
   clientSummaries: string[]
 }) {
-  return `You are an agency operations assistant. Write a concise weekly recap (3-5 sentences) for the agency covering overall performance, who got attention, who needs attention, and any revenue notes. Be direct and actionable. No headers.
+  return `You are an agency operations assistant. Write a concise weekly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers.
 
-Today: ${params.today} | Week: ${params.weekStart}–${params.today} | MRR: $${params.mrrDollars}
+Today: ${params.today} | Week: ${params.weekStart}–${params.today}
 ${params.clientSummaries.join('\n')}`
 }

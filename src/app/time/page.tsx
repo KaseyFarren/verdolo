@@ -14,7 +14,7 @@ export default async function TimePage() {
       .eq('org_id', orgId)
       .order('started_at', { ascending: false })
       .limit(200),
-    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
+    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role').eq('org_id', orgId).eq('status', 'active'),
   ])
 
   return (

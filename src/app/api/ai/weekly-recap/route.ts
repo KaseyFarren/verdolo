@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getOrgAnthropicKey } from '@/lib/orgSecrets'
 import { buildWeeklyRecapPrompt, callClaude, extractText } from '@/lib/ai'
-import { centsToDollars, getHealthScore, getOffsetDate, getStage, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { getHealthScore, getOffsetDate, getStage, todayKey } from '@/lib/agency'
 
 export async function POST(request: Request) {
   const { orgId } = await request.json()
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const today = todayKey()
   const weekStart = getOffsetDate(-7)
   const [{ data: clients }, { data: messages }, { data: doneTasks }] = await Promise.all([
-    supabase.from('clients').select('*').eq('org_id', orgId),
+    supabase.from('clients').select('id, name, stage, status, cadence_days, last_contacted').eq('org_id', orgId),
     supabase.from('ai_message_log').select('client_id, created_at').eq('org_id', orgId).gte('created_at', weekStart),
     supabase.from('tasks').select('client_id').eq('org_id', orgId).eq('done', true).gte('completed_at', weekStart),
   ])
@@ -37,11 +37,11 @@ export async function POST(request: Request) {
     const msgCount = (messages || []).filter((m) => m.client_id === c.id).length
     const done = (doneTasks || []).filter((t) => t.client_id === c.id).length
     const health = stage === 'Churned' ? 'Churned' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
-    return `- ${c.name} (${stage}${c.retainer_cents ? ', $' + centsToDollars(c.retainer_cents) + '/mo' : ''}): ${msgCount} msgs, ${done} tasks done, health: ${health}, last: ${c.last_contacted || 'never'}`
+    return `- ${c.name} (${stage}): ${msgCount} msgs, ${done} tasks done, health: ${health}, last: ${c.last_contacted || 'never'}`
   })
 
   try {
-    const prompt = buildWeeklyRecapPrompt({ today, weekStart, mrrDollars: centsToDollars(mrrCentsTotal(clients || [])), clientSummaries: summaries })
+    const prompt = buildWeeklyRecapPrompt({ today, weekStart, clientSummaries: summaries })
     const result = await callClaude(apiKey, { model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ recap: extractText(result) })
   } catch {

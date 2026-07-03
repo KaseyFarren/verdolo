@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { memberName, todayKey } from '@/lib/agency'
+import { AVATAR_COLORS, getInitials, memberName, todayKey } from '@/lib/agency'
+import MetricBar from '@/components/ui/MetricBar'
 
 type Client = { id: string; name: string }
 type Task = { id: string; title: string; client_id: string | null }
@@ -18,7 +19,20 @@ type Entry = {
   note: string | null
   billable: boolean
 }
-type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
+type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null; role?: string }
+
+function Avatar({ member, index }: { member: Member; index: number }) {
+  const name = memberName(member)
+  if (member.avatar_url) return <img src={member.avatar_url} alt={name} className="h-8 w-8 rounded-full object-cover shrink-0" />
+  return (
+    <div
+      className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+      style={{ background: AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length] }}
+    >
+      {getInitials(name)}
+    </div>
+  )
+}
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -401,7 +415,7 @@ export default function TimeClient({
       {totalByClient.length > 0 && (
         <div className="mb-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by client</div>
-          <div className="rounded-lg border border-ink/10 divide-y divide-white/10">
+          <div className="rounded-lg border border-ink/10 divide-y divide-ink/10">
             {totalByClient.map((r) => (
               <div key={r.client.id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span>{r.client.name}</span>
@@ -415,11 +429,30 @@ export default function TimeClient({
       {isAdmin && totalByMember.length > 0 && (
         <div className="mb-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by teammate</div>
-          <div className="rounded-lg border border-ink/10 divide-y divide-white/10">
-            {totalByMember.map((r) => (
-              <div key={r.member.user_id} className="flex items-center justify-between px-3 py-2 text-sm">
-                <span>{memberName(r.member)}</span>
-                <span className="text-sage">{formatHours(r.seconds)}h</span>
+          <div className="space-y-3">
+            {totalByMember.map((r, i) => (
+              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar member={r.member} index={i} />
+                  <div>
+                    <div className="text-sm font-semibold">{memberName(r.member)}</div>
+                    {r.member.role && <div className="text-xs text-sage capitalize">{r.member.role}</div>}
+                  </div>
+                  <div className="ml-auto text-sm font-semibold">{formatHours(r.seconds)}h total</div>
+                </div>
+                <div className="flex gap-2 overflow-x-auto">
+                  {totalByClient.map((cr) => {
+                    const seconds = completed
+                      .filter((e) => e.user_id === r.member.user_id && e.client_id === cr.client.id)
+                      .reduce((s, e) => s + (e.duration_seconds || 0), 0)
+                    return (
+                      <div key={cr.client.id} className="flex-1 min-w-[100px]">
+                        <div className="text-[10px] text-sage mb-1 truncate">{cr.client.name}</div>
+                        <MetricBar value={seconds} max={cr.seconds} display={seconds > 0 ? `${formatHours(seconds)}h` : '—'} />
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ))}
           </div>
