@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate, todayKey } from '@/lib/agency'
 
@@ -21,6 +22,13 @@ export default function CalendarClient({
   const [calDate, setCalDate] = useState(todayKey())
   const [newTitle, setNewTitle] = useState('')
   const today = todayKey()
+
+  // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
+  // re-runs the server component and gives us a new initialTasks array, but useState's
+  // initializer only runs on mount — without this, the prop update never reaches local state.
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
 
   const [calY, calM] = calDate.split('-').map(Number).slice(0, 2).map((v, i) => (i === 1 ? v - 1 : v))
   const firstDay = new Date(calY, calM, 1).getDay()
@@ -64,9 +72,22 @@ export default function CalendarClient({
       .single()
     if (data) setTasks((prev) => prev.map((x) => (x.id === t.id ? (data as Task) : x)))
   }
-  async function deleteTask(id: string) {
-    await supabase.from('tasks').delete().eq('id', id)
+  function deleteTask(id: string) {
+    const removed = tasks.find((t) => t.id === id)
+    if (!removed) return
     setTasks((prev) => prev.filter((t) => t.id !== id))
+    const timeoutId = setTimeout(async () => {
+      await supabase.from('tasks').delete().eq('id', id)
+    }, 5000)
+    toast('Task deleted', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId)
+          setTasks((prev) => [...prev, removed])
+        },
+      },
+    })
   }
 
   return (

@@ -52,6 +52,12 @@ export default function TimeClient({
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
   const [now, setNow] = useState<number | null>(null)
 
+  // router.refresh() re-runs the server component and gives a new initialEntries array, but
+  // useState's initializer only runs on mount — without this, the prop update never lands.
+  useEffect(() => {
+    setEntries(initialEntries)
+  }, [initialEntries])
+
   const [timerClientId, setTimerClientId] = useState('')
   const [timerTaskId, setTimerTaskId] = useState('')
   const [timerNote, setTimerNote] = useState('')

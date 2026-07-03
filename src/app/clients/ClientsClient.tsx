@@ -87,6 +87,16 @@ export default function ClientsClient({
   const confirm = useConfirm()
   const [clients, setClients] = useState<Client[]>(initialClients)
   const [notes, setNotes] = useState<Note[]>(initialNotes)
+
+  // router.refresh() gives a new initialClients/initialNotes array, but useState's initializer
+  // only runs on mount — without this, the prop update never reaches local state.
+  useEffect(() => {
+    setClients(initialClients)
+  }, [initialClients])
+  useEffect(() => {
+    setNotes(initialNotes)
+  }, [initialNotes])
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState<Record<string, unknown>>(emptyForm)
