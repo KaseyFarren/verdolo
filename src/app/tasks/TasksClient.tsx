@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
@@ -41,6 +42,7 @@ type Recurring = {
   priority: string
   frequency: string
   notes: string | null
+  paused: boolean
 }
 
 const emptyTaskForm = { title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: 'Medium', notes: '' }
@@ -140,9 +142,22 @@ export default function TasksClient({
   async function uncompleteTask(t: Task) {
     await updateTask(t.id, { done: false, completed_at: null })
   }
-  async function deleteTask(id: string) {
-    await supabase.from('tasks').delete().eq('id', id)
+  function deleteTask(id: string) {
+    const removed = tasks.find((t) => t.id === id)
+    if (!removed) return
     setTasks((prev) => prev.filter((t) => t.id !== id))
+    const timeoutId = setTimeout(async () => {
+      await supabase.from('tasks').delete().eq('id', id)
+    }, 5000)
+    toast('Task deleted', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId)
+          setTasks((prev) => [...prev, removed])
+        },
+      },
+    })
   }
   async function snoozeTask(t: Task) {
     await updateTask(t.id, { due_date: getOffsetDate(1), done: false })
@@ -538,13 +553,19 @@ export default function TasksClient({
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{r.title}</div>
+                  <div className={`text-sm font-medium ${r.paused ? 'text-neutral-500' : ''}`}>
+                    {r.title}
+                    {r.paused && <span className="ml-2 text-[10px] uppercase text-neutral-600">Paused</span>}
+                  </div>
                   <div className="text-xs text-neutral-500 mt-0.5">
                     {recurringFrequencyLabel(r.frequency)}
                     {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
                     {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
                   </div>
                 </div>
+                <button className="text-xs text-neutral-400" onClick={() => updateRecurring(r.id, { paused: !r.paused })}>
+                  {r.paused ? 'Resume' : 'Pause'}
+                </button>
                 <button
                   className="text-xs text-neutral-400"
                   onClick={() => {

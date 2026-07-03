@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { memberName, todayKey } from '@/lib/agency'
 
@@ -150,9 +151,22 @@ export default function TimeClient({
     setShowManual(false)
   }
 
-  async function deleteEntry(id: string) {
-    await supabase.from('time_entries').delete().eq('id', id)
+  function deleteEntry(id: string) {
+    const removed = entries.find((e) => e.id === id)
+    if (!removed) return
     setEntries((prev) => prev.filter((e) => e.id !== id))
+    const timeoutId = setTimeout(async () => {
+      await supabase.from('time_entries').delete().eq('id', id)
+    }, 5000)
+    toast('Time entry deleted', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId)
+          setEntries((prev) => [...prev, removed])
+        },
+      },
+    })
   }
 
   function startEdit(e: Entry) {
@@ -213,6 +227,32 @@ export default function TimeClient({
     bucket.items.push(e)
   }
   grouped.sort((a, b) => b.date.localeCompare(a.date))
+
+  function exportCsv() {
+    const rows = [
+      ['Date', 'Client', 'Task', 'Member', 'Hours', 'Billable', 'Note'],
+      ...completed
+        .slice()
+        .sort((a, b) => a.started_at.localeCompare(b.started_at))
+        .map((e) => [
+          e.started_at.slice(0, 10),
+          clientName(e.client_id),
+          taskTitle(e.task_id) || '',
+          memberEmail(e.user_id),
+          formatHours(e.duration_seconds || 0),
+          e.billable ? 'Yes' : 'No',
+          e.note || '',
+        ]),
+    ]
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `time-entries-${todayKey()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div>
@@ -380,7 +420,14 @@ export default function TimeClient({
         </div>
       )}
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">Entries</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Entries</div>
+        {completed.length > 0 && (
+          <button onClick={exportCsv} className="text-xs text-neutral-400 hover:text-white transition-colors">
+            Export CSV
+          </button>
+        )}
+      </div>
       {grouped.length === 0 && <div className="text-sm text-neutral-500 py-3">No time logged yet.</div>}
       {grouped.map((g) => (
         <div key={g.date} className="mb-4">

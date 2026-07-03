@@ -2,7 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getOffsetDate, getStage, isWeekend, recurringMatchesDate, todayKey } from '@/lib/agency'
 
 type Client = { id: string; stage?: string | null; status?: string | null }
-type RecurringTemplate = { id: string; title: string; client_id?: string | null; priority?: string | null; frequency: string; notes?: string | null; assigned_to?: string | null }
+type RecurringTemplate = {
+  id: string
+  title: string
+  client_id?: string | null
+  priority?: string | null
+  frequency: string
+  notes?: string | null
+  assigned_to?: string | null
+  paused?: boolean
+}
 
 /** Idempotent and safe to call concurrently (e.g. from Dashboard and Tasks mounting at once):
  * duplicate auto check-ins / recurring instances are prevented by DB-level unique constraints
@@ -38,6 +47,7 @@ export async function ensureAutoAndRecurringTasks(
       })
     }
     for (const r of recurring) {
+      if (r.paused) continue
       if (!recurringMatchesDate(r.frequency, date)) continue
       recurringRows.push({
         org_id: orgId,
