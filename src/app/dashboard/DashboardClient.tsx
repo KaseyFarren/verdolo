@@ -570,7 +570,7 @@ export default function DashboardClient({
       </div>
 
       <div className="mt-8 pt-6 border-t border-ink/10">
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex flex-wrap justify-between items-center gap-y-1 mb-2">
           <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sage hover:text-ink" onClick={() => setShowMessages((v) => !v)}>
             <span className="text-[10px]">{showMessages ? '▾' : '▸'}</span> Client messages
           </button>
@@ -792,7 +792,7 @@ function SimpleTaskRow({
         </div>
         {clientName && <div className="text-xs text-sage mt-0.5">{clientName}</div>}
       </div>
-      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
         {!t.done &&
           (isTimerRunning ? (
             <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>

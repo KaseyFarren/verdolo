@@ -30,6 +30,11 @@
   --font-sans: var(--font-inter);
   --font-heading: var(--font-syne);
 
+  /* Bare `rounded` is the most common radius in the app (every plain input/select/
+     textarea/secondary button uses it) — pushed to a full stadium/pill so nothing
+     in the product renders a hard right angle, matching the primary-button pills. */
+  --radius: 9999px;
+  --radius-md: 14px;
   --radius-lg: 18px;
   --radius-xl: 22px;
   --radius-2xl: 28px;

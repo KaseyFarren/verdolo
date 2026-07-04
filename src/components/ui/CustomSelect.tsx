@@ -54,7 +54,7 @@ export default function CustomSelect({
         type="button"
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        className={`w-full flex items-center justify-between gap-2 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm text-left ${
+        className={`w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left ${
           disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
       >

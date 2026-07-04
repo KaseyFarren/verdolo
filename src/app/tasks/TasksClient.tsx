@@ -559,7 +559,7 @@ export default function TasksClient({
       <h1 className="text-xl font-semibold mb-5">Tasks</h1>
 
       <div className="flex flex-col md:flex-row gap-6">
-        <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible md:w-40 shrink-0 mb-4 md:mb-0">
+        <nav className="flex flex-wrap md:flex-col gap-1 md:w-40 shrink-0 mb-4 md:mb-0">
           {TASK_NAV.map((item) => (
             <button
               key={item.value}
@@ -567,14 +567,14 @@ export default function TasksClient({
                 setView(item.value)
                 setShowAddTask(false)
               }}
-              className={`relative rounded-lg px-3 py-2 text-sm whitespace-nowrap text-left transition-colors ${
+              className={`relative rounded-full px-3 py-2 text-sm whitespace-nowrap text-left transition-colors ${
                 view === item.value ? 'font-medium text-ink' : 'text-sage hover:text-ink hover:bg-sand'
               }`}
             >
               {view === item.value && (
                 <motion.div
                   layoutId="tasks-nav-active"
-                  className="absolute inset-0 rounded-lg bg-white"
+                  className="absolute inset-0 rounded-full bg-white"
                   style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
@@ -586,14 +586,14 @@ export default function TasksClient({
         <div className="flex-1 min-w-0">
           {/* Always rendered in the same spot on all four tabs — the "+ New task" button never
               moves or changes as you switch tabs; only the controls to its left change. */}
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2">
               {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
               {(view === 'list' || view === 'calendar') && filterSelect}
             </div>
             {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
             <div className={headerAction.open ? 'invisible pointer-events-none' : ''}>
-              <Button variant="primary" size="lg" className="rounded-md" onClick={headerAction.onClick}>
+              <Button variant="primary" size="lg" className="rounded-full" onClick={headerAction.onClick}>
                 + New task
               </Button>
             </div>
@@ -642,7 +642,7 @@ export default function TasksClient({
                       const isSel = k === selectedDate
                       const cnt = tasksForDate(k).filter((t) => !t.done).length
                       return (
-                        <div key={d} onClick={() => selectDate(k)} className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}>
+                        <div key={d} onClick={() => selectDate(k)} className={`text-center py-1.5 rounded-full cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}>
                           <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-accent font-medium' : ''}`}>{d}</div>
                           {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-white/80' : 'bg-ink/40'}`} />}
                         </div>
@@ -813,7 +813,7 @@ export default function TasksClient({
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
                           {r.title}
                           {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
@@ -938,7 +938,7 @@ export default function TasksClient({
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium ${d.paused ? 'text-sage' : ''}`}>
                           {d.title}
                           {d.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
@@ -1076,7 +1076,7 @@ function TaskRow({
         </div>
         {t.notes && !t.done && <div className="text-xs text-sage mt-1">{t.notes}</div>}
       </div>
-      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
         {!t.done &&
           (isTimerRunning ? (
             <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>

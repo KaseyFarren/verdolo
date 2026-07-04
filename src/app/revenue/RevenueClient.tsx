@@ -210,7 +210,7 @@ export default function RevenueClient({
       </div>
       <p className="text-xs text-sage mb-5">Retainer + extra billables, attributed to the hours logged this month. Owner-only.</p>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">Total revenue</div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>
@@ -235,9 +235,9 @@ export default function RevenueClient({
             const expanded = expandedClientId === r.client.id
             return (
               <div key={r.client.id} className="px-3 py-2.5">
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-y-1 text-sm">
                   <button
-                    className="flex-1 text-left"
+                    className="flex-1 min-w-[140px] text-left"
                     onClick={() => setExpandedClientId(expanded ? null : r.client.id)}
                   >
                     <span className="font-medium">{r.client.name}</span>
@@ -261,7 +261,7 @@ export default function RevenueClient({
                             <div className="flex items-center gap-2">
                               <span>{fmtMoney(c.amount_cents)}</span>
                               <button
-                                className="opacity-0 group-hover:opacity-100 text-red-600"
+                                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-red-600"
                                 onClick={() => deleteCharge(c)}
                               >
                                 ✕
@@ -312,7 +312,7 @@ export default function RevenueClient({
             const stats = taskStatsByMember.get(r.member.user_id) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
             return (
               <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   <Avatar member={r.member} index={i} />
                   <div className="min-w-0">
                     <div className="text-sm font-semibold">{memberName(r.member)}</div>
@@ -323,7 +323,7 @@ export default function RevenueClient({
                       </div>
                     )}
                   </div>
-                  <div className="ml-auto flex gap-2 shrink-0">
+                  <div className="sm:ml-auto flex gap-2 shrink-0">
                     <div className="w-28">
                       <div className="text-[10px] text-sage mb-1">Hours</div>
                       <MetricBar value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
@@ -334,7 +334,7 @@ export default function RevenueClient({
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-3 pl-12">
+                <div className="flex flex-wrap gap-2 mt-3 sm:pl-12">
                   <div className="rounded-lg bg-sand px-3 py-1.5 text-xs">
                     <span className="font-semibold">{stats.completed}</span> <span className="text-sage">completed</span>
                   </div>

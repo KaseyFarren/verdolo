@@ -581,14 +581,14 @@ export default function TimeClient({
                   </div>
                   <div className="ml-auto text-sm font-semibold">{formatHours(r.seconds)}h total</div>
                 </div>
-                <div className="flex gap-2 overflow-x-auto">
+                <div className="flex flex-wrap gap-2">
                   {totalByClient.map((cr) => {
                     const seconds =
                       completed
                         .filter((e) => e.user_id === r.member.user_id && e.client_id === cr.client.id)
                         .reduce((s, e) => s + (e.duration_seconds || 0), 0) + archivedSecondsFor(cr.client.id, r.member.user_id)
                     return (
-                      <div key={cr.client.id} className="flex-1 min-w-[100px]">
+                      <div key={cr.client.id} className="flex-1 min-w-[100px] basis-[100px]">
                         <div className="text-[10px] text-sage mb-1 truncate">{cr.client.name}</div>
                         <MetricBar value={seconds} max={cr.seconds} display={seconds > 0 ? `${formatHours(seconds)}h` : '—'} />
                       </div>
@@ -724,7 +724,7 @@ export default function TimeClient({
                         </div>
                         <div className="text-sm text-sage shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
                         {canEdit && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                          <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0">
                             <button className="text-xs text-sage px-1" onClick={() => startEdit(e)}>
                               ✏
                             </button>

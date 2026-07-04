@@ -72,7 +72,7 @@ export default function MembersList({
   }
 
   return (
-    <ul className="divide-y divide-white/10 rounded border border-ink/10">
+    <ul className="divide-y divide-white/10 rounded-2xl border border-ink/10 overflow-hidden">
       {rows.map((m) => {
         const isSelf = m.user_id === currentUserId
         const canTouch = canManage && !isSelf && (m.role !== 'owner' || canManageOwners)

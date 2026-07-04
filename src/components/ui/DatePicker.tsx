@@ -64,7 +64,7 @@ export default function DatePicker({
       <button
         type="button"
         onClick={toggleOpen}
-        className="w-full flex items-center justify-between gap-2 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm text-left"
+        className="w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left"
       >
         <span className={`truncate ${value ? '' : 'text-sage'}`}>{value ? formatDate(value) : placeholder}</span>
         <span className={`text-sage text-[10px] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
@@ -72,11 +72,11 @@ export default function DatePicker({
       {open && (
         <div className="absolute z-20 mt-1 w-64 rounded-xl bg-white shadow-lg border border-ink/10 p-3">
           <div className="flex items-center justify-between mb-2">
-            <button type="button" onClick={prevMonth} className="text-sage px-2">
+            <button type="button" onClick={prevMonth} className="text-sage px-2 rounded-full">
               ‹
             </button>
             <div className="text-sm font-medium">{new Date(y, jsMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
-            <button type="button" onClick={nextMonth} className="text-sage px-2">
+            <button type="button" onClick={nextMonth} className="text-sage px-2 rounded-full">
               ›
             </button>
           </div>
@@ -105,7 +105,7 @@ export default function DatePicker({
                     type="button"
                     key={d}
                     onClick={() => select(k)}
-                    className={`text-center py-1.5 rounded-md text-sm ${
+                    className={`text-center py-1.5 rounded-full text-sm ${
                       isSel ? 'bg-accent text-white font-semibold' : isToday ? 'bg-ink/5 text-accent font-medium' : 'hover:bg-sand'
                     }`}
                   >
