@@ -71,8 +71,7 @@ export default function DashboardClient({
   initialNote,
   hasApiKey,
   excludeWeekends,
-  initialRecap,
-  pastReports,
+  hasRecapThisWeek,
   initialSentToday,
 }: {
   orgId: string
@@ -87,8 +86,7 @@ export default function DashboardClient({
   initialNote: string
   hasApiKey: boolean
   excludeWeekends: boolean
-  initialRecap: string | null
-  pastReports: { week_start: string; content: string }[]
+  hasRecapThisWeek: boolean
   initialSentToday: string[]
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -116,9 +114,6 @@ export default function DashboardClient({
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingOne, setLoadingOne] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [recap, setRecap] = useState<string | null>(initialRecap)
-  const [loadingRecap, setLoadingRecap] = useState(false)
-  const [showPastReports, setShowPastReports] = useState(false)
   const [showMessages, setShowMessages] = useState(true)
   const [sentClientIds, setSentClientIds] = useState<Set<string>>(new Set(initialSentToday))
   const [showAddTask, setShowAddTask] = useState(false)
@@ -312,21 +307,6 @@ export default function DashboardClient({
     await supabase.from('clients').update({ awaiting_reply: false }).eq('id', client.id)
   }
 
-  async function generateRecap() {
-    setLoadingRecap(true)
-    try {
-      const res = await fetch('/api/ai/weekly-recap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId }),
-      })
-      const body = await res.json()
-      setRecap(res.ok ? body.recap : 'Failed to generate. Check your API key in Settings.')
-    } finally {
-      setLoadingRecap(false)
-    }
-  }
-
   const msgTasksDone = activeClients.filter((c) => isSentToday(c.id)).length
 
   return (
@@ -368,49 +348,15 @@ export default function DashboardClient({
         </div>
       )}
 
-      {dashIsToday && (
+      {dashIsToday && isAdmin && (
         <div className="mb-6 pt-6 border-t border-ink/10">
-          {recap ? (
-            <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-semibold uppercase text-sage">Weekly Recap</div>
-                <div className="flex gap-2">
-                  <button className="text-xs text-sage hover:text-ink" onClick={generateRecap} disabled={loadingRecap}>
-                    ↺
-                  </button>
-                  <button className="text-xs text-red-600" onClick={() => setRecap(null)}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-              <div className="text-sm leading-relaxed text-ink">{loadingRecap ? 'Generating…' : recap}</div>
-            </div>
-          ) : (
-            <button
-              className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50"
-              onClick={generateRecap}
-              disabled={loadingRecap || !hasApiKey}
-            >
-              {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'Add an Anthropic key in Settings to enable AI'}
-            </button>
-          )}
-          {pastReports.length > 0 && (
-            <div className="mt-2">
-              <button className="text-xs text-sage hover:text-ink" onClick={() => setShowPastReports((v) => !v)}>
-                {showPastReports ? '▾' : '▸'} Past reports ({pastReports.length})
-              </button>
-              {showPastReports && (
-                <div className="mt-2 space-y-2">
-                  {pastReports.map((r) => (
-                    <div key={r.week_start} className="rounded-xl bg-white shadow-md p-3">
-                      <div className="text-xs font-semibold text-sage mb-1">Week of {formatDate(r.week_start)}</div>
-                      <div className="text-sm leading-relaxed text-ink">{r.content}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <Link
+            href="/reports"
+            className="flex items-center justify-between rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm text-sage shadow-md hover:text-ink"
+          >
+            <span>{hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'}</span>
+            <span>→</span>
+          </Link>
         </div>
       )}
 

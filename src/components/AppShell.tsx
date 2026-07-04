@@ -14,6 +14,7 @@ const NAV = [
   { href: '/tasks', icon: '✅', label: 'Tasks' },
   { href: '/clients', icon: '👥', label: 'Clients' },
   { href: '/time', icon: '⏱️', label: 'Time' },
+  { href: '/reports', icon: '📊', label: 'Reports', adminOnly: true },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
   { href: '/revenue', icon: '💰', label: 'Revenue', ownerOnly: true },
   { href: '/settings', icon: '⚙️', label: 'Settings' },

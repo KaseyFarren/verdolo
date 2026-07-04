@@ -63,8 +63,7 @@ export default async function DashboardPage() {
         initialNote={noteRow?.content ?? ''}
         hasApiKey={!!apiKey}
         excludeWeekends={org?.settings?.exclude_weekends ?? true}
-        initialRecap={reports?.find((r) => r.week_start === weekAnchor)?.content ?? null}
-        pastReports={(reports ?? []).filter((r) => r.week_start !== weekAnchor)}
+        hasRecapThisWeek={!!reports?.some((r) => r.week_start === weekAnchor)}
         initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
       />
     </AppShell>
