@@ -54,8 +54,8 @@ export async function POST(request: Request) {
       },
     ],
     subscription_data: trialDaysRemaining > 0 ? { trial_period_days: trialDaysRemaining, metadata: { org_id: orgId } } : { metadata: { org_id: orgId } },
-    success_url: `${origin}/settings/billing?checkout=success`,
-    cancel_url: `${origin}/settings/billing?checkout=cancelled`,
+    success_url: `${origin}/settings?view=billing&checkout=success`,
+    cancel_url: `${origin}/settings?view=billing&checkout=cancelled`,
     metadata: { org_id: orgId },
   })
 

@@ -83,7 +83,7 @@ export default function BillingClient({
   if (role !== 'owner') {
     return (
       <div>
-        <h1 className="text-xl font-semibold mb-4">Billing</h1>
+        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Billing</div>
         {trialExpired || subscriptionStatus === 'canceled' ? (
           <div className="rounded-lg border border-amber-300 bg-amber-100/70 p-4 text-sm text-amber-700">
             This organization&apos;s trial has ended and there&apos;s no active subscription. Ask your org owner to
@@ -103,7 +103,7 @@ export default function BillingClient({
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-5">Billing</h1>
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Billing</div>
 
       <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
         {subscriptionStatus === 'trialing' && !trialExpired && (

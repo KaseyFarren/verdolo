@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.redirect(`${origin}/login`)
 
   if (!code || !state || state !== cookieState) {
-    return NextResponse.redirect(`${origin}/settings?gmail=error`)
+    return NextResponse.redirect(`${origin}/settings?view=integrations&gmail=error`)
   }
 
   const { data: membership } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('status', 'active').maybeSingle()
@@ -44,10 +44,10 @@ export async function GET(request: Request) {
       { onConflict: 'org_id,user_id,provider' }
     )
 
-    const res = NextResponse.redirect(`${origin}/settings?gmail=connected`)
+    const res = NextResponse.redirect(`${origin}/settings?view=integrations&gmail=connected`)
     res.cookies.delete('google_oauth_state')
     return res
   } catch {
-    return NextResponse.redirect(`${origin}/settings?gmail=error`)
+    return NextResponse.redirect(`${origin}/settings?view=integrations&gmail=error`)
   }
 }
