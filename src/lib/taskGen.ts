@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getOffsetDate, getStage, isWeekend, recurringMatchesDate, todayKey } from '@/lib/agency'
 
-type Client = { id: string; stage?: string | null; status?: string | null; primary_contact_id?: string | null }
+type Client = { id: string; stage?: string | null; status?: string | null }
 type RecurringTemplate = {
   id: string
   title: string
@@ -12,16 +12,26 @@ type RecurringTemplate = {
   assigned_to?: string | null
   paused?: boolean
 }
+type DefaultTemplate = {
+  id: string
+  title: string
+  priority?: string | null
+  notes?: string | null
+  assigned_to?: string | null
+  auto_type?: string | null
+  paused?: boolean
+}
 
 /** Idempotent and safe to call concurrently (e.g. from Dashboard and Tasks mounting at once):
- * duplicate auto check-ins / recurring instances are prevented by DB-level unique constraints
- * (tasks_auto_checkin_unique, tasks_recurring_instance_unique), so upserting with
+ * duplicate default-task / recurring instances are prevented by DB-level unique constraints
+ * (tasks_default_template_instance_unique, tasks_recurring_instance_unique), so upserting with
  * ignoreDuplicates can't race regardless of how many callers run at the same time. */
 export async function ensureAutoAndRecurringTasks(
   supabase: SupabaseClient,
   orgId: string,
   clients: Client[],
   recurring: RecurringTemplate[],
+  defaultTemplates: DefaultTemplate[],
   excludeWeekends: boolean
 ) {
   const today = todayKey()
@@ -29,23 +39,28 @@ export async function ensureAutoAndRecurringTasks(
   const dates = [today, tomorrow].filter((d) => !excludeWeekends || !isWeekend(d))
   if (!dates.length) return
 
-  const checkinRows: Record<string, unknown>[] = []
+  const defaultRows: Record<string, unknown>[] = []
   const recurringRows: Record<string, unknown>[] = []
 
   for (const date of dates) {
     for (const c of clients) {
       if (getStage(c) === 'Churned') continue
-      checkinRows.push({
-        org_id: orgId,
-        client_id: c.id,
-        assigned_to: c.primary_contact_id || null,
-        title: `Daily check-in`,
-        due_date: date,
-        priority: 'High',
-        done: false,
-        is_auto: true,
-        auto_type: 'checkin',
-      })
+      for (const d of defaultTemplates) {
+        if (d.paused) continue
+        defaultRows.push({
+          org_id: orgId,
+          client_id: c.id,
+          assigned_to: d.assigned_to || null,
+          title: d.title,
+          due_date: date,
+          priority: d.priority || 'Medium',
+          notes: d.notes || '',
+          done: false,
+          is_auto: true,
+          auto_type: d.auto_type || null,
+          default_template_id: d.id,
+        })
+      }
     }
     for (const r of recurring) {
       if (r.paused) continue
@@ -64,8 +79,8 @@ export async function ensureAutoAndRecurringTasks(
     }
   }
 
-  if (checkinRows.length) {
-    await supabase.from('tasks').upsert(checkinRows, { onConflict: 'org_id,client_id,due_date,auto_type', ignoreDuplicates: true })
+  if (defaultRows.length) {
+    await supabase.from('tasks').upsert(defaultRows, { onConflict: 'org_id,client_id,due_date,default_template_id', ignoreDuplicates: true })
   }
   if (recurringRows.length) {
     await supabase.from('tasks').upsert(recurringRows, { onConflict: 'org_id,recurring_id,due_date', ignoreDuplicates: true })

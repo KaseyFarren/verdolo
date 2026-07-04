@@ -47,6 +47,7 @@ type Task = {
   skipped: boolean
 }
 type Recurring = { id: string; title: string; client_id: string | null; priority: string; frequency: string; notes: string | null }
+type DefaultTemplate = { id: string; title: string; priority: string; assigned_to: string | null; notes: string | null; auto_type: string | null; paused: boolean }
 type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seconds: number | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
@@ -64,6 +65,7 @@ export default function DashboardClient({
   initialClients,
   initialTasks,
   initialRecurring,
+  initialDefaults,
   todayTimeEntries,
   members,
   initialNote,
@@ -79,6 +81,7 @@ export default function DashboardClient({
   initialClients: Client[]
   initialTasks: Task[]
   initialRecurring: Recurring[]
+  initialDefaults: DefaultTemplate[]
   todayTimeEntries: TodayTimeEntry[]
   members: Member[]
   initialNote: string
@@ -101,7 +104,7 @@ export default function DashboardClient({
   }, [initialTasks])
 
   useEffect(() => {
-    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, excludeWeekends).then(async () => {
+    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, initialDefaults, excludeWeekends).then(async () => {
       const { data } = await supabase.from('tasks').select('*').eq('org_id', orgId)
       if (data) setTasks(data as Task[])
     })

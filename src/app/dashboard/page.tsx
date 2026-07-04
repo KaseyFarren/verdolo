@@ -14,6 +14,7 @@ export default async function DashboardPage() {
     { data: clients },
     { data: tasks },
     { data: recurring },
+    { data: defaults },
     { data: todayTimeEntries },
     { data: members },
     { data: noteRow },
@@ -28,6 +29,7 @@ export default async function DashboardPage() {
       .order('name'),
     supabase.from('tasks').select('*').eq('org_id', orgId),
     supabase.from('recurring_templates').select('*').eq('org_id', orgId),
+    supabase.from('default_task_templates').select('*').eq('org_id', orgId),
     // RLS scopes this for free: admins/owners get every member's rows, members only get their own.
     supabase
       .from('time_entries')
@@ -55,6 +57,7 @@ export default async function DashboardPage() {
         initialClients={clients ?? []}
         initialTasks={tasks ?? []}
         initialRecurring={recurring ?? []}
+        initialDefaults={defaults ?? []}
         todayTimeEntries={todayTimeEntries ?? []}
         members={members ?? []}
         initialNote={noteRow?.content ?? ''}

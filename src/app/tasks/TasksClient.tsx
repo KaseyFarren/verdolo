@@ -12,18 +12,15 @@ import DatePicker from '@/components/ui/DatePicker'
 import AddTaskForm from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import Button from '@/components/ui/Button'
-import {
-  PRIORITY,
-  formatDate,
-  getOffsetDate,
-  memberName,
-  recurringFrequencyLabel,
-  sortTasks,
-  todayKey,
-} from '@/lib/agency'
+import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 
 type Client = { id: string; name: string }
-type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
+type Member = {
+  user_id: string
+  invited_email: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+}
 type Task = {
   id: string
   client_id: string | null
@@ -37,6 +34,7 @@ type Task = {
   is_auto: boolean
   auto_type: string | null
   recurring_id: string | null
+  default_template_id: string | null
   quick: boolean
   skipped: boolean
 }
@@ -50,9 +48,38 @@ type Recurring = {
   notes: string | null
   paused: boolean
 }
+type Default = {
+  id: string
+  title: string
+  assigned_to: string | null
+  priority: string
+  notes: string | null
+  auto_type: string | null
+  paused: boolean
+}
 
-const emptyTaskForm = { title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: 'Medium', notes: '' }
-const emptyRecurringForm = { title: '', clientId: '', assignedTo: '', priority: 'Medium', frequency: 'daily', notes: '' }
+const emptyTaskForm = {
+  title: '',
+  clientId: '',
+  assignedTo: '',
+  dueDate: todayKey(),
+  priority: 'Medium',
+  notes: '',
+}
+const emptyRecurringForm = {
+  title: '',
+  clientId: '',
+  assignedTo: '',
+  priority: 'Medium',
+  frequency: 'daily',
+  notes: '',
+}
+const emptyDefaultForm = {
+  title: '',
+  assignedTo: '',
+  priority: 'Medium',
+  notes: '',
+}
 
 export default function TasksClient({
   orgId,
@@ -61,6 +88,7 @@ export default function TasksClient({
   initialClients,
   initialTasks,
   initialRecurring,
+  initialDefaults,
   members,
   excludeWeekends,
 }: {
@@ -70,15 +98,17 @@ export default function TasksClient({
   initialClients: Client[]
   initialTasks: Task[]
   initialRecurring: Recurring[]
+  initialDefaults: Default[]
   members: Member[]
   excludeWeekends: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
   const searchParams = useSearchParams()
-  const [view, setView] = useState<'list' | 'calendar'>(searchParams.get('view') === 'calendar' ? 'calendar' : 'list')
+  const [view, setView] = useState<'list' | 'calendar' | 'recurring' | 'defaults'>(searchParams.get('view') === 'calendar' ? 'calendar' : 'list')
   const [clients] = useState(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [recurring, setRecurring] = useState<Recurring[]>(initialRecurring)
+  const [defaults, setDefaults] = useState<Default[]>(initialDefaults)
   const [filter, setFilter] = useState('all')
   const [selectedDate, setSelectedDate] = useState('')
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
@@ -91,6 +121,10 @@ export default function TasksClient({
   const [recurringForm, setRecurringForm] = useState(emptyRecurringForm)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null)
   const [editRecurringForm, setEditRecurringForm] = useState<Record<string, unknown>>({})
+  const [showAddDefault, setShowAddDefault] = useState(false)
+  const [defaultForm, setDefaultForm] = useState(emptyDefaultForm)
+  const [editingDefaultId, setEditingDefaultId] = useState<string | null>(null)
+  const [editDefaultForm, setEditDefaultForm] = useState<Record<string, unknown>>({})
   const timer = useTaskTimer(supabase, orgId, userId)
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
@@ -110,7 +144,7 @@ export default function TasksClient({
   }, [view])
 
   useEffect(() => {
-    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, excludeWeekends).then(async () => {
+    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, initialDefaults, excludeWeekends).then(async () => {
       const { data } = await supabase.from('tasks').select('*').eq('org_id', orgId).order('due_date')
       if (data) setTasks(data as Task[])
     })
@@ -218,7 +252,7 @@ export default function TasksClient({
   // Regenerates this template's today/tomorrow instance right away (via the same idempotent
   // upsert used on mount) instead of leaving it missing until the next page load.
   async function regenerateRecurringInstance(r: Recurring) {
-    await ensureAutoAndRecurringTasks(supabase, orgId, clients, [r], excludeWeekends)
+    await ensureAutoAndRecurringTasks(supabase, orgId, clients, [r], [], excludeWeekends)
     const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
     if (fresh) setTasks(fresh as Task[])
   }
@@ -253,6 +287,62 @@ export default function TasksClient({
     setTasks((prev) => prev.filter((t) => t.recurring_id !== id))
   }
 
+  async function addDefault() {
+    if (!defaultForm.title.trim()) return
+    const { data } = await supabase
+      .from('default_task_templates')
+      .insert({
+        org_id: orgId,
+        title: defaultForm.title,
+        assigned_to: defaultForm.assignedTo || null,
+        priority: defaultForm.priority,
+        notes: defaultForm.notes,
+      })
+      .select()
+      .single()
+    if (data) {
+      setDefaults((prev) => [...prev, data as Default])
+      await regenerateDefaultInstance(data as Default)
+    }
+    setDefaultForm(emptyDefaultForm)
+    setShowAddDefault(false)
+  }
+  // Regenerates this template's today/tomorrow instance (one per client) right away instead of
+  // leaving it missing until the next page load, mirroring regenerateRecurringInstance above.
+  async function regenerateDefaultInstance(d: Default) {
+    await ensureAutoAndRecurringTasks(supabase, orgId, clients, [], [d], excludeWeekends)
+    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
+    if (fresh) setTasks(fresh as Task[])
+  }
+  async function updateDefault(id: string, fields: Record<string, unknown>) {
+    const { data } = await supabase.from('default_task_templates').update(fields).eq('id', id).select().single()
+    if (data) setDefaults((prev) => prev.map((d) => (d.id === id ? (data as Default) : d)))
+    await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false).gte('due_date', today)
+    if (data && !(data as Default).paused) {
+      await regenerateDefaultInstance(data as Default)
+    } else {
+      setTasks((prev) => prev.filter((t) => !(t.default_template_id === id && t.due_date >= today && !t.done)))
+    }
+    setEditingDefaultId(null)
+  }
+  async function toggleDefaultPaused(d: Default) {
+    const nextPaused = !d.paused
+    const { data } = await supabase.from('default_task_templates').update({ paused: nextPaused }).eq('id', d.id).select().single()
+    if (data) setDefaults((prev) => prev.map((x) => (x.id === d.id ? (data as Default) : x)))
+    if (nextPaused) {
+      await supabase.from('tasks').delete().eq('default_template_id', d.id).eq('done', false).gte('due_date', today)
+      setTasks((prev) => prev.filter((t) => !(t.default_template_id === d.id && t.due_date >= today && !t.done)))
+    } else {
+      await regenerateDefaultInstance({ ...d, paused: false })
+    }
+  }
+  async function deleteDefault(id: string) {
+    await supabase.from('default_task_templates').delete().eq('id', id)
+    await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false)
+    setDefaults((prev) => prev.filter((d) => d.id !== id))
+    setTasks((prev) => prev.filter((t) => !(t.default_template_id === id && !t.done)))
+  }
+
   // skipped instances stay in the DB (so the recurring-instance upsert won't regenerate them)
   // but are hidden everywhere in the UI — they weren't actually done, just dismissed
   const visible = tasks.filter((t) => !t.skipped)
@@ -275,11 +365,34 @@ export default function TasksClient({
   }
 
   function visibleBuckets(): { label: string; items: Task[] }[] {
-    if (selectedDate) return [{ label: `Tasks for ${formatDate(selectedDate)}`, items: tasksForDate(selectedDate) }]
-    if (filter === 'overdue') return [{ label: 'Overdue', items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)) }]
-    if (filter === 'today') return [{ label: 'Today', items: sortTasks(visible.filter((t) => t.due_date === today && !t.done)) }]
+    if (selectedDate)
+      return [
+        {
+          label: `Tasks for ${formatDate(selectedDate)}`,
+          items: tasksForDate(selectedDate),
+        },
+      ]
+    if (filter === 'overdue')
+      return [
+        {
+          label: 'Overdue',
+          items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)),
+        },
+      ]
+    if (filter === 'today')
+      return [
+        {
+          label: 'Today',
+          items: sortTasks(visible.filter((t) => t.due_date === today && !t.done)),
+        },
+      ]
     if (filter === 'completed')
-      return [{ label: 'Completed', items: [...visible.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)) }]
+      return [
+        {
+          label: 'Completed',
+          items: [...visible.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)),
+        },
+      ]
     if (filter.startsWith('assignee:')) {
       const key = filter.slice('assignee:'.length)
       const label = key === 'mine' ? 'Mine' : key === 'unassigned' ? 'Unassigned' : memberEmail(key)
@@ -293,11 +406,26 @@ export default function TasksClient({
     const tomorrow = getOffsetDate(1)
     const yesterday = getOffsetDate(-1)
     return [
-      { label: 'Overdue', items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)) },
-      { label: 'Yesterday', items: sortTasks(visible.filter((t) => t.due_date === yesterday && t.done)) },
-      { label: 'Today', items: sortTasks(visible.filter((t) => t.due_date === today)) },
-      { label: 'Tomorrow', items: sortTasks(visible.filter((t) => t.due_date === tomorrow)) },
-      { label: 'Upcoming', items: sortTasks(visible.filter((t) => t.due_date > tomorrow)) },
+      {
+        label: 'Overdue',
+        items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)),
+      },
+      {
+        label: 'Yesterday',
+        items: sortTasks(visible.filter((t) => t.due_date === yesterday && t.done)),
+      },
+      {
+        label: 'Today',
+        items: sortTasks(visible.filter((t) => t.due_date === today)),
+      },
+      {
+        label: 'Tomorrow',
+        items: sortTasks(visible.filter((t) => t.due_date === tomorrow)),
+      },
+      {
+        label: 'Upcoming',
+        items: sortTasks(visible.filter((t) => t.due_date > tomorrow)),
+      },
     ].filter((b) => b.items.length > 0)
   }
 
@@ -307,7 +435,10 @@ export default function TasksClient({
   // see everyone's tasks flat (each row already shows its assignee) and use the chips instead.
   function splitBucket(items: Task[]) {
     if (isAdmin) return { mine: items, unassigned: [] as Task[] }
-    return { mine: items.filter((t) => t.assigned_to !== null), unassigned: items.filter((t) => t.assigned_to === null) }
+    return {
+      mine: items.filter((t) => t.assigned_to !== null),
+      unassigned: items.filter((t) => t.assigned_to === null),
+    }
   }
 
   function renderTaskRow(t: Task) {
@@ -325,7 +456,14 @@ export default function TasksClient({
         members={members}
         startEdit={() => {
           setEditingTaskId(t.id)
-          setEditForm({ title: t.title, client_id: t.client_id || '', assigned_to: t.assigned_to || '', priority: t.priority, due_date: t.due_date, notes: t.notes || '' })
+          setEditForm({
+            title: t.title,
+            client_id: t.client_id || '',
+            assigned_to: t.assigned_to || '',
+            priority: t.priority,
+            due_date: t.due_date,
+            notes: t.notes || '',
+          })
         }}
         cancelEdit={() => setEditingTaskId(null)}
         save={() => updateTask(t.id, editForm)}
@@ -345,24 +483,42 @@ export default function TasksClient({
   const filterOptions: SelectOption[] = [
     { value: 'all', label: 'All' },
     { value: 'today', label: 'Today' },
-    { value: 'overdue', label: overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue' },
+    {
+      value: 'overdue',
+      label: overdueCount > 0 ? `Overdue (${overdueCount})` : 'Overdue',
+    },
     { value: 'completed', label: 'Done' },
-    ...(isAdmin ? [{ value: 'assignee:mine', label: 'Mine' }, { value: 'assignee:unassigned', label: 'Unassigned' }] : []),
+    ...(isAdmin
+      ? [
+          { value: 'assignee:mine', label: 'Mine' },
+          { value: 'assignee:unassigned', label: 'Unassigned' },
+        ]
+      : []),
   ]
   const filterGroups: SelectGroup[] = [
     ...(isAdmin && members.filter((m) => m.user_id !== userId).length > 0
       ? [
           {
             label: 'Team',
-            options: members.filter((m) => m.user_id !== userId).map((m) => ({ value: `assignee:${m.user_id}`, label: memberName(m) })),
+            options: members
+              .filter((m) => m.user_id !== userId)
+              .map((m) => ({
+                value: `assignee:${m.user_id}`,
+                label: memberName(m),
+              })),
           },
         ]
       : []),
-    ...(clients.length > 0 ? [{ label: 'Clients', options: clients.map((c) => ({ value: c.id, label: c.name })) }] : []),
+    ...(clients.length > 0
+      ? [
+          {
+            label: 'Clients',
+            options: clients.map((c) => ({ value: c.id, label: c.name })),
+          },
+        ]
+      : []),
   ]
-  const filterSelect = (
-    <CustomSelect value={filter} onChange={setFilter} options={filterOptions} groups={filterGroups} className="w-36" />
-  )
+  const filterSelect = <CustomSelect value={filter} onChange={setFilter} options={filterOptions} groups={filterGroups} className="w-36" />
 
   const [calY, calM] = calMonth.split('-').map(Number)
   const jsMonth = calM - 1
@@ -378,312 +534,447 @@ export default function TasksClient({
     setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Tasks</h1>
-          <div className="flex gap-1 bg-sand rounded-md p-1">
-            {(['list', 'calendar'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => {
-                  setView(v)
-                  setShowAddTask(false)
-                }}
-                className={`relative px-3 py-1 rounded text-xs capitalize ${view === v ? 'text-ink' : 'text-sage'}`}
-              >
-                {view === v && (
-                  <motion.div
-                    layoutId="tasks-view-toggle"
-                    className="absolute inset-0 rounded bg-white shadow-sm"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <span className="relative">{v}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* invisible (not unmounted) when hidden so the header row height stays constant across view/showAddTask changes */}
-        <div className={view === 'list' && !showAddTask ? '' : 'invisible pointer-events-none'}>
-          <Button
-            variant="primary"
-            size="lg"
-            className="rounded-md"
-            onClick={() => {
+  const TASK_NAV: { value: typeof view; label: string }[] = [
+    { value: 'list', label: 'List' },
+    { value: 'calendar', label: 'Calendar' },
+    { value: 'recurring', label: 'Recurring' },
+    { value: 'defaults', label: 'Defaults' },
+  ]
+
+  const headerAction =
+    view === 'recurring'
+      ? { open: showAddRecurring, onClick: () => setShowAddRecurring(true) }
+      : view === 'defaults'
+        ? { open: showAddDefault, onClick: () => setShowAddDefault(true) }
+        : {
+            open: showAddTask,
+            onClick: () => {
               setShowAddTask(true)
               setTaskForm((f) => ({ ...emptyTaskForm, dueDate: selectedDate || todayKey(), title: f.title }))
-            }}
-          >
-            + New task
-          </Button>
-        </div>
-      </div>
+            },
+          }
 
-      {view === 'list' && showAddTask && (
-        <AddTaskForm
-          mode={taskMode}
-          setMode={setTaskMode}
-          form={taskForm}
-          setForm={setTaskForm}
-          clients={clients}
-          members={members}
-          onSubmit={addTask}
-          onCancel={() => setShowAddTask(false)}
-        />
-      )}
+  return (
+    <div>
+      <h1 className="text-xl font-semibold mb-5">Tasks</h1>
 
-      {view === 'list' ? (
-        <div className="flex items-center gap-2 mb-4">
-          <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />
-          {filterSelect}
-        </div>
-      ) : (
-        <div className="mb-4">{filterSelect}</div>
-      )}
-
-      {view === 'calendar' && (
-        <>
-          <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={prevMonth} className="text-sage px-2">
-                ‹
-              </button>
-              <div className="text-sm font-medium">{new Date(calY, jsMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
-              <button onClick={nextMonth} className="text-sage px-2">
-                ›
-              </button>
+      <div className="flex flex-col md:flex-row gap-6">
+        <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible md:w-40 shrink-0 mb-4 md:mb-0">
+          {TASK_NAV.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => {
+                setView(item.value)
+                setShowAddTask(false)
+              }}
+              className={`relative rounded-lg px-3 py-2 text-sm whitespace-nowrap text-left transition-colors ${
+                view === item.value ? 'font-medium text-ink' : 'text-sage hover:text-ink hover:bg-sand'
+              }`}
+            >
+              {view === item.value && (
+                <motion.div
+                  layoutId="tasks-nav-active"
+                  className="absolute inset-0 rounded-lg bg-white"
+                  style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className="relative">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="flex-1 min-w-0">
+          {/* Always rendered in the same spot on all four tabs — the "+ New task" button never
+              moves or changes as you switch tabs; only the controls to its left change. */}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
+              {(view === 'list' || view === 'calendar') && filterSelect}
             </div>
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-[11px] text-sage py-1">
-                  {d}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {Array(firstDay)
-                .fill(null)
-                .map((_, i) => (
-                  <div key={'e' + i} />
-                ))}
-              {Array(daysInMonth)
-                .fill(null)
-                .map((_, i) => {
-                  const d = i + 1
-                  const k = `${calY}-${String(jsMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-                  const isToday = k === today
-                  const isSel = k === selectedDate
-                  const cnt = tasksForDate(k).filter((t) => !t.done).length
-                  return (
-                    <div
-                      key={d}
-                      onClick={() => selectDate(k)}
-                      className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}
-                    >
-                      <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-accent font-medium' : ''}`}>{d}</div>
-                      {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-white/80' : 'bg-ink/40'}`} />}
-                    </div>
-                  )
-                })}
+            {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
+            <div className={headerAction.open ? 'invisible pointer-events-none' : ''}>
+              <Button variant="primary" size="lg" className="rounded-md" onClick={headerAction.onClick}>
+                + New task
+              </Button>
             </div>
           </div>
 
-          {selectedDate && (
+          {view === 'list' && showAddTask && (
+            <AddTaskForm mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
+          )}
+
+          {view === 'calendar' && (
             <>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium">{formatDate(selectedDate)}</div>
-                <button
-                  className="text-xs text-sage hover:text-ink"
-                  onClick={() => {
-                    if (showAddTask) {
-                      setShowAddTask(false)
-                    } else {
-                      setShowAddTask(true)
-                      setTaskForm((f) => ({ ...emptyTaskForm, dueDate: selectedDate, title: f.title }))
-                    }
-                  }}
-                >
-                  {showAddTask ? 'Cancel' : '+ Add task'}
-                </button>
+              <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <button onClick={prevMonth} className="text-sage px-2">
+                    ‹
+                  </button>
+                  <div className="text-sm font-medium">
+                    {new Date(calY, jsMonth).toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </div>
+                  <button onClick={nextMonth} className="text-sage px-2">
+                    ›
+                  </button>
+                </div>
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                    <div key={i} className="text-center text-[11px] text-sage py-1">
+                      {d}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array(firstDay)
+                    .fill(null)
+                    .map((_, i) => (
+                      <div key={'e' + i} />
+                    ))}
+                  {Array(daysInMonth)
+                    .fill(null)
+                    .map((_, i) => {
+                      const d = i + 1
+                      const k = `${calY}-${String(jsMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+                      const isToday = k === today
+                      const isSel = k === selectedDate
+                      const cnt = tasksForDate(k).filter((t) => !t.done).length
+                      return (
+                        <div key={d} onClick={() => selectDate(k)} className={`text-center py-1.5 rounded-md cursor-pointer ${isSel ? 'bg-accent text-white' : isToday ? 'bg-ink/5' : ''}`}>
+                          <div className={`text-sm ${isSel ? 'font-semibold' : isToday ? 'text-accent font-medium' : ''}`}>{d}</div>
+                          {cnt > 0 && <div className={`h-1 w-1 rounded-full mx-auto mt-0.5 ${isSel ? 'bg-white/80' : 'bg-ink/40'}`} />}
+                        </div>
+                      )
+                    })}
+                </div>
               </div>
 
-              {showAddTask && (
-                <AddTaskForm
-                  mode={taskMode}
-                  setMode={setTaskMode}
-                  form={taskForm}
-                  setForm={setTaskForm}
-                  clients={clients}
-                  members={members}
-                  onSubmit={addTask}
-                  onCancel={() => setShowAddTask(false)}
-                />
-              )}
+              {selectedDate && (
+                <>
+                  <div className="text-sm font-medium mb-2">{formatDate(selectedDate)}</div>
 
-              {tasksForDate(selectedDate).length === 0 ? (
-                <div className="text-sm text-sage py-4">No tasks scheduled.</div>
-              ) : (
-                <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                  {showAddTask && (
+                    <AddTaskForm
+                      mode={taskMode}
+                      setMode={setTaskMode}
+                      form={taskForm}
+                      setForm={setTaskForm}
+                      clients={clients}
+                      members={members}
+                      onSubmit={addTask}
+                      onCancel={() => setShowAddTask(false)}
+                    />
+                  )}
+
+                  {tasksForDate(selectedDate).length === 0 ? (
+                    <div className="text-sm text-sage py-4">No tasks scheduled.</div>
+                  ) : (
+                    <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                  )}
+                </>
               )}
             </>
           )}
-        </>
-      )}
 
-      {view === 'list' && (
-        <>
-          {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
-          {buckets.map((b) => {
-            const { mine, unassigned } = splitBucket(b.items)
-            const pendingCount = b.items.filter((t) => !t.done).length
-            return (
-              <div key={b.label} className="mb-5">
-                <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
-                  {pendingCount > 1 && (
-                    <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
-                      Complete all ({pendingCount})
-                    </button>
-                  )}
-                </div>
-                <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
-                {unassigned.length > 0 && (
-                  <>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
-                    <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
-                  </>
-                )}
-              </div>
-            )
-          })}
-
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Recurring</div>
-              <button className="text-xs text-sage" onClick={() => setShowAddRecurring((v) => !v)}>
-                {showAddRecurring ? 'Cancel' : '+ Add'}
-              </button>
-            </div>
-            {showAddRecurring && (
-              <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
-                <input
-                  className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-                  placeholder="e.g. Check emails"
-                  value={recurringForm.title}
-                  onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
-                  autoFocus
-                />
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <CustomSelect
-                    value={recurringForm.frequency}
-                    onChange={(v) => setRecurringForm((f) => ({ ...f, frequency: v }))}
-                    options={[
-                      { value: 'daily', label: 'Daily' },
-                      { value: 'weekdays', label: 'Weekdays' },
-                      ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({ value: `weekly:${(i + 1) % 7}`, label: `Weekly – ${d}` })),
-                    ]}
-                  />
-                  <CustomSelect
-                    value={recurringForm.priority}
-                    onChange={(v) => setRecurringForm((f) => ({ ...f, priority: v }))}
-                    options={PRIORITY.map((p) => ({ value: p, label: p }))}
-                  />
-                  <CustomSelect
-                    value={recurringForm.clientId}
-                    onChange={(v) => setRecurringForm((f) => ({ ...f, clientId: v }))}
-                    options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
-                  />
-                  <CustomSelect
-                    value={recurringForm.assignedTo}
-                    onChange={(v) => setRecurringForm((f) => ({ ...f, assignedTo: v }))}
-                    options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
-                    Cancel
-                  </button>
-                  <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
-                    Save
-                  </button>
-                </div>
-              </div>
-            )}
-            {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-sage py-3">No recurring tasks.</div>}
-            {recurring.map((r) => (
-              <div key={r.id} className="border-b border-ink/10 py-2">
-                {editingRecurringId === r.id ? (
-                  <div className="rounded-lg border border-ink/10 bg-white p-4">
-                    <input
-                      className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-                      value={(editRecurringForm.title as string) || ''}
-                      onChange={(e) => setEditRecurringForm((f) => ({ ...f, title: e.target.value }))}
-                    />
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <CustomSelect
-                        value={(editRecurringForm.frequency as string) || 'daily'}
-                        onChange={(v) => setEditRecurringForm((f) => ({ ...f, frequency: v }))}
-                        options={[
-                          { value: 'daily', label: 'Daily' },
-                          { value: 'weekdays', label: 'Weekdays' },
-                          ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({ value: `weekly:${(i + 1) % 7}`, label: `Weekly – ${d}` })),
-                        ]}
-                      />
-                      <CustomSelect
-                        value={(editRecurringForm.priority as string) || 'Medium'}
-                        onChange={(v) => setEditRecurringForm((f) => ({ ...f, priority: v }))}
-                        options={PRIORITY.map((p) => ({ value: p, label: p }))}
-                      />
+          {view === 'list' && (
+            <>
+              {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
+              {buckets.map((b) => {
+                const { mine, unassigned } = splitBucket(b.items)
+                const pendingCount = b.items.filter((t) => !t.done).length
+                return (
+                  <div key={b.label} className="mb-5">
+                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
+                      {pendingCount > 1 && (
+                        <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
+                          Complete all ({pendingCount})
+                        </button>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
-                        Cancel
+                    <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
+                    {unassigned.length > 0 && (
+                      <>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                        <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {view === 'recurring' && (
+            <div>
+              <p className="text-sm text-sage mb-4">Repeats on a schedule you choose — daily, weekdays, or a specific day each week.</p>
+              {showAddRecurring && (
+                <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
+                  <input
+                    className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                    placeholder="e.g. Check emails"
+                    value={recurringForm.title}
+                    onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <CustomSelect
+                      value={recurringForm.frequency}
+                      onChange={(v) => setRecurringForm((f) => ({ ...f, frequency: v }))}
+                      options={[
+                        { value: 'daily', label: 'Daily' },
+                        { value: 'weekdays', label: 'Weekdays' },
+                        ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({
+                          value: `weekly:${(i + 1) % 7}`,
+                          label: `Weekly – ${d}`,
+                        })),
+                      ]}
+                    />
+                    <CustomSelect value={recurringForm.priority} onChange={(v) => setRecurringForm((f) => ({ ...f, priority: v }))} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
+                    <CustomSelect
+                      value={recurringForm.clientId}
+                      onChange={(v) => setRecurringForm((f) => ({ ...f, clientId: v }))}
+                      options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+                    />
+                    <CustomSelect
+                      value={recurringForm.assignedTo}
+                      onChange={(v) => setRecurringForm((f) => ({ ...f, assignedTo: v }))}
+                      options={[
+                        { value: '', label: 'Unassigned' },
+                        ...members.map((m) => ({
+                          value: m.user_id,
+                          label: memberName(m),
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
+                      Cancel
+                    </button>
+                    <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addRecurring}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+              {recurring.length === 0 && !showAddRecurring && <div className="text-sm text-sage py-6 text-center">No recurring tasks yet.</div>}
+              {recurring.map((r) => (
+                <div key={r.id} className="border-b border-ink/10 py-2">
+                  {editingRecurringId === r.id ? (
+                    <div className="rounded-lg border border-ink/10 bg-white p-4">
+                      <input
+                        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                        value={(editRecurringForm.title as string) || ''}
+                        onChange={(e) =>
+                          setEditRecurringForm((f) => ({
+                            ...f,
+                            title: e.target.value,
+                          }))
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <CustomSelect
+                          value={(editRecurringForm.frequency as string) || 'daily'}
+                          onChange={(v) =>
+                            setEditRecurringForm((f) => ({
+                              ...f,
+                              frequency: v,
+                            }))
+                          }
+                          options={[
+                            { value: 'daily', label: 'Daily' },
+                            { value: 'weekdays', label: 'Weekdays' },
+                            ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({
+                              value: `weekly:${(i + 1) % 7}`,
+                              label: `Weekly – ${d}`,
+                            })),
+                          ]}
+                        />
+                        <CustomSelect
+                          value={(editRecurringForm.priority as string) || 'Medium'}
+                          onChange={(v) => setEditRecurringForm((f) => ({ ...f, priority: v }))}
+                          options={PRIORITY.map((p) => ({
+                            value: p,
+                            label: p,
+                          }))}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
+                          Cancel
+                        </button>
+                        <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => updateRecurring(r.id, editRecurringForm)}>
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
+                          {r.title}
+                          {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                        </div>
+                        <div className="text-xs text-sage mt-0.5">
+                          {recurringFrequencyLabel(r.frequency)}
+                          {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
+                          {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
+                        </div>
+                      </div>
+                      <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
+                        {r.paused ? 'Resume' : 'Pause'}
                       </button>
                       <button
-                        className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium"
-                        onClick={() => updateRecurring(r.id, editRecurringForm)}
+                        className="text-xs text-sage"
+                        onClick={() => {
+                          setEditingRecurringId(r.id)
+                          setEditRecurringForm({
+                            title: r.title,
+                            priority: r.priority,
+                            frequency: r.frequency,
+                          })
+                        }}
                       >
-                        Save
+                        Edit
+                      </button>
+                      <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
+                        Delete
                       </button>
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === 'defaults' && (
+            <div>
+              <p className="text-sm text-sage mb-4">Applied automatically to every client, every day — including clients you add later.</p>
+              {showAddDefault && (
+                <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
+                  <input
+                    className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                    placeholder="e.g. Daily check-in"
+                    value={defaultForm.title}
+                    onChange={(e) => setDefaultForm((f) => ({ ...f, title: e.target.value }))}
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <CustomSelect value={defaultForm.priority} onChange={(v) => setDefaultForm((f) => ({ ...f, priority: v }))} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
+                    <CustomSelect
+                      value={defaultForm.assignedTo}
+                      onChange={(v) => setDefaultForm((f) => ({ ...f, assignedTo: v }))}
+                      options={[
+                        { value: '', label: 'Unassigned' },
+                        ...members.map((m) => ({
+                          value: m.user_id,
+                          label: memberName(m),
+                        })),
+                      ]}
+                    />
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
-                        {r.title}
-                        {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                  <div className="flex gap-2">
+                    <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddDefault(false)}>
+                      Cancel
+                    </button>
+                    <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addDefault}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+              {defaults.length === 0 && !showAddDefault && <div className="text-sm text-sage py-6 text-center">No default tasks yet — every client gets these automatically, each day.</div>}
+              {defaults.map((d) => (
+                <div key={d.id} className="border-b border-ink/10 py-2">
+                  {editingDefaultId === d.id ? (
+                    <div className="rounded-lg border border-ink/10 bg-white p-4">
+                      <input
+                        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                        value={(editDefaultForm.title as string) || ''}
+                        onChange={(e) =>
+                          setEditDefaultForm((f) => ({
+                            ...f,
+                            title: e.target.value,
+                          }))
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <CustomSelect
+                          value={(editDefaultForm.priority as string) || 'Medium'}
+                          onChange={(v) => setEditDefaultForm((f) => ({ ...f, priority: v }))}
+                          options={PRIORITY.map((p) => ({
+                            value: p,
+                            label: p,
+                          }))}
+                        />
+                        <CustomSelect
+                          value={(editDefaultForm.assigned_to as string) || ''}
+                          onChange={(v) =>
+                            setEditDefaultForm((f) => ({
+                              ...f,
+                              assigned_to: v || null,
+                            }))
+                          }
+                          options={[
+                            { value: '', label: 'Unassigned' },
+                            ...members.map((m) => ({
+                              value: m.user_id,
+                              label: memberName(m),
+                            })),
+                          ]}
+                        />
                       </div>
-                      <div className="text-xs text-sage mt-0.5">
-                        {recurringFrequencyLabel(r.frequency)}
-                        {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
-                        {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
+                      <div className="flex gap-2">
+                        <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingDefaultId(null)}>
+                          Cancel
+                        </button>
+                        <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => updateDefault(d.id, editDefaultForm)}>
+                          Save
+                        </button>
                       </div>
                     </div>
-                    <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
-                      {r.paused ? 'Resume' : 'Pause'}
-                    </button>
-                    <button
-                      className="text-xs text-sage"
-                      onClick={() => {
-                        setEditingRecurringId(r.id)
-                        setEditRecurringForm({ title: r.title, priority: r.priority, frequency: r.frequency })
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className={`text-sm font-medium ${d.paused ? 'text-sage' : ''}`}>
+                          {d.title}
+                          {d.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                        </div>
+                        <div className="text-xs text-sage mt-0.5">
+                          Every client · daily
+                          {d.assigned_to ? ` · ${memberEmail(d.assigned_to)}` : ''} · {d.priority}
+                        </div>
+                      </div>
+                      <button className="text-xs text-sage" onClick={() => toggleDefaultPaused(d)}>
+                        {d.paused ? 'Resume' : 'Pause'}
+                      </button>
+                      <button
+                        className="text-xs text-sage"
+                        onClick={() => {
+                          setEditingDefaultId(d.id)
+                          setEditDefaultForm({
+                            title: d.title,
+                            priority: d.priority,
+                            assigned_to: d.assigned_to || '',
+                          })
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button className="text-xs text-red-600" onClick={() => deleteDefault(d.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -734,17 +1025,7 @@ function TaskRow({
   stopTimer: () => void
 }) {
   if (isEditing) {
-    return (
-      <TaskEditForm
-        editForm={editForm}
-        setEditForm={setEditForm}
-        clients={clients}
-        members={members}
-        showDueDate={!t.is_auto}
-        onCancel={cancelEdit}
-        onSave={save}
-      />
-    )
+    return <TaskEditForm editForm={editForm} setEditForm={setEditForm} clients={clients} members={members} showDueDate={!t.is_auto} onCancel={cancelEdit} onSave={save} />
   }
 
   const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-amber-700' : 'text-green'
@@ -783,7 +1064,15 @@ function TaskRow({
           {t.client_id && <span>{clientName(t.client_id)}</span>}
           {t.assigned_to && t.assigned_to !== currentUserId && <span>→ {memberEmail(t.assigned_to)}</span>}
           <span>{formatDate(t.due_date)}</span>
-          {t.done && t.completed_at && <span className="text-green">Done {new Date(t.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+          {t.done && t.completed_at && (
+            <span className="text-green">
+              Done{' '}
+              {new Date(t.completed_at).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </span>
+          )}
         </div>
         {t.notes && !t.done && <div className="text-xs text-sage mt-1">{t.notes}</div>}
       </div>
