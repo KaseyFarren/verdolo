@@ -7,3 +7,9 @@ export function getStripe() {
 }
 
 export const SEAT_PRICE_ID = process.env.STRIPE_SEAT_PRICE_ID!
+
+// Stripe Connect (Standard accounts): every call that should act on the agency's own
+// connected Stripe account, not Verdolo's platform account, takes this as its request options.
+export function connectAccount(stripeAccountId: string) {
+  return { stripeAccount: stripeAccountId }
+}

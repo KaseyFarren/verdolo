@@ -21,13 +21,17 @@ const COMING_SOON = [
 export default function IntegrationsClient({
   orgId,
   isAdmin,
+  isOwner,
   initialApiKey,
   hasKey: initialHasKey,
+  stripeConnectStatus,
 }: {
   orgId: string
   isAdmin: boolean
+  isOwner: boolean
   initialApiKey: string
   hasKey: boolean
+  stripeConnectStatus: 'not_connected' | 'pending' | 'active'
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [apiKeyInput, setApiKeyInput] = useState(initialApiKey)
@@ -78,6 +82,10 @@ export default function IntegrationsClient({
         ) : (
           <div className="text-sm">{hasKey ? '● Connected' : '○ Not connected'}</div>
         )}
+      </Section>
+
+      <Section label="Client Billing">
+        <StripeConnectCard orgId={orgId} isOwner={isOwner} status={stripeConnectStatus} />
       </Section>
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Integrations</div>
@@ -135,6 +143,56 @@ function GmailCard() {
         <a href="/api/integrations/google/connect" className="text-xs rounded border border-ink/10 px-2 py-1 shrink-0">
           Connect
         </a>
+      )}
+    </div>
+  )
+}
+
+function StripeConnectCard({
+  orgId,
+  isOwner,
+  status,
+}: {
+  orgId: string
+  isOwner: boolean
+  status: 'not_connected' | 'pending' | 'active'
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function connect() {
+    setLoading(true)
+    setError(null)
+    const res = await fetch('/api/billing/connect/onboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+    else {
+      setError(data.error ?? 'Failed to start Stripe onboarding')
+      setLoading(false)
+    }
+  }
+
+  const label = status === 'active' ? '● Connected' : status === 'pending' ? '○ Onboarding in progress' : '○ Not connected'
+
+  return (
+    <div className="flex items-center gap-3">
+      <IntegrationIcon name="stripe" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">Stripe (client invoicing)</div>
+        <div className={`text-xs mt-0.5 ${status === 'active' ? 'text-green' : 'text-sage'}`}>
+          {isOwner || status !== 'not_connected' ? label : 'Invoice and collect payment from your own clients'}
+        </div>
+        {!isOwner && <div className="text-xs text-sage mt-0.5">Only the org owner can connect billing.</div>}
+        {error && <div className="text-xs text-red-600 mt-0.5">{error}</div>}
+      </div>
+      {isOwner && status !== 'active' && (
+        <Button variant="primary" onClick={connect} disabled={loading}>
+          {status === 'pending' ? 'Finish setup' : 'Connect Stripe'}
+        </Button>
       )}
     </div>
   )
