@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
+import Logo from '@/components/Logo'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -47,7 +48,10 @@ export default function SignupPage() {
   if (checkEmail) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
-        <h1 className="text-xl font-semibold">Check your email</h1>
+        <div className="mb-2 flex justify-center">
+          <Logo size={24} />
+        </div>
+        <h1 className="text-xl font-semibold text-center">Check your email</h1>
         <p className="text-sm text-sage">
           We sent a confirmation link to {email}. Click it, then come back and log in.
         </p>
@@ -60,7 +64,10 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
-      <h1 className="text-xl font-semibold">Create your account</h1>
+      <div className="mb-2 flex justify-center">
+        <Logo size={24} />
+      </div>
+      <h1 className="text-xl font-semibold text-center">Create your account</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="email"
