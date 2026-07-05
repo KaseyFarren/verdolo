@@ -46,7 +46,6 @@ type Client = {
   primary_contact_id: string | null
 }
 type Note = { id: string; client_id: string; text: string; created_at: string }
-type InboxMessage = { id: string; thread_id: string; direction: 'in' | 'out'; sender: string | null; body: string | null; sent_at: string; user_id: string | null }
 type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string }
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
@@ -132,12 +131,6 @@ export default function ClientsClient({
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
   const [noteInput, setNoteInput] = useState('')
-  const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([])
-  const [loadingInbox, setLoadingInbox] = useState(false)
-  const [syncingInbox, setSyncingInbox] = useState(false)
-  const [inboxError, setInboxError] = useState<string | null>(null)
-  const [replyBody, setReplyBody] = useState('')
-  const [sendingReply, setSendingReply] = useState(false)
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices)
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [invoiceLineItems, setInvoiceLineItems] = useState<LineItemDraft[]>([])
@@ -165,59 +158,6 @@ export default function ClientsClient({
   }
   function healthDotColor(health: HealthSnapshot['health']) {
     return health === 'churned' ? '#6060a0' : health === 'green' ? '#2db87a' : health === 'amber' ? '#cc9a3c' : '#e05070'
-  }
-
-  async function loadInbox(clientId: string) {
-    setLoadingInbox(true)
-    const { data: threads } = await supabase.from('inbox_threads').select('id').eq('client_id', clientId)
-    const threadIds = (threads || []).map((t) => t.id)
-    if (threadIds.length) {
-      const { data: msgs } = await supabase
-        .from('inbox_messages')
-        .select('*')
-        .in('thread_id', threadIds)
-        .order('sent_at', { ascending: false })
-        .limit(20)
-      setInboxMessages((msgs || []) as InboxMessage[])
-    } else {
-      setInboxMessages([])
-    }
-    setLoadingInbox(false)
-  }
-
-  useEffect(() => {
-    if (selectedId) loadInbox(selectedId)
-    setInboxError(null)
-    setReplyBody('')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId])
-
-  async function syncInbox() {
-    setSyncingInbox(true)
-    setInboxError(null)
-    const res = await fetch('/api/integrations/gmail/sync', { method: 'POST' })
-    const body = await res.json()
-    if (!res.ok) setInboxError(body.error ?? 'Sync failed')
-    else if (selectedId) await loadInbox(selectedId)
-    setSyncingInbox(false)
-  }
-
-  async function sendReply() {
-    if (!selected || !replyBody.trim()) return
-    setSendingReply(true)
-    setInboxError(null)
-    const res = await fetch('/api/integrations/gmail/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: selected.id, subject: `Re: ${selected.name}`, body: replyBody }),
-    })
-    const body = await res.json()
-    if (!res.ok) setInboxError(body.error ?? 'Send failed')
-    else {
-      setReplyBody('')
-      await loadInbox(selected.id)
-    }
-    setSendingReply(false)
   }
 
   async function addClient() {
@@ -528,52 +468,6 @@ export default function ClientsClient({
           />
         </div>
 
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage">Inbox</div>
-            <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={syncInbox} disabled={syncingInbox}>
-              {syncingInbox ? 'Syncing…' : '↺ Sync inbox'}
-            </button>
-          </div>
-          {inboxError && <div className="text-xs text-red-600 mb-2">{inboxError}</div>}
-          {loadingInbox && <div className="text-sm text-sage py-2">Loading…</div>}
-          {!loadingInbox && inboxMessages.length === 0 && (
-            <div className="text-sm text-sage py-2">
-              No matched emails yet. Connect Gmail in Settings, add this client&apos;s contact email/domain, then sync.
-            </div>
-          )}
-          {inboxMessages.map((m) => {
-            const sentByMember = m.direction === 'out' ? memberById(m.user_id) : null
-            const outLabel = sentByMember ? (m.user_id === userId ? `${memberName(sentByMember)} (you)` : memberName(sentByMember)) : m.sender || 'You'
-            return (
-              <div key={m.id} className={`rounded-md px-3 py-2 mb-2 text-sm ${m.direction === 'out' ? 'bg-ink/5 ml-6' : 'bg-white mr-6'}`}>
-                <div className="text-xs text-sage mb-1">
-                  {m.direction === 'out' ? outLabel : m.sender} · {formatNoteTime(m.sent_at)}
-                </div>
-                <div className="whitespace-pre-wrap">{m.body}</div>
-              </div>
-            )
-          })}
-          {selected.primary_contact_id && selected.primary_contact_id !== userId && (
-            <div className="text-xs text-sage/70 mb-1">Replying as {memberName(memberById(selected.primary_contact_id))}</div>
-          )}
-          <div className="flex gap-2 items-end mt-2">
-            <textarea
-              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
-              placeholder={selected.contact_email ? `Message ${selected.name}…` : 'Add a contact email to this client first'}
-              value={replyBody}
-              onChange={(e) => setReplyBody(e.target.value)}
-              disabled={!selected.contact_email}
-            />
-            <button
-              className="rounded bg-accent text-white shadow-md px-3 py-2 text-sm font-medium shrink-0 disabled:opacity-40"
-              onClick={sendReply}
-              disabled={!selected.contact_email || !replyBody.trim() || sendingReply}
-            >
-              {sendingReply ? 'Sending…' : 'Send'}
-            </button>
-          </div>
-        </div>
 
         <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Activity</div>
         <div className="flex gap-2 mb-4 items-end">
@@ -903,7 +797,6 @@ function ClientForm({
         </div>
       </div>
       <label className="block text-xs text-sage mb-1">Contact email</label>
-      <div className="text-xs text-sage/70 mb-1">Matches Gmail messages to this client (leave blank to match by domain instead)</div>
       <input
         type="email"
         className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"

@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { Section } from '@/components/settings/SettingsUI'
 import IntegrationIcon from '@/components/settings/IntegrationIcon'
 import Button from '@/components/ui/Button'
 
 const COMING_SOON = [
-  { key: 'gcal', name: 'Google Calendar' },
   { key: 'slack', name: 'Slack' },
   { key: 'zoom', name: 'Zoom' },
   { key: 'teams', name: 'Microsoft Teams' },
@@ -60,7 +58,6 @@ export default function IntegrationsClient({
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Integrations</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <GmailCard />
         {COMING_SOON.map((p) => (
           <div key={p.key} className="rounded-2xl bg-white shadow-md p-4 flex items-center gap-3">
             <IntegrationIcon name={p.key} />
@@ -72,49 +69,6 @@ export default function IntegrationsClient({
         ))}
       </div>
     </>
-  )
-}
-
-function GmailCard() {
-  const searchParams = useSearchParams()
-  const [status, setStatus] = useState<{ connected: boolean; email: string | null } | null>(null)
-  const feedback = searchParams.get('gmail')
-
-  useEffect(() => {
-    fetch('/api/integrations/google/status')
-      .then((r) => r.json())
-      .then(setStatus)
-  }, [])
-
-  async function disconnect() {
-    await fetch('/api/integrations/google/disconnect', { method: 'POST' })
-    setStatus({ connected: false, email: null })
-  }
-
-  return (
-    <div className="rounded-2xl bg-white shadow-md p-4 flex items-center gap-3">
-      <IntegrationIcon name="gmail" />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">Gmail</div>
-        {status?.connected ? (
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-green truncate">● {status.email}</span>
-          </div>
-        ) : (
-          <div className="text-xs text-sage mt-0.5">Read and reply to client emails</div>
-        )}
-        {feedback === 'error' && <div className="text-xs text-red-600 mt-0.5">Connection failed — try again</div>}
-      </div>
-      {status?.connected ? (
-        <button className="text-xs text-red-600 shrink-0" onClick={disconnect}>
-          Disconnect
-        </button>
-      ) : (
-        <a href="/api/integrations/google/connect" className="text-xs rounded border border-ink/10 px-2 py-1 shrink-0">
-          Connect
-        </a>
-      )}
-    </div>
   )
 }
 

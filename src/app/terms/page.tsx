@@ -22,9 +22,8 @@ export default function TermsPage() {
       <p className="mb-6">
         Verdolo is a multi-user platform for running a client services agency: a client CRM, task and time
         tracking, calendar, and AI-assisted client messaging. Some features connect to third-party services on your
-        behalf, including Google Gmail (to read and send email on your connected inbox), Anthropic (to generate AI
-        messages using an API key you provide), and Stripe (to process subscription payments and, optionally, your
-        own client billing).
+        behalf, including Anthropic (to generate AI messages using an API key you provide) and Stripe (to process
+        subscription payments and, optionally, your own client billing).
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">2. Accounts and organizations</h2>
@@ -61,18 +60,8 @@ export default function TermsPage() {
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">6. Third-party services</h2>
       <p className="mb-6">
-        Features that connect to Google, Anthropic, or Stripe are subject to those providers&apos; own terms and
-        policies. We are not responsible for their availability, accuracy, or acts or omissions. Our use of Gmail
-        data via the Google API follows the{' '}
-        <a
-          href="https://developers.google.com/terms/api-services-user-data-policy"
-          target="_blank"
-          rel="noreferrer"
-          className="text-accent underline"
-        >
-          Google API Services User Data Policy
-        </a>
-        , including its Limited Use requirements.
+        Features that connect to Anthropic or Stripe are subject to those providers&apos; own terms and policies. We
+        are not responsible for their availability, accuracy, or acts or omissions.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">7. Termination</h2>

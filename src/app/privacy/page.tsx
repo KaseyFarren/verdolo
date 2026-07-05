@@ -22,10 +22,6 @@ export default function PrivacyPage() {
       <ul className="mb-6 list-disc pl-5 space-y-1">
         <li><strong>Account information:</strong> email address, password (hashed), display name, profile picture.</li>
         <li><strong>Customer Data you enter:</strong> client records, notes, tasks, calendar entries, and time entries you or your team create.</li>
-        <li>
-          <strong>Gmail data (only if you connect it):</strong> message metadata and content for emails matched to your
-          clients, used solely to show and reply to those conversations inside Verdolo.
-        </li>
         <li><strong>Billing information:</strong> handled directly by Stripe — we store your subscription status and plan, not your card details.</li>
         <li><strong>Usage data:</strong> basic log/analytics data (e.g. request timestamps) used for security and reliability.</li>
       </ul>
@@ -34,39 +30,24 @@ export default function PrivacyPage() {
       <p className="mb-6">
         We use this information to operate the Service: authenticate you, sync and display your organization&apos;s
         data, generate AI client messages (via Anthropic, using an API key your organization provides — your prompts
-        and client context are sent to Anthropic to generate that message), send and receive email through your
-        connected Gmail account, process subscription billing through Stripe, and provide customer support.
+        and client context are sent to Anthropic to generate that message), process subscription billing through
+        Stripe, and provide customer support.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">3. Who we share it with</h2>
       <p className="mb-6">
         We don&apos;t sell your data. We share it only with the service providers that power Verdolo, each acting on
         our instructions to provide the Service: Supabase (database, authentication, file storage), Vercel (hosting),
-        Google (Gmail API, only for organizations that connect it), Anthropic (AI message generation, only when your
-        organization supplies an API key), and Stripe (subscription billing). Other members of your organization can
-        see Customer Data according to their role&apos;s permissions, as described in-app.
-      </p>
-      <p className="mb-6">
-        Our use of information received from Google APIs adheres to the{' '}
-        <a
-          href="https://developers.google.com/terms/api-services-user-data-policy"
-          target="_blank"
-          rel="noreferrer"
-          className="text-accent underline"
-        >
-          Google API Services User Data Policy
-        </a>
-        , including the Limited Use requirements: Gmail data is used only to provide the client-messaging features
-        you see in the app, is not used for advertising, and is not read by humans except as needed for security,
-        support (with your permission), or legal compliance.
+        Anthropic (AI message generation, only when your organization supplies an API key), and Stripe (subscription
+        billing). Other members of your organization can see Customer Data according to their role&apos;s permissions,
+        as described in-app.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">4. Data retention and deletion</h2>
       <p className="mb-6">
         We retain your data for as long as your account is active. You can export your organization&apos;s data at any
         time from Settings. If you cancel your subscription or close your account, we retain data for a reasonable
-        period to allow recovery/export, then delete it. You can disconnect Gmail at any time, which revokes our
-        access and stops future syncing.
+        period to allow recovery/export, then delete it.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">5. Security</h2>

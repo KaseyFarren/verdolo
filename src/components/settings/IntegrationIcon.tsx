@@ -1,8 +1,6 @@
 const BRAND: Record<string, string> = {
   anthropic: '#CC785C',
-  gmail: '#EA4335',
   stripe: '#635BFF',
-  gcal: '#1A73E8',
   slack: '#4A154B',
   zoom: '#2D8CFF',
   teams: '#6264A7',
@@ -25,20 +23,6 @@ function Glyph({ name }: { name: string }) {
       return (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round">
           <path d="M6 9.5c0-1.4 1.4-2.5 4-2.5 1.7 0 3 .4 4 .9v3c-1-.5-2.3-.9-4-.9-.9 0-1.5.3-1.5.9 0 1.7 6 .7 6 4.9 0 1.7-1.5 2.9-4.2 2.9-1.8 0-3.4-.5-4.5-1.1v-3.1c1.1.7 2.6 1.2 4.5 1.2 1 0 1.5-.3 1.5-.8 0-1.8-6-.7-6-5.4z" />
-        </svg>
-      )
-    case 'gmail':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke={stroke} strokeWidth="1.6" strokeLinejoin="round">
-          <rect x="3" y="5" width="18" height="14" rx="1.5" />
-          <path d="M3.5 6l8.5 7 8.5-7" />
-        </svg>
-      )
-    case 'gcal':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="5" width="18" height="16" rx="1.5" />
-          <path d="M3 9.5h18M8 3v4M16 3v4" />
         </svg>
       )
     case 'calendly':
