@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { AVATAR_COLORS, formatDate, getInitials, memberName, todayKey } from '@/lib/agency'
+import { periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
+import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
 
 type Client = { id: string; name: string }
@@ -53,20 +56,31 @@ export default function TimeClient({
   isAdmin,
   clients,
   tasks,
+  allTasks,
   initialEntries,
   members,
   archivedTotals,
+  period,
+  filterClientId,
+  filterUserId,
+  filterTaskId,
 }: {
   orgId: string
   userId: string
   isAdmin: boolean
   clients: Client[]
   tasks: Task[]
+  allTasks: Task[]
   initialEntries: Entry[]
   members: Member[]
   archivedTotals: { client_id: string | null; user_id: string; seconds: number }[]
+  period: PeriodValue
+  filterClientId: string
+  filterUserId: string
+  filterTaskId: string
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
   const confirm = useConfirm()
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
   const [localArchivedTotals, setLocalArchivedTotals] = useState(archivedTotals)
@@ -88,20 +102,44 @@ export default function TimeClient({
     setLocalArchivedTotals(archivedTotals)
   }, [archivedTotals])
 
+  const bounds = useMemo(() => periodBounds(period), [period])
+
   async function loadMore() {
     setLoadingMore(true)
-    const { data } = await supabase
-      .from('time_entries')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('started_at', { ascending: false })
-      .range(fetchedCount, fetchedCount + PAGE_SIZE - 1)
+    let q = supabase.from('time_entries').select('*').eq('org_id', orgId)
+    if (bounds.start) q = q.gte('started_at', bounds.start)
+    if (bounds.end) q = q.lt('started_at', bounds.end)
+    if (filterClientId) q = q.eq('client_id', filterClientId)
+    if (filterUserId) q = q.eq('user_id', filterUserId)
+    if (filterTaskId) q = q.eq('task_id', filterTaskId)
+    const { data } = await q.order('started_at', { ascending: false }).range(fetchedCount, fetchedCount + PAGE_SIZE - 1)
     if (data) {
       setEntries((prev) => [...prev, ...(data as Entry[])])
       setFetchedCount((prev) => prev + data.length)
       if (data.length < PAGE_SIZE) setHasMore(false)
     }
     setLoadingMore(false)
+  }
+
+  // Filters live in the URL (?period=&start=&end=&clientId=&userId=&taskId=) so the server
+  // component re-fetches an already-filtered page — same convention as Reports' ?range= and
+  // Revenue's ?month=.
+  function pushFilters(next: { period?: PeriodValue; clientId?: string; userId?: string; taskId?: string }) {
+    const p = next.period ?? period
+    const clientId = next.clientId ?? filterClientId
+    const memberFilter = next.userId ?? filterUserId
+    const taskId = next.taskId ?? filterTaskId
+    const params = new URLSearchParams()
+    if (p.period !== 'all_time') params.set('period', p.period)
+    if (p.period === 'custom') {
+      if (p.start) params.set('start', p.start)
+      if (p.end) params.set('end', p.end)
+    }
+    if (clientId) params.set('clientId', clientId)
+    if (memberFilter) params.set('userId', memberFilter)
+    if (taskId) params.set('taskId', taskId)
+    const qs = params.toString()
+    router.push(qs ? `/time?${qs}` : '/time')
   }
 
   const [timerClientId, setTimerClientId] = useState('')
@@ -144,7 +182,7 @@ export default function TimeClient({
   }, [running?.id])
 
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || '—'
-  const taskTitle = (id: string | null) => tasks.find((t) => t.id === id)?.title || null
+  const taskTitle = (id: string | null) => allTasks.find((t) => t.id === id)?.title || null
   const memberEmail = (id: string) => memberName(members.find((m) => m.user_id === id))
 
   async function startTimer() {
@@ -411,6 +449,97 @@ export default function TimeClient({
   }
   monthGroups.sort((a, b) => b.month.localeCompare(a.month))
   for (const mg of monthGroups) mg.days.sort((a, b) => b.date.localeCompare(a.date))
+  // a narrow period (a week, a single custom range within one month, etc.) never needs the
+  // collapsible month wrapper — that's only useful once there's more than one month to hide
+  const spansMultipleMonths = monthGroups.length > 1
+  const allDays = monthGroups.flatMap((mg) => mg.days).sort((a, b) => b.date.localeCompare(a.date))
+
+  function renderDayGroup(g: { date: string; items: Entry[] }) {
+    return (
+      <div key={g.date}>
+        <div className="text-xs text-sage mb-1.5">{formatDate(g.date)}</div>
+        <div className="rounded-lg border border-ink/10 divide-y divide-ink/10 overflow-hidden">
+          {g.items.map((e) => {
+            const canEdit = isAdmin || e.user_id === userId
+            if (editingId === e.id) {
+              const editTasks = allTasks.filter((t) => t.client_id === editClientId)
+              return (
+                <div key={e.id} className="bg-white p-3">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <CustomSelect
+                      value={editClientId}
+                      onChange={(v) => {
+                        setEditClientId(v)
+                        setEditTaskId('')
+                      }}
+                      options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+                    />
+                    <CustomSelect
+                      value={editTaskId}
+                      onChange={setEditTaskId}
+                      disabled={!editClientId}
+                      options={[{ value: '', label: 'No task' }, ...editTasks.map((t) => ({ value: t.id, label: t.title }))]}
+                    />
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+                      placeholder="Hours"
+                      value={editHours}
+                      onChange={(ev) => setEditHours(ev.target.value)}
+                    />
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={editBillable} onChange={(ev) => setEditBillable(ev.target.checked)} />
+                      Billable
+                    </label>
+                  </div>
+                  <input
+                    className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                    placeholder="Note (optional)"
+                    value={editNote}
+                    onChange={(ev) => setEditNote(ev.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </button>
+                    <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => updateEntry(e)}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div key={e.id} className="flex items-center gap-3 px-3 py-2.5 bg-white group">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">
+                    {clientName(e.client_id)}
+                    {e.task_id && <span className="text-sage"> · {taskTitle(e.task_id)}</span>}
+                    {!e.billable && <span className="ml-2 text-[10px] text-sage">non-billable</span>}
+                  </div>
+                  {e.note && <div className="text-xs text-sage">{e.note}</div>}
+                  {isAdmin && <div className="text-xs text-sage/70">{memberEmail(e.user_id)}</div>}
+                </div>
+                <div className="text-sm text-sage shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
+                {canEdit && (
+                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0">
+                    <button className="text-xs text-sage px-1" onClick={() => startEdit(e)}>
+                      ✏
+                    </button>
+                    <button className="text-xs text-red-600 px-1" onClick={() => deleteEntry(e.id)}>
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   function exportCsv() {
     const rows = [
@@ -548,6 +677,36 @@ export default function TimeClient({
         </div>
       )}
 
+      <div className="mb-6">
+        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Filter</div>
+        <PeriodSelector layoutId="time-period-active" value={period} onChange={(next) => pushFilters({ period: next })} className="mb-3" />
+        <div className="flex flex-wrap gap-2">
+          <CustomSelect
+            value={filterClientId}
+            onChange={(v) => pushFilters({ clientId: v, taskId: '' })}
+            options={[{ value: '', label: 'All clients' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+            className="w-40"
+          />
+          <CustomSelect
+            value={filterTaskId}
+            onChange={(v) => pushFilters({ taskId: v })}
+            options={[{ value: '', label: 'All tasks' }, ...allTasks.filter((t) => !filterClientId || t.client_id === filterClientId).map((t) => ({ value: t.id, label: t.title }))]}
+            className="w-40"
+          />
+          {isAdmin && (
+            <CustomSelect
+              value={filterUserId}
+              onChange={(v) => pushFilters({ userId: v })}
+              options={[{ value: '', label: 'All teammates' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+              className="w-40"
+            />
+          )}
+        </div>
+        {period.period !== 'all_time' && (
+          <div className="text-xs text-sage/70 mt-2">Cleared history isn&apos;t reflected in a specific period — switch to All time for lifetime totals.</div>
+        )}
+      </div>
+
       {totalByClient.length > 0 && (
         <div className="mb-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by client</div>
@@ -641,106 +800,26 @@ export default function TimeClient({
         </div>
       )}
       {monthGroups.length === 0 && <div className="text-sm text-sage py-3">No time logged yet.</div>}
-      {monthGroups.map((mg) => {
-        const expanded = expandedMonths.has(mg.month)
-        return (
-          <div key={mg.month} className="mb-4">
-            <button
-              type="button"
-              className="w-full flex items-center justify-between py-1.5 text-left"
-              onClick={() => toggleMonth(mg.month)}
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide text-sage">
-                {expanded ? '▾' : '▸'} {mg.label}
-              </span>
-              <span className="text-xs text-sage">{formatHours(mg.totalSeconds)}h</span>
-            </button>
-            {expanded &&
-              mg.days.map((g) => (
-                <div key={g.date} className="mb-3 pl-3">
-                  <div className="text-xs text-sage mb-1">{g.date}</div>
-                  {g.items.map((e) => {
-                    const canEdit = isAdmin || e.user_id === userId
-                    if (editingId === e.id) {
-                      const editTasks = tasks.filter((t) => t.client_id === editClientId)
-                      return (
-                        <div key={e.id} className="rounded-lg border border-ink/10 bg-white p-3 mb-2">
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <CustomSelect
-                              value={editClientId}
-                              onChange={(v) => {
-                                setEditClientId(v)
-                                setEditTaskId('')
-                              }}
-                              options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
-                            />
-                            <CustomSelect
-                              value={editTaskId}
-                              onChange={setEditTaskId}
-                              disabled={!editClientId}
-                              options={[{ value: '', label: 'No task' }, ...editTasks.map((t) => ({ value: t.id, label: t.title }))]}
-                            />
-                            <input
-                              type="number"
-                              step="0.25"
-                              min="0"
-                              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-                              placeholder="Hours"
-                              value={editHours}
-                              onChange={(ev) => setEditHours(ev.target.value)}
-                            />
-                            <label className="flex items-center gap-2 text-sm">
-                              <input type="checkbox" checked={editBillable} onChange={(ev) => setEditBillable(ev.target.checked)} />
-                              Billable
-                            </label>
-                          </div>
-                          <input
-                            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-                            placeholder="Note (optional)"
-                            value={editNote}
-                            onChange={(ev) => setEditNote(ev.target.value)}
-                          />
-                          <div className="flex gap-2">
-                            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingId(null)}>
-                              Cancel
-                            </button>
-                            <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={() => updateEntry(e)}>
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div key={e.id} className="flex items-center gap-3 py-2 border-b border-ink/10 group">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm">
-                            {clientName(e.client_id)}
-                            {e.task_id && <span className="text-sage"> · {taskTitle(e.task_id)}</span>}
-                            {!e.billable && <span className="ml-2 text-[10px] text-sage">non-billable</span>}
-                          </div>
-                          {e.note && <div className="text-xs text-sage">{e.note}</div>}
-                          {isAdmin && <div className="text-xs text-sage/70">{memberEmail(e.user_id)}</div>}
-                        </div>
-                        <div className="text-sm text-sage shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
-                        {canEdit && (
-                          <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0">
-                            <button className="text-xs text-sage px-1" onClick={() => startEdit(e)}>
-                              ✏
-                            </button>
-                            <button className="text-xs text-red-600 px-1" onClick={() => deleteEntry(e.id)}>
-                              ✕
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-          </div>
-        )
-      })}
+      {spansMultipleMonths
+        ? monthGroups.map((mg) => {
+            const expanded = expandedMonths.has(mg.month)
+            return (
+              <div key={mg.month} className="mb-4">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between py-1.5 text-left"
+                  onClick={() => toggleMonth(mg.month)}
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-sage">
+                    {expanded ? '▾' : '▸'} {mg.label}
+                  </span>
+                  <span className="text-xs text-sage">{formatHours(mg.totalSeconds)}h</span>
+                </button>
+                {expanded && <div className="pl-3 space-y-3">{mg.days.map(renderDayGroup)}</div>}
+              </div>
+            )
+          })
+        : <div className="space-y-3">{allDays.map(renderDayGroup)}</div>}
       {hasMore && (
         <button
           className="w-full text-center text-xs text-sage hover:text-ink py-2 disabled:opacity-50"

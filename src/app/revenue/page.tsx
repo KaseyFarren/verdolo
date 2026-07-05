@@ -2,9 +2,12 @@ import { redirect } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { requireOrgContext } from '@/lib/org'
 import { todayKey } from '@/lib/agency'
+import { periodBounds, type Period } from '@/lib/period'
 import RevenueClient from './RevenueClient'
 
-export default async function RevenuePage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+const VALID_PERIODS: Period[] = ['this_month', 'last_month', 'this_week', 'last_week', 'custom']
+
+export default async function RevenuePage({ searchParams }: { searchParams: Promise<{ period?: string; start?: string; end?: string }> }) {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
 
   // revenue is owner-only — redirect server-side before any revenue data is fetched, rather
@@ -12,13 +15,12 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   // regardless of what's rendered, same reasoning as stripRetainer() in lib/agency.ts)
   if (role !== 'owner') redirect('/dashboard')
 
-  const { month: monthParam } = await searchParams
-  const now = new Date()
-  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [y, m] = month.split('-').map(Number)
-  const monthStart = `${month}-01`
-  const nextMonthDate = new Date(y, m, 1)
-  const monthEnd = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`
+  const sp = await searchParams
+  const period: Period = VALID_PERIODS.includes(sp.period as Period) ? (sp.period as Period) : 'this_month'
+  const bounds = periodBounds({ period, start: sp.start, end: sp.end })
+  // 'all_time' isn't in VALID_PERIODS above, so bounds is always concrete here
+  const rangeStart = bounds.start as string
+  const rangeEnd = bounds.end as string
 
   const [{ data: clients }, { data: charges }, { data: entries }, { data: members }, { data: tasks }] = await Promise.all([
     supabase.from('clients').select('id, name, retainer_cents, stage, status').eq('org_id', orgId).order('name'),
@@ -26,15 +28,15 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .from('client_charges')
       .select('*')
       .eq('org_id', orgId)
-      .gte('charged_on', monthStart)
-      .lt('charged_on', monthEnd)
+      .gte('charged_on', rangeStart)
+      .lt('charged_on', rangeEnd)
       .order('charged_on', { ascending: false }),
     supabase
       .from('time_entries')
-      .select('user_id, client_id, duration_seconds, started_at')
+      .select('user_id, client_id, duration_seconds, started_at, billable')
       .eq('org_id', orgId)
-      .gte('started_at', monthStart)
-      .lt('started_at', monthEnd),
+      .gte('started_at', rangeStart)
+      .lt('started_at', rangeEnd),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role, title').eq('org_id', orgId).eq('status', 'active'),
     // original_due_date is frozen at creation (see migration 0020) so this can't be gamed by
     // pushing due_date forward — completed/overdue/late counters always reflect the original commitment
@@ -43,21 +45,22 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .select('assigned_to, done, completed_at, original_due_date')
       .eq('org_id', orgId)
       .not('assigned_to', 'is', null)
-      .gte('original_due_date', monthStart)
-      .lt('original_due_date', monthEnd),
+      .gte('original_due_date', rangeStart)
+      .lt('original_due_date', rangeEnd),
   ])
 
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
       <RevenueClient
         orgId={orgId}
-        month={month}
+        period={{ period, start: sp.start, end: sp.end }}
         today={todayKey()}
         clients={clients ?? []}
         initialCharges={charges ?? []}
         entries={entries ?? []}
         members={members ?? []}
         tasks={tasks ?? []}
+        hourlyCostCents={org?.settings?.hourly_cost_cents ?? 0}
       />
     </AppShell>
   )

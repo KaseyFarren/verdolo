@@ -1,18 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
-import { AVATAR_COLORS, centsToDollars, dollarsToCents, getInitials, memberName, todayKey } from '@/lib/agency'
+import PeriodSelector from '@/components/ui/PeriodSelector'
+import { AVATAR_COLORS, centsToDollars, dollarsToCents, getInitials, getStage, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { isFullCalendarMonth, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 
 type Client = { id: string; name: string; retainer_cents: number | null; stage: string | null; status: string | null }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
-type Entry = { user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string }
+type Entry = { user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
 type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string; title?: string | null }
 
 function Avatar({ member, index }: { member: Member; index: number }) {
@@ -28,15 +29,6 @@ function Avatar({ member, index }: { member: Member; index: number }) {
   )
 }
 
-function monthLabel(month: string) {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-}
-function adjacentMonth(month: string, offset: number) {
-  const [y, m] = month.split('-').map(Number)
-  const d = new Date(y, m - 1 + offset, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
 function formatHours(seconds: number) {
   return (seconds / 3600).toFixed(1)
 }
@@ -48,33 +40,47 @@ type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null
 
 export default function RevenueClient({
   orgId,
-  month,
+  period,
   today,
   clients,
   initialCharges,
   entries,
   members,
   tasks,
+  hourlyCostCents,
 }: {
   orgId: string
-  month: string
+  period: PeriodValue
   today: string
   clients: Client[]
   initialCharges: Charge[]
   entries: Entry[]
   members: Member[]
   tasks: TaskRow[]
+  hourlyCostCents: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const confirm = useConfirm()
   const [charges, setCharges] = useState<Charge[]>(initialCharges)
-  // router.push to a different ?month= re-runs the server component and gives a new
+  // router.push to a different ?period= re-runs the server component and gives a new
   // initialCharges array, but useState's initializer only runs on mount — without this,
-  // switching months would keep showing the previous month's charges.
+  // switching periods would keep showing the previous period's charges.
   useEffect(() => {
     setCharges(initialCharges)
   }, [initialCharges])
+  const isFullMonth = isFullCalendarMonth(period)
+
+  function pushPeriod(next: PeriodValue) {
+    const params = new URLSearchParams()
+    if (next.period !== 'this_month') params.set('period', next.period)
+    if (next.period === 'custom') {
+      if (next.start) params.set('start', next.start)
+      if (next.end) params.set('end', next.end)
+    }
+    const qs = params.toString()
+    router.push(qs ? `/revenue?${qs}` : '/revenue')
+  }
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
   const [chargeDesc, setChargeDesc] = useState('')
   const [chargeAmount, setChargeAmount] = useState('')
@@ -104,15 +110,19 @@ export default function RevenueClient({
     return clients
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
-        const totalRevenue = (c.retainer_cents || 0) + chargesTotal
+        // retainers are a monthly figure — only a full calendar month period can honestly
+        // include one; a week or custom range only counts what was actually billed/logged in it
+        const totalRevenue = (isFullMonth ? c.retainer_cents || 0 : 0) + chargesTotal
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
         const rate = hours > 0 ? totalRevenue / hours : null
-        return { client: c, chargesTotal, totalRevenue, seconds, hours, rate }
+        const costCents = Math.round(hours * hourlyCostCents)
+        const marginCents = totalRevenue - costCents
+        return { client: c, chargesTotal, totalRevenue, seconds, hours, rate, costCents, marginCents }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient])
+  }, [clients, chargesByClient, hoursByClient, isFullMonth, hourlyCostCents])
 
   const memberRows = useMemo(() => {
     return members
@@ -156,8 +166,23 @@ export default function RevenueClient({
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
     const seconds = clientRows.reduce((s, r) => s + r.seconds, 0)
     const hours = seconds / 3600
-    return { revenue, hours, rate: hours > 0 ? revenue / hours : null }
-  }, [clientRows])
+    const costCents = Math.round(hours * hourlyCostCents)
+    return { revenue, hours, rate: hours > 0 ? revenue / hours : null, costCents, marginCents: revenue - costCents }
+  }, [clientRows, hourlyCostCents])
+
+  // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period —
+  // a retainer is "at risk" regardless of which week you happen to be looking at.
+  const mrrCents = useMemo(() => mrrCentsTotal(clients), [clients])
+  const atRiskCents = useMemo(
+    () => clients.filter((c) => getStage(c) === 'At Risk').reduce((s, c) => s + (c.retainer_cents || 0), 0),
+    [clients]
+  )
+  const utilization = useMemo(() => {
+    const totalSeconds = entries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    const billableSeconds = entries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    return totalSeconds > 0 ? (billableSeconds / totalSeconds) * 100 : null
+  }, [entries])
+  const topClientPct = totals.revenue > 0 && clientRows.length > 0 ? (clientRows[0].totalRevenue / totals.revenue) * 100 : null
 
   async function addCharge(clientId: string) {
     const cents = dollarsToCents(chargeAmount || '0')
@@ -188,32 +213,34 @@ export default function RevenueClient({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="mb-1">
         <h1 className="text-xl font-semibold">Revenue</h1>
-        <div className="flex items-center gap-3">
-          <Link href={`/revenue?month=${adjacentMonth(month, -1)}`} className="text-sage px-1">
-            ‹
-          </Link>
-          <label className="relative text-sm font-medium w-32 text-center cursor-pointer hover:text-accent">
-            {monthLabel(month)}
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => e.target.value && router.push(`/revenue?month=${e.target.value}`)}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-            />
-          </label>
-          <Link href={`/revenue?month=${adjacentMonth(month, 1)}`} className="text-sage px-1">
-            ›
-          </Link>
-        </div>
       </div>
-      <p className="text-xs text-sage mb-5">Retainer + extra billables, attributed to the hours logged this month. Owner-only.</p>
+      <p className="text-xs text-sage mb-4">Retainer + extra billables, attributed to the hours logged this period. Owner-only.</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <PeriodSelector
+        layoutId="revenue-period-active"
+        value={period}
+        onChange={pushPeriod}
+        presets={['this_month', 'last_month', 'this_week', 'last_week', 'custom']}
+        className="mb-4"
+      />
+      {!isFullMonth && (
+        <div className="text-xs text-sage/70 mb-5">Retainer only counted for full-month periods — showing billables + hours actually logged in this range.</div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">Total revenue</div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>
+        </div>
+        <div className="rounded-2xl bg-white shadow-md p-4">
+          <div className="text-xs text-sage mb-1">MRR</div>
+          <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
+        </div>
+        <div className="rounded-2xl bg-white shadow-md p-4">
+          <div className="text-xs text-sage mb-1">Margin</div>
+          <div className={`text-2xl font-heading font-bold ${totals.marginCents < 0 ? 'text-red-600' : ''}`}>{fmtMoney(totals.marginCents)}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">Hours logged</div>
@@ -223,11 +250,33 @@ export default function RevenueClient({
           <div className="text-xs text-sage mb-1">Blended rate</div>
           <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '—'}</div>
         </div>
+        <div className="rounded-2xl bg-white shadow-md p-4">
+          <div className="text-xs text-sage mb-1">Billable utilization</div>
+          <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '—'}</div>
+        </div>
+      </div>
+      {hourlyCostCents === 0 && (
+        <div className="text-xs text-sage bg-white rounded-xl shadow-md p-3 mb-3">
+          Set an hourly cost rate in Settings → General to see accurate cost and margin figures (currently $0/hr, so margin = revenue).
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {topClientPct !== null && (
+          <div className={`rounded-lg px-3 py-1.5 text-xs ${topClientPct >= 50 ? 'bg-amber-100' : 'bg-sand'}`}>
+            <span className={`font-semibold ${topClientPct >= 50 ? 'text-amber-700' : ''}`}>{topClientPct.toFixed(0)}%</span>{' '}
+            <span className={topClientPct >= 50 ? 'text-amber-700' : 'text-sage'}>of revenue from top client</span>
+          </div>
+        )}
+        {atRiskCents > 0 && (
+          <div className="rounded-lg px-3 py-1.5 text-xs bg-red-100">
+            <span className="font-semibold text-red-600">{fmtMoney(atRiskCents)}</span> <span className="text-red-600">MRR at risk</span>
+          </div>
+        )}
       </div>
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">By client</div>
       {clientRows.length === 0 ? (
-        <div className="text-sm text-sage py-4 mb-6">No revenue or time logged this month.</div>
+        <div className="text-sm text-sage py-4 mb-6">No revenue or time logged this period.</div>
       ) : (
         <div className="rounded-lg border border-ink/10 divide-y divide-ink/10 mb-6">
           {clientRows.map((r) => {
@@ -246,6 +295,7 @@ export default function RevenueClient({
                   <div className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
                     <span className="text-sage w-16 text-right">{r.rate ? `$${centsToDollars(r.rate)}/hr` : '—'}</span>
+                    <span className={`w-16 text-right ${r.marginCents < 0 ? 'text-red-600' : 'text-sage'}`}>{fmtMoney(r.marginCents)} mgn</span>
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                   </div>
                 </div>

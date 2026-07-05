@@ -38,7 +38,13 @@ export default async function DashboardPage() {
       .lt('started_at', `${tomorrow}T00:00:00`),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
     supabase.from('quick_notes').select('content').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
-    supabase.from('weekly_reports').select('week_start, content').eq('org_id', orgId).order('week_start', { ascending: false }).limit(8),
+    supabase
+      .from('reports')
+      .select('period_start, content')
+      .eq('org_id', orgId)
+      .eq('period_type', 'week')
+      .order('period_start', { ascending: false })
+      .limit(8),
     // Drives the client-messages "✓ Sent" state directly from the actual send log, rather than
     // from a same-day auto-checkin task existing/being done — that task can lag or be missing
     // (e.g. right after mount), which made "Copy & mark sent" look like it did nothing.
@@ -60,7 +66,7 @@ export default async function DashboardPage() {
         initialNote={noteRow?.content ?? ''}
         hasApiKey={!!process.env.ANTHROPIC_API_KEY}
         excludeWeekends={org?.settings?.exclude_weekends ?? true}
-        hasRecapThisWeek={!!reports?.some((r) => r.week_start === weekAnchor)}
+        hasRecapThisWeek={!!reports?.some((r) => r.period_start === weekAnchor)}
         initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
       />
     </AppShell>

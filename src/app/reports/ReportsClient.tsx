@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
-import { formatDate, memberName } from '@/lib/agency'
+import { formatDate, todayKey, memberName } from '@/lib/agency'
+import DatePicker from '@/components/ui/DatePicker'
 import type { ReportRange } from './page'
 
 type Client = { id: string; name: string; retainer_cents: number | null }
@@ -14,7 +15,16 @@ type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null }
 type PaidInvoice = { client_id: string; amount_cents: number }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
-type WeeklyReport = { week_start: string; content: string }
+type Report = { period_type: 'week' | 'month'; period_start: string; content: string }
+
+function monthLabel(monthStart: string) {
+  const [y, m] = monthStart.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function reportLabel(r: Report) {
+  return r.period_type === 'week' ? `Week of ${formatDate(r.period_start)}` : monthLabel(r.period_start)
+}
 
 const RANGE_LABELS: Record<ReportRange, string> = {
   this_week: 'This week',
@@ -62,7 +72,7 @@ export default function ReportsClient({
   tasks: Task[]
   entries: TimeEntry[]
   members: Member[]
-  reports: WeeklyReport[]
+  reports: Report[]
   weekAnchor: string
   hasApiKey: boolean
   openTasks: OpenTask[]
@@ -73,25 +83,54 @@ export default function ReportsClient({
 }) {
   const router = useRouter()
   const [view, setView] = useState<View>('overview')
-  const [recap, setRecap] = useState<string | null>(reports.find((r) => r.week_start === weekAnchor)?.content ?? null)
+  const [recap, setRecap] = useState<string | null>(reports.find((r) => r.period_type === 'week' && r.period_start === weekAnchor)?.content ?? null)
   const [loadingRecap, setLoadingRecap] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [scopeNotes, setScopeNotes] = useState<Record<string, string>>({})
   const [loadingNote, setLoadingNote] = useState<string | null>(null)
 
+  const [backfillType, setBackfillType] = useState<'week' | 'month'>('week')
+  const [backfillDate, setBackfillDate] = useState(todayKey())
+  const [loadingBackfill, setLoadingBackfill] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<string | null>(null)
+
   async function generateRecap() {
     setLoadingRecap(true)
     try {
-      const res = await fetch('/api/ai/weekly-recap', {
+      const res = await fetch('/api/ai/generate-recap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId }),
+        body: JSON.stringify({ orgId, periodType: 'week' }),
       })
       const body = await res.json()
       setRecap(res.ok ? body.recap : body.error || 'Failed to generate.')
       router.refresh()
     } finally {
       setLoadingRecap(false)
+    }
+  }
+
+  // Backfills or regenerates a report for any past week/month, not just "this week" — the fix
+  // for forgetting to generate one on time. Lands in the Report library below via router.refresh().
+  async function generateBackfill() {
+    setLoadingBackfill(true)
+    setBackfillResult(null)
+    try {
+      const res = await fetch('/api/ai/generate-recap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, periodType: backfillType, periodStart: backfillDate }),
+      })
+      const body = await res.json()
+      if (res.ok) {
+        setBackfillResult(`Generated for ${backfillType === 'week' ? `week of ${formatDate(body.periodStart)}` : monthLabel(body.periodStart)}.`)
+        setExpanded((prev) => new Set(prev).add(`${body.periodType}:${body.periodStart}`))
+        router.refresh()
+      } else {
+        setBackfillResult(body.error || 'Failed to generate.')
+      }
+    } finally {
+      setLoadingBackfill(false)
     }
   }
 
@@ -110,11 +149,11 @@ export default function ReportsClient({
     }
   }
 
-  function toggleExpanded(weekStart: string) {
+  function toggleExpanded(key: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(weekStart)) next.delete(weekStart)
-      else next.add(weekStart)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -203,7 +242,8 @@ export default function ReportsClient({
             {view === item.value && (
               <motion.div
                 layoutId="reports-nav-active"
-                className="absolute inset-0 rounded-full bg-white shadow-sm"
+                className="absolute inset-0 rounded-full bg-white"
+                style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                 transition={{ type: 'spring', stiffness: 500, damping: 35 }}
               />
             )}
@@ -249,6 +289,59 @@ export default function ReportsClient({
                 {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'AI generation is not available right now'}
               </button>
             )}
+          </div>
+
+          <div className="mb-8">
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Generate a report for a past period</div>
+            <div className="rounded-xl bg-white shadow-md p-4">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex gap-1 bg-sand/60 rounded-full p-1 w-fit">
+                  {(['week', 'month'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setBackfillType(t)}
+                      className={`relative rounded-full px-3 py-1.5 text-sm capitalize transition-colors ${
+                        backfillType === t ? 'font-medium text-ink' : 'text-sage hover:text-ink'
+                      }`}
+                    >
+                      {backfillType === t && (
+                        <motion.div
+                          layoutId="backfill-type-active"
+                          className="absolute inset-0 rounded-full bg-white"
+                          style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                        />
+                      )}
+                      <span className="relative">{t}</span>
+                    </button>
+                  ))}
+                </div>
+                {backfillType === 'week' ? (
+                  <DatePicker value={backfillDate} onChange={setBackfillDate} placeholder="Pick a date in that week…" className="w-44" />
+                ) : (
+                  <input
+                    type="month"
+                    value={backfillDate.slice(0, 7)}
+                    onChange={(e) => e.target.value && setBackfillDate(`${e.target.value}-01`)}
+                    className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm"
+                  />
+                )}
+                <button
+                  className="rounded-full bg-accent text-white shadow-md px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
+                  onClick={generateBackfill}
+                  disabled={loadingBackfill || !hasApiKey}
+                >
+                  {loadingBackfill ? 'Generating…' : 'Generate'}
+                </button>
+              </div>
+              <div className="text-xs text-sage">
+                {backfillType === 'week'
+                  ? 'Pick any date — it snaps to that date’s Monday–Sunday week.'
+                  : 'Pick any month to generate or regenerate its recap.'}
+              </div>
+              {backfillResult && <div className="text-xs text-ink mt-2">{backfillResult}</div>}
+            </div>
           </div>
 
           <div className="mb-8">
@@ -309,11 +402,14 @@ export default function ReportsClient({
             ) : (
               <div className="space-y-2">
                 {reports.map((r) => {
-                  const isOpen = expanded.has(r.week_start)
+                  const key = `${r.period_type}:${r.period_start}`
+                  const isOpen = expanded.has(key)
                   return (
-                    <div key={r.week_start} className="rounded-2xl bg-white shadow-md p-4">
-                      <button className="flex w-full justify-between items-center text-left" onClick={() => toggleExpanded(r.week_start)}>
-                        <span className="text-xs font-semibold text-sage">Week of {formatDate(r.week_start)}</span>
+                    <div key={key} className="rounded-2xl bg-white shadow-md p-4">
+                      <button className="flex w-full justify-between items-center text-left" onClick={() => toggleExpanded(key)}>
+                        <span className="text-xs font-semibold text-sage">
+                          {reportLabel(r)} <span className="text-sage/50 capitalize">· {r.period_type}</span>
+                        </span>
                         <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>
                       </button>
                       {isOpen && <div className="text-sm leading-relaxed text-ink mt-2">{r.content}</div>}

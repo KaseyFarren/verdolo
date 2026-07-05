@@ -71,15 +71,17 @@ export function buildSingleMessagePrompt(client: ClientCtx, prior: PriorContext,
   return `Write one short friendly check-in message (3-5 sentences) for today (${dateStr}). ${voiceLine(brandVoice)}${focus}${ctxLine(client, prior)}. Return ONLY the message text, nothing else.`
 }
 
-export function buildWeeklyRecapPrompt(params: {
-  today: string
-  weekStart: string
+export function buildRecapPrompt(params: {
+  periodType: 'week' | 'month'
+  periodStart: string
+  periodEnd: string
   clientSummaries: string[]
   brandVoice?: string | null
 }) {
-  return `You are an agency operations assistant. Write a concise weekly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers.
+  const periodLabel = params.periodType === 'week' ? 'Week' : 'Month'
+  return `You are an agency operations assistant. Write a concise ${params.periodType}ly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers.
 ${voiceLine(params.brandVoice)}
-Today: ${params.today} | Week: ${params.weekStart}–${params.today}
+${periodLabel}: ${params.periodStart}–${params.periodEnd}
 ${params.clientSummaries.join('\n')}`
 }
 
