@@ -82,3 +82,11 @@ ${voiceLine(params.brandVoice)}
 Today: ${params.today} | Week: ${params.weekStart}–${params.today}
 ${params.clientSummaries.join('\n')}`
 }
+
+export function buildScopeCreepPrompt(params: { clientName: string; hours: number; revenueCents: number; costCents: number; isEstimatedRevenue: boolean }) {
+  const revenue = (params.revenueCents / 100).toFixed(0)
+  const cost = (params.costCents / 100).toFixed(0)
+  return `You are an agency operations assistant. A client is costing more in delivered hours than they're paying for this month.
+Client: ${params.clientName}. Hours logged this month: ${params.hours.toFixed(1)}. Revenue this month: $${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Cost of hours delivered: $${cost}.
+In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers.`
+}

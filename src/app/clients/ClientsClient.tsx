@@ -62,6 +62,7 @@ type Invoice = {
 }
 type ClientCharge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type LineItemDraft = { description: string; amount_cents: number; quantity: number; chargeId?: string }
+type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
 
 const emptyForm = {
   name: '',
@@ -93,6 +94,7 @@ export default function ClientsClient({
   members,
   invoices: initialInvoices,
   unbilledCharges,
+  healthSnapshots,
   stripeConnectStatus,
 }: {
   orgId: string
@@ -107,6 +109,7 @@ export default function ClientsClient({
   members: Member[]
   invoices: Invoice[]
   unbilledCharges: ClientCharge[]
+  healthSnapshots: HealthSnapshot[]
   stripeConnectStatus: 'not_connected' | 'pending' | 'active'
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -155,6 +158,13 @@ export default function ClientsClient({
     const live = timeEntries.filter((e) => e.client_id === clientId).reduce((s, e) => s + (e.duration_seconds || 0), 0)
     const archived = archivedTimeTotals.filter((e) => e.client_id === clientId).reduce((s, e) => s + e.seconds, 0)
     return live + archived
+  }
+
+  function clientHealthTrend(clientId: string) {
+    return healthSnapshots.filter((s) => s.client_id === clientId).sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
+  }
+  function healthDotColor(health: HealthSnapshot['health']) {
+    return health === 'churned' ? '#6060a0' : health === 'green' ? '#2db87a' : health === 'amber' ? '#cc9a3c' : '#e05070'
   }
 
   async function loadInbox(clientId: string) {
@@ -382,6 +392,19 @@ export default function ClientsClient({
                   {selected.cadence_days && <span className="text-sage">{cadenceLabel(selected.cadence_days)}</span>}
                 </div>
                 {selected.last_contacted && <div className="text-xs text-sage mt-1">Last contacted: {formatDate(selected.last_contacted)}</div>}
+                {clientHealthTrend(selected.id).length > 1 && (
+                  <div className="flex items-center gap-0.5 mt-1.5">
+                    {clientHealthTrend(selected.id).map((s) => (
+                      <div
+                        key={s.snapshot_date}
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: healthDotColor(s.health) }}
+                        title={`${formatDate(s.snapshot_date)}: ${s.health}`}
+                      />
+                    ))}
+                    <span className="text-[10px] text-sage ml-1">health, last {clientHealthTrend(selected.id).length}d</span>
+                  </div>
+                )}
                 <div className="flex gap-3 mt-1 flex-wrap">
                   {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">${centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
                   {selected.contract_ends && <span className="text-xs text-sage">Contract ends: {formatDate(selected.contract_ends)}</span>}

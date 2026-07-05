@@ -8,6 +8,8 @@ type Settings = {
   eod_hour?: number
   exclude_weekends?: boolean
   notifications?: boolean
+  hourly_cost_cents?: number
+  brand_voice?: string
 }
 
 export default function GeneralClient({
@@ -23,11 +25,15 @@ export default function GeneralClient({
   const [eodHour, setEodHour] = useState(settings.eod_hour ?? 17)
   const [excludeWeekends, setExcludeWeekends] = useState(settings.exclude_weekends ?? true)
   const [notifications, setNotifications] = useState(settings.notifications ?? true)
+  const [hourlyCost, setHourlyCost] = useState(String((settings.hourly_cost_cents ?? 0) / 100))
   const [saved, setSaved] = useState(false)
 
+  // Spread the full settings object (not just this component's own fields) — otherwise saving
+  // here would silently wipe out settings owned by other tabs (e.g. VoiceClient's brand_voice)
+  // since the jsonb column is replaced wholesale, not merged, on every write.
   async function saveSettings(next: Partial<Settings>) {
     if (!isAdmin) return
-    const merged = { eod_hour: eodHour, exclude_weekends: excludeWeekends, notifications, ...next }
+    const merged = { ...settings, eod_hour: eodHour, exclude_weekends: excludeWeekends, notifications, hourly_cost_cents: Math.round(parseFloat(hourlyCost) * 100) || 0, ...next }
     await supabase.from('orgs').update({ settings: merged }).eq('id', orgId)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
@@ -54,6 +60,22 @@ export default function GeneralClient({
       </Row>
       <Row title="Desktop notifications" subtitle="EOD alert + morning summary">
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
+      </Row>
+      <Row title="Hourly cost rate" subtitle="Used to compute per-client margin in Reports → Profitability">
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-sage">$</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            className="w-20 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
+            value={hourlyCost}
+            disabled={!isAdmin}
+            onChange={(e) => setHourlyCost(e.target.value)}
+            onBlur={() => saveSettings({})}
+          />
+          <span className="text-sm text-sage">/hr</span>
+        </div>
       </Row>
       {saved && <div className="text-xs text-green mt-2">Saved</div>}
     </Section>

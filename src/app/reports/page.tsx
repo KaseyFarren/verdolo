@@ -37,8 +37,25 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const range: ReportRange = rangeParam === 'last_week' || rangeParam === 'this_month' ? rangeParam : 'this_week'
   const { start, end } = rangeBounds(range)
 
-  const [{ data: clients }, { data: tasks }, { data: entries }, { data: members }, { data: reports }] = await Promise.all([
-    supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),
+  // Profitability and capacity are always calendar-month / calendar-week, independent of the
+  // "by client" range picker above — a retainer is a monthly figure and "who's overloaded"
+  // means this week, regardless of what range the user has the activity table set to.
+  const { start: monthStart, end: monthEnd } = rangeBounds('this_month')
+  const weekAnchor = getWeekAnchor()
+  const weekEnd = todayKey(new Date(new Date(weekAnchor).getTime() + 7 * 86400000))
+
+  const [
+    { data: clients },
+    { data: tasks },
+    { data: entries },
+    { data: members },
+    { data: reports },
+    { data: openTasks },
+    { data: weekTimeEntries },
+    { data: monthTimeEntries },
+    { data: monthPaidInvoices },
+  ] = await Promise.all([
+    supabase.from('clients').select('id, name, retainer_cents').eq('org_id', orgId).order('name'),
     supabase
       .from('tasks')
       .select('id, client_id, assigned_to, title, completed_at')
@@ -55,9 +72,23 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .lt('started_at', end),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
     supabase.from('weekly_reports').select('week_start, content').eq('org_id', orgId).order('week_start', { ascending: false }),
+    supabase.from('tasks').select('id, assigned_to').eq('org_id', orgId).eq('done', false),
+    supabase
+      .from('time_entries')
+      .select('user_id, duration_seconds')
+      .eq('org_id', orgId)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', weekAnchor)
+      .lt('started_at', weekEnd),
+    supabase
+      .from('time_entries')
+      .select('client_id, duration_seconds')
+      .eq('org_id', orgId)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', monthStart)
+      .lt('started_at', monthEnd),
+    supabase.from('invoices').select('client_id, amount_cents').eq('org_id', orgId).eq('status', 'paid').gte('paid_at', monthStart).lt('paid_at', monthEnd),
   ])
-
-  const weekAnchor = getWeekAnchor()
 
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
@@ -71,6 +102,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         reports={reports ?? []}
         weekAnchor={weekAnchor}
         hasApiKey={!!process.env.ANTHROPIC_API_KEY}
+        openTasks={openTasks ?? []}
+        weekTimeEntries={weekTimeEntries ?? []}
+        monthTimeEntries={monthTimeEntries ?? []}
+        monthPaidInvoices={monthPaidInvoices ?? []}
+        hourlyCostCents={org?.settings?.hourly_cost_cents ?? 0}
       />
     </AppShell>
   )

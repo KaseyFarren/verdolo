@@ -1,0 +1,58 @@
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createAndSendInvoice, type LineItem } from '@/lib/invoicing'
+import { isAuthorizedCronRequest } from '@/lib/cronAuth'
+import { getStage } from '@/lib/agency'
+
+// Runs on the 1st of the month (see vercel.json). For every org with Stripe Connect active,
+// invoices every non-churned client with a non-zero retainer — the same line-item shape
+// (retainer + any unbilled client_charges) as the manual "Create Invoice" flow in
+// ClientsClient.tsx, just headless. Skips a client if it's already been invoiced this month
+// (source = 'recurring'), so a re-run or a slow cron doesn't double-bill.
+export async function GET(request: Request) {
+  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+  const monthStart = new Date()
+  monthStart.setUTCDate(1)
+  monthStart.setUTCHours(0, 0, 0, 0)
+
+  const { data: orgs } = await admin.from('orgs').select('id, stripe_connect_account_id').eq('stripe_connect_status', 'active')
+
+  const results: { clientId: string; status: 'invoiced' | 'skipped' | 'error'; detail?: string }[] = []
+
+  for (const org of orgs || []) {
+    const accountId = org.stripe_connect_account_id as string | null
+    if (!accountId) continue
+
+    const [{ data: clients }, { data: alreadyBilled }, { data: unbilledCharges }] = await Promise.all([
+      admin.from('clients').select('id, stage, status, retainer_cents').eq('org_id', org.id).gt('retainer_cents', 0),
+      admin.from('invoices').select('client_id').eq('org_id', org.id).eq('source', 'recurring').gte('sent_at', monthStart.toISOString()),
+      admin.from('client_charges').select('*').eq('org_id', org.id).is('invoice_id', null),
+    ])
+
+    const alreadyBilledIds = new Set((alreadyBilled || []).map((r) => r.client_id))
+
+    for (const client of clients || []) {
+      if (getStage(client) === 'Churned') continue
+      if (alreadyBilledIds.has(client.id)) {
+        results.push({ clientId: client.id, status: 'skipped', detail: 'already invoiced this month' })
+        continue
+      }
+
+      const lineItems: LineItem[] = [{ description: 'Monthly retainer', amount_cents: client.retainer_cents!, quantity: 1 }]
+      for (const charge of (unbilledCharges || []).filter((c) => c.client_id === client.id)) {
+        lineItems.push({ description: charge.description, amount_cents: charge.amount_cents, quantity: 1, chargeId: charge.id })
+      }
+
+      try {
+        await createAndSendInvoice({ admin, orgId: org.id, clientId: client.id, accountId, lineItems, source: 'recurring' })
+        results.push({ clientId: client.id, status: 'invoiced' })
+      } catch (err) {
+        results.push({ clientId: client.id, status: 'error', detail: (err as Error).message })
+      }
+    }
+  }
+
+  return NextResponse.json({ results })
+}

@@ -1,3 +1,7 @@
 {
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "crons": [
+    { "path": "/api/cron/recurring-invoices", "schedule": "0 6 1 * *" },
+    { "path": "/api/cron/health-snapshot", "schedule": "0 5 * * *" }
+  ]
 }

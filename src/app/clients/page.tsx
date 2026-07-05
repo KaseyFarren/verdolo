@@ -17,6 +17,7 @@ export default async function ClientsPage() {
     { data: members },
     { data: invoices },
     { data: unbilledCharges },
+    { data: healthSnapshots },
   ] = await Promise.all([
     supabase.from('clients').select('*').eq('org_id', orgId).order('name'),
     supabase.from('client_notes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
@@ -29,6 +30,12 @@ export default async function ClientsPage() {
     canEdit
       ? supabase.from('client_charges').select('*').eq('org_id', orgId).is('invoice_id', null).order('charged_on', { ascending: false })
       : Promise.resolve({ data: [] }),
+    supabase
+      .from('client_health_snapshots')
+      .select('client_id, snapshot_date, health')
+      .eq('org_id', orgId)
+      .gte('snapshot_date', new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10))
+      .order('snapshot_date', { ascending: true }),
   ])
 
   // retainer amounts are revenue — members (view-only on clients) don't get them, admins/owners do
@@ -49,6 +56,7 @@ export default async function ClientsPage() {
         members={members ?? []}
         invoices={invoices ?? []}
         unbilledCharges={unbilledCharges ?? []}
+        healthSnapshots={healthSnapshots ?? []}
         stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
       />
     </AppShell>
