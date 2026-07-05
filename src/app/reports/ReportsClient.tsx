@@ -59,7 +59,7 @@ export default function ReportsClient({
         body: JSON.stringify({ orgId }),
       })
       const body = await res.json()
-      setRecap(res.ok ? body.recap : 'Failed to generate. Check your API key in Settings.')
+      setRecap(res.ok ? body.recap : body.error || 'Failed to generate.')
       router.refresh()
     } finally {
       setLoadingRecap(false)
@@ -154,7 +154,7 @@ export default function ReportsClient({
             onClick={generateRecap}
             disabled={loadingRecap || !hasApiKey}
           >
-            {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'Add an Anthropic key in Settings to enable AI'}
+            {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'AI generation is not available right now'}
           </button>
         )}
       </div>

@@ -41,8 +41,7 @@ export default function SettingsClient({
   settings,
   initialAccentColor,
   initialDisplayName,
-  initialApiKey,
-  hasKey,
+  aiCredits,
   subscriptionStatus,
   trialEndsAt,
   seatsPurchased,
@@ -57,8 +56,7 @@ export default function SettingsClient({
   settings: Settings
   initialAccentColor: string
   initialDisplayName: string
-  initialApiKey: string
-  hasKey: boolean
+  aiCredits: { tierName: string; limit: number; used: number; remaining: number }
   subscriptionStatus: Status
   trialEndsAt: string | null
   seatsPurchased: number
@@ -103,14 +101,7 @@ export default function SettingsClient({
           {view === 'appearance' && <AppearanceClient orgId={orgId} isAdmin={isAdmin} initialAccentColor={initialAccentColor} />}
           {view === 'voice' && <VoiceClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
           {view === 'integrations' && (
-            <IntegrationsClient
-              orgId={orgId}
-              isAdmin={isAdmin}
-              isOwner={role === 'owner'}
-              initialApiKey={initialApiKey}
-              hasKey={hasKey}
-              stripeConnectStatus={stripeConnectStatus}
-            />
+            <IntegrationsClient orgId={orgId} isOwner={role === 'owner'} aiCredits={aiCredits} stripeConnectStatus={stripeConnectStatus} />
           )}
           {view === 'security' && <SecurityClient />}
           {view === 'data' && <DataClient orgId={orgId} isAdmin={isAdmin} />}

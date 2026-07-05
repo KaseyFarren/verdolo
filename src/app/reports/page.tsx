@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOrgAnthropicKey } from '@/lib/orgSecrets'
 import { getWeekAnchor, todayKey } from '@/lib/agency'
 import ReportsClient from './ReportsClient'
 
@@ -38,7 +37,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const range: ReportRange = rangeParam === 'last_week' || rangeParam === 'this_month' ? rangeParam : 'this_week'
   const { start, end } = rangeBounds(range)
 
-  const [{ data: clients }, { data: tasks }, { data: entries }, { data: members }, { data: reports }, apiKey] = await Promise.all([
+  const [{ data: clients }, { data: tasks }, { data: entries }, { data: members }, { data: reports }] = await Promise.all([
     supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),
     supabase
       .from('tasks')
@@ -56,7 +55,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .lt('started_at', end),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
     supabase.from('weekly_reports').select('week_start, content').eq('org_id', orgId).order('week_start', { ascending: false }),
-    getOrgAnthropicKey(orgId),
   ])
 
   const weekAnchor = getWeekAnchor()
@@ -72,7 +70,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         members={members ?? []}
         reports={reports ?? []}
         weekAnchor={weekAnchor}
-        hasApiKey={!!apiKey}
+        hasApiKey={!!process.env.ANTHROPIC_API_KEY}
       />
     </AppShell>
   )

@@ -1,6 +1,6 @@
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOrgAnthropicKey } from '@/lib/orgSecrets'
+import { getAiCreditStatus } from '@/lib/aiCredits'
 import SettingsClient from './SettingsClient'
 
 export default async function SettingsPage() {
@@ -9,10 +9,10 @@ export default async function SettingsPage() {
   const { supabase, user, orgId, role, org } = await requireOrgContext({ skipPaywall: true })
   const isAdmin = isAdminRole(role)
 
-  const [{ data: membership }, { count: activeMemberCount }, apiKey] = await Promise.all([
+  const [{ data: membership }, { count: activeMemberCount }, aiCredits] = await Promise.all([
     supabase.from('org_members').select('display_name').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
     supabase.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
-    isAdmin ? getOrgAnthropicKey(orgId) : Promise.resolve(null),
+    getAiCreditStatus(orgId),
   ])
 
   return (
@@ -25,8 +25,7 @@ export default async function SettingsPage() {
         settings={org?.settings ?? {}}
         initialAccentColor={org?.accent_color ?? '#dd6b2c'}
         initialDisplayName={membership?.display_name ?? ''}
-        initialApiKey={apiKey ?? ''}
-        hasKey={!!apiKey}
+        aiCredits={aiCredits}
         subscriptionStatus={org?.subscription_status ?? null}
         trialEndsAt={org?.trial_ends_at ?? null}
         seatsPurchased={org?.seats_purchased ?? 1}

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Section } from '@/components/settings/SettingsUI'
 import IntegrationIcon from '@/components/settings/IntegrationIcon'
 import Button from '@/components/ui/Button'
@@ -20,36 +19,16 @@ const COMING_SOON = [
 
 export default function IntegrationsClient({
   orgId,
-  isAdmin,
   isOwner,
-  initialApiKey,
-  hasKey: initialHasKey,
+  aiCredits,
   stripeConnectStatus,
 }: {
   orgId: string
-  isAdmin: boolean
   isOwner: boolean
-  initialApiKey: string
-  hasKey: boolean
+  aiCredits: { tierName: string; limit: number; used: number; remaining: number }
   stripeConnectStatus: 'not_connected' | 'pending' | 'active'
 }) {
-  const supabase = useMemo(() => createClient(), [])
-  const [apiKeyInput, setApiKeyInput] = useState(initialApiKey)
-  const [hasKey, setHasKey] = useState(initialHasKey)
-  const [saving, setSaving] = useState(false)
-
-  async function saveApiKey() {
-    setSaving(true)
-    await supabase.from('org_secrets').upsert({ org_id: orgId, anthropic_api_key: apiKeyInput.trim() })
-    setHasKey(!!apiKeyInput.trim())
-    setSaving(false)
-  }
-
-  async function removeApiKey() {
-    await supabase.from('org_secrets').upsert({ org_id: orgId, anthropic_api_key: null })
-    setApiKeyInput('')
-    setHasKey(false)
-  }
+  const pct = Math.min(100, Math.round((aiCredits.used / Math.max(aiCredits.limit, 1)) * 100))
 
   return (
     <>
@@ -57,30 +36,21 @@ export default function IntegrationsClient({
         <div className="flex items-center gap-3 mb-3">
           <IntegrationIcon name="anthropic" />
           <div>
-            <div className="text-sm font-medium">Anthropic API key</div>
-            <div className="text-xs text-sage">Shared across your org, used to generate daily client messages. {!isAdmin && 'Only admins can view or change it.'}</div>
+            <div className="text-sm font-medium">AI generation</div>
+            <div className="text-xs text-sage">Included with your plan — no API key to manage.</div>
           </div>
         </div>
-        {isAdmin ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="password"
-              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
-              placeholder="sk-ant-…"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-            />
-            <Button variant="primary" onClick={saveApiKey} disabled={saving}>
-              Save
-            </Button>
-            {hasKey && (
-              <button className="text-xs text-red-600 shrink-0" onClick={removeApiKey}>
-                Remove
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="text-sm">{hasKey ? '● Connected' : '○ Not connected'}</div>
+        <div className="flex items-center justify-between text-xs text-sage mb-1">
+          <span>
+            {aiCredits.used} / {aiCredits.limit} generations used this month
+          </span>
+          <span>{aiCredits.tierName} plan</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-sand overflow-hidden">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        </div>
+        {aiCredits.remaining === 0 && (
+          <div className="text-xs text-red-600 mt-1.5">You've used all your AI generations for this month. More seats raise your monthly allowance.</div>
         )}
       </Section>
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getOrgAnthropicKey } from '@/lib/orgSecrets'
+import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { buildSingleMessagePrompt, callClaude, extractText } from '@/lib/ai'
 import { getOffsetDate, todayKey } from '@/lib/agency'
 
@@ -23,8 +23,16 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const brandVoice = (membership.orgs as any)?.settings?.brand_voice as string | undefined
 
-  const apiKey = await getOrgAnthropicKey(orgId)
-  if (!apiKey) return NextResponse.json({ error: 'No Anthropic API key set for this org' }, { status: 400 })
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return NextResponse.json({ error: 'AI generation is not configured yet' }, { status: 500 })
+
+  const credit = await checkAndConsumeAiCredit(orgId)
+  if (!credit.allowed) {
+    return NextResponse.json(
+      { error: `You've used all ${credit.limit} AI generations included in your ${credit.tierName} plan this month. More seats raise your monthly allowance.` },
+      { status: 402 }
+    )
+  }
 
   const { data: client } = await supabase.from('clients').select('*').eq('id', clientId).eq('org_id', orgId).single()
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })

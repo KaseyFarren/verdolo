@@ -1,6 +1,5 @@
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOrgAnthropicKey } from '@/lib/orgSecrets'
 import { getOffsetDate, getWeekAnchor, todayKey } from '@/lib/agency'
 import DashboardClient from './DashboardClient'
 
@@ -20,7 +19,6 @@ export default async function DashboardPage() {
     { data: noteRow },
     { data: reports },
     { data: sentTodayRows },
-    apiKey,
   ] = await Promise.all([
     supabase
       .from('clients')
@@ -45,7 +43,6 @@ export default async function DashboardPage() {
     // from a same-day auto-checkin task existing/being done — that task can lag or be missing
     // (e.g. right after mount), which made "Copy & mark sent" look like it did nothing.
     supabase.from('ai_message_log').select('client_id').eq('org_id', orgId).gte('created_at', `${today}T00:00:00`).lt('created_at', `${tomorrow}T00:00:00`),
-    getOrgAnthropicKey(orgId),
   ])
 
   return (
@@ -61,7 +58,7 @@ export default async function DashboardPage() {
         todayTimeEntries={todayTimeEntries ?? []}
         members={members ?? []}
         initialNote={noteRow?.content ?? ''}
-        hasApiKey={!!apiKey}
+        hasApiKey={!!process.env.ANTHROPIC_API_KEY}
         excludeWeekends={org?.settings?.exclude_weekends ?? true}
         hasRecapThisWeek={!!reports?.some((r) => r.week_start === weekAnchor)}
         initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
