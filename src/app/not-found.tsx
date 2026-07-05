@@ -6,7 +6,7 @@ export default function NotFound() {
       <div className="text-5xl font-semibold">404</div>
       <p className="text-sm text-sage">This page doesn&apos;t exist.</p>
       <Link href="/" className="mt-2 text-sm underline hover:text-sage">
-        Back to Agency Hub
+        Back to Verdolo
       </Link>
     </main>
   )

@@ -17,7 +17,7 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
       supabase.from('tasks').select('*').eq('org_id', orgId),
       supabase.from('client_notes').select('*').eq('org_id', orgId),
     ])
-    triggerDownload(JSON.stringify({ clients, tasks, notes, exported: new Date().toISOString() }, null, 2), `agency-hub-export-${todayKey()}.json`, 'application/json')
+    triggerDownload(JSON.stringify({ clients, tasks, notes, exported: new Date().toISOString() }, null, 2), `verdolo-export-${todayKey()}.json`, 'application/json')
   }
 
   async function exportCSV() {
@@ -27,7 +27,7 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
       ...(clients || []).map((c) => [c.name, c.business || '', c.stage || '', c.retainer_cents ? c.retainer_cents / 100 : '', c.platform || '', c.service || '', c.tone || '', c.last_contacted || '', c.contract_ends || '']),
     ]
     const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-    triggerDownload(csv, `agency-hub-clients-${todayKey()}.csv`, 'text/csv')
+    triggerDownload(csv, `verdolo-clients-${todayKey()}.csv`, 'text/csv')
   }
 
   async function clearCompleted() {

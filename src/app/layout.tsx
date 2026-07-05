@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Agency Hub",
+  title: "Verdolo",
   description: "Run your agency — clients, tasks, time, and billing in one place.",
 };
 

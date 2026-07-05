@@ -87,7 +87,7 @@ export default function BillingClient({
         {trialExpired || subscriptionStatus === 'canceled' ? (
           <div className="rounded-lg border border-amber-300 bg-amber-100/70 p-4 text-sm text-amber-700">
             This organization&apos;s trial has ended and there&apos;s no active subscription. Ask your org owner to
-            subscribe to continue using Agency Hub.
+            subscribe to continue using Verdolo.
           </div>
         ) : (
           <div className="rounded-lg border border-ink/10 bg-white p-4 text-sm text-sage">

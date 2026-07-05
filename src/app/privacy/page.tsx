@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Privacy Policy — Agency Hub' }
+export const metadata = { title: 'Privacy Policy — Verdolo' }
 
 export default function PrivacyPage() {
   return (
@@ -13,8 +13,8 @@ export default function PrivacyPage() {
       <p className="mb-8 text-sm text-sage">Last updated: [DATE — fill in when published]</p>
 
       <p className="mb-6">
-        This Privacy Policy explains what information Agency Hub (&quot;we&quot;, &quot;us&quot;) collects, how we use it, and
-        the choices you have. It applies to the Agency Hub web application and covers both your account information
+        This Privacy Policy explains what information Verdolo (&quot;we&quot;, &quot;us&quot;) collects, how we use it, and
+        the choices you have. It applies to the Verdolo web application and covers both your account information
         and the Customer Data your organization stores in the Service.
       </p>
 
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <li><strong>Customer Data you enter:</strong> client records, notes, tasks, calendar entries, and time entries you or your team create.</li>
         <li>
           <strong>Gmail data (only if you connect it):</strong> message metadata and content for emails matched to your
-          clients, used solely to show and reply to those conversations inside Agency Hub.
+          clients, used solely to show and reply to those conversations inside Verdolo.
         </li>
         <li><strong>Billing information:</strong> handled directly by Stripe — we store your subscription status and plan, not your card details.</li>
         <li><strong>Usage data:</strong> basic log/analytics data (e.g. request timestamps) used for security and reliability.</li>
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">3. Who we share it with</h2>
       <p className="mb-6">
-        We don&apos;t sell your data. We share it only with the service providers that power Agency Hub, each acting on
+        We don&apos;t sell your data. We share it only with the service providers that power Verdolo, each acting on
         our instructions to provide the Service: Supabase (database, authentication, file storage), Vercel (hosting),
         Google (Gmail API, only for organizations that connect it), Anthropic (AI message generation, only when your
         organization supplies an API key), and Stripe (subscription billing). Other members of your organization can
@@ -90,7 +90,7 @@ export default function PrivacyPage() {
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">8. Children</h2>
-      <p className="mb-6">Agency Hub is a business tool and is not directed at, or intended for use by, children.</p>
+      <p className="mb-6">Verdolo is a business tool and is not directed at, or intended for use by, children.</p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">9. Changes to this policy</h2>
       <p className="mb-6">

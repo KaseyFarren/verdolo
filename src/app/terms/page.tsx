@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Terms of Service — Agency Hub' }
+export const metadata = { title: 'Terms of Service — Verdolo' }
 
 export default function TermsPage() {
   return (
@@ -13,14 +13,14 @@ export default function TermsPage() {
       <p className="mb-8 text-sm text-sage">Last updated: [DATE — fill in when published]</p>
 
       <p className="mb-6">
-        These Terms of Service (&quot;Terms&quot;) govern access to and use of Agency Hub (the &quot;Service&quot;),
+        These Terms of Service (&quot;Terms&quot;) govern access to and use of Verdolo (the &quot;Service&quot;),
         provided by [LEGAL ENTITY NAME] (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;). By creating an account or using the
         Service, you agree to these Terms on behalf of yourself and, if applicable, the organization you represent.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">1. The Service</h2>
       <p className="mb-6">
-        Agency Hub is a multi-user platform for running a client services agency: a client CRM, task and time
+        Verdolo is a multi-user platform for running a client services agency: a client CRM, task and time
         tracking, calendar, and AI-assisted client messaging. Some features connect to third-party services on your
         behalf, including Google Gmail (to read and send email on your connected inbox), Anthropic (to generate AI
         messages using an API key you provide), and Stripe (to process subscription payments and, optionally, your
