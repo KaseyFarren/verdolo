@@ -123,21 +123,28 @@ export default function TimeClient({
 
   // Filters live in the URL (?period=&start=&end=&clientId=&userId=&taskId=) so the server
   // component re-fetches an already-filtered page — same convention as Reports' ?range= and
-  // Revenue's ?month=.
+  // Revenue's ?month=. The URL round trip has real network latency though, so the pill/dropdown
+  // controls are driven by this local, optimistically-updated copy instead of the raw props —
+  // otherwise the active pill wouldn't move until the server responded, feeling sluggish next to
+  // Settings/Tasks' purely client-side pills. `entries` etc. below still reflect the server props
+  // until that response lands, same as before.
+  const [localFilters, setLocalFilters] = useState({ period, clientId: filterClientId, userId: filterUserId, taskId: filterTaskId })
+  useEffect(() => {
+    setLocalFilters({ period, clientId: filterClientId, userId: filterUserId, taskId: filterTaskId })
+  }, [period, filterClientId, filterUserId, filterTaskId])
+
   function pushFilters(next: { period?: PeriodValue; clientId?: string; userId?: string; taskId?: string }) {
-    const p = next.period ?? period
-    const clientId = next.clientId ?? filterClientId
-    const memberFilter = next.userId ?? filterUserId
-    const taskId = next.taskId ?? filterTaskId
+    const merged = { ...localFilters, ...next }
+    setLocalFilters(merged)
     const params = new URLSearchParams()
-    if (p.period !== 'all_time') params.set('period', p.period)
-    if (p.period === 'custom') {
-      if (p.start) params.set('start', p.start)
-      if (p.end) params.set('end', p.end)
+    if (merged.period.period !== 'all_time') params.set('period', merged.period.period)
+    if (merged.period.period === 'custom') {
+      if (merged.period.start) params.set('start', merged.period.start)
+      if (merged.period.end) params.set('end', merged.period.end)
     }
-    if (clientId) params.set('clientId', clientId)
-    if (memberFilter) params.set('userId', memberFilter)
-    if (taskId) params.set('taskId', taskId)
+    if (merged.clientId) params.set('clientId', merged.clientId)
+    if (merged.userId) params.set('userId', merged.userId)
+    if (merged.taskId) params.set('taskId', merged.taskId)
     const qs = params.toString()
     router.push(qs ? `/time?${qs}` : '/time')
   }
@@ -679,30 +686,30 @@ export default function TimeClient({
 
       <div className="mb-6">
         <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Filter</div>
-        <PeriodSelector layoutId="time-period-active" value={period} onChange={(next) => pushFilters({ period: next })} className="mb-3" />
+        <PeriodSelector layoutId="time-period-active" value={localFilters.period} onChange={(next) => pushFilters({ period: next })} className="mb-3" />
         <div className="flex flex-wrap gap-2">
           <CustomSelect
-            value={filterClientId}
+            value={localFilters.clientId}
             onChange={(v) => pushFilters({ clientId: v, taskId: '' })}
             options={[{ value: '', label: 'All clients' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
             className="w-40"
           />
           <CustomSelect
-            value={filterTaskId}
+            value={localFilters.taskId}
             onChange={(v) => pushFilters({ taskId: v })}
-            options={[{ value: '', label: 'All tasks' }, ...allTasks.filter((t) => !filterClientId || t.client_id === filterClientId).map((t) => ({ value: t.id, label: t.title }))]}
+            options={[{ value: '', label: 'All tasks' }, ...allTasks.filter((t) => !localFilters.clientId || t.client_id === localFilters.clientId).map((t) => ({ value: t.id, label: t.title }))]}
             className="w-40"
           />
           {isAdmin && (
             <CustomSelect
-              value={filterUserId}
+              value={localFilters.userId}
               onChange={(v) => pushFilters({ userId: v })}
               options={[{ value: '', label: 'All teammates' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
               className="w-40"
             />
           )}
         </div>
-        {period.period !== 'all_time' && (
+        {localFilters.period.period !== 'all_time' && (
           <div className="text-xs text-sage/70 mt-2">Cleared history isn&apos;t reflected in a specific period — switch to All time for lifetime totals.</div>
         )}
       </div>

@@ -71,7 +71,16 @@ export default function RevenueClient({
   }, [initialCharges])
   const isFullMonth = isFullCalendarMonth(period)
 
+  // The pill itself is driven by this local, optimistically-updated copy so it slides
+  // instantly on click — the actual revenue figures below stay tied to the real `period` prop
+  // until router.push's server round trip lands, same as the underlying data always has.
+  const [localPeriod, setLocalPeriod] = useState(period)
+  useEffect(() => {
+    setLocalPeriod(period)
+  }, [period])
+
   function pushPeriod(next: PeriodValue) {
+    setLocalPeriod(next)
     const params = new URLSearchParams()
     if (next.period !== 'this_month') params.set('period', next.period)
     if (next.period === 'custom') {
@@ -220,7 +229,7 @@ export default function RevenueClient({
 
       <PeriodSelector
         layoutId="revenue-period-active"
-        value={period}
+        value={localPeriod}
         onChange={pushPeriod}
         presets={['this_month', 'last_month', 'this_week', 'last_week', 'custom']}
         className="mb-4"
@@ -283,24 +292,24 @@ export default function RevenueClient({
             const clientCharges = chargesByClient.get(r.client.id) || []
             const expanded = expandedClientId === r.client.id
             return (
-              <div key={r.client.id} className="px-3 py-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-y-1 text-sm">
-                  <button
-                    className="flex-1 min-w-[140px] text-left"
-                    onClick={() => setExpandedClientId(expanded ? null : r.client.id)}
-                  >
+              <div key={r.client.id} className="hover:bg-sand/40 transition-colors">
+                <button
+                  className="flex flex-wrap w-full items-center justify-between gap-y-1 text-sm text-left px-3 py-2.5"
+                  onClick={() => setExpandedClientId(expanded ? null : r.client.id)}
+                >
+                  <span className="flex-1 min-w-[140px]">
                     <span className="font-medium">{r.client.name}</span>
                     {r.client.retainer_cents ? <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span> : null}
-                  </button>
-                  <div className="flex items-center gap-4 shrink-0">
+                  </span>
+                  <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
                     <span className="text-sage w-16 text-right">{r.rate ? `$${centsToDollars(r.rate)}/hr` : '—'}</span>
                     <span className={`w-16 text-right ${r.marginCents < 0 ? 'text-red-600' : 'text-sage'}`}>{fmtMoney(r.marginCents)} mgn</span>
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
-                  </div>
-                </div>
+                  </span>
+                </button>
                 {expanded && (
-                  <div className="mt-3 pl-1 border-l-2 border-ink/10 pl-3 space-y-2">
+                  <div className="mx-3 mb-3 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
                     {clientCharges.length > 0 && (
                       <div className="space-y-1">
                         {clientCharges.map((c) => (

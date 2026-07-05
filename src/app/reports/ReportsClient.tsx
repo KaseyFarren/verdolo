@@ -405,14 +405,17 @@ export default function ReportsClient({
                   const key = `${r.period_type}:${r.period_start}`
                   const isOpen = expanded.has(key)
                   return (
-                    <div key={key} className="rounded-2xl bg-white shadow-md p-4">
-                      <button className="flex w-full justify-between items-center text-left" onClick={() => toggleExpanded(key)}>
+                    <div key={key} className="rounded-2xl bg-white shadow-md overflow-hidden">
+                      <button
+                        className="flex w-full justify-between items-center text-left p-4 hover:bg-sand/40 transition-colors"
+                        onClick={() => toggleExpanded(key)}
+                      >
                         <span className="text-xs font-semibold text-sage">
                           {reportLabel(r)} <span className="text-sage/50 capitalize">· {r.period_type}</span>
                         </span>
                         <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>
                       </button>
-                      {isOpen && <div className="text-sm leading-relaxed text-ink mt-2">{r.content}</div>}
+                      {isOpen && <div className="text-sm leading-relaxed text-ink px-4 pb-4">{r.content}</div>}
                     </div>
                   )
                 })}
