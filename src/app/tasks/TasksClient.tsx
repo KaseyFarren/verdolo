@@ -12,6 +12,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import AddTaskForm from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import Button from '@/components/ui/Button'
+import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 
 type Client = { id: string; name: string }
@@ -126,6 +127,25 @@ export default function TasksClient({
   const [editingDefaultId, setEditingDefaultId] = useState<string | null>(null)
   const [editDefaultForm, setEditDefaultForm] = useState<Record<string, unknown>>({})
   const timer = useTaskTimer(supabase, orgId, userId)
+
+  // Logs a fixed duration against a task directly, for when someone forgot to run the timer —
+  // an already-completed entry (started_at/ended_at both set), not a running one, so it doesn't
+  // touch `timer` at all and can't collide with an actually-running timer on the same task.
+  async function addManualTimeForTask(task: Task, hours: number) {
+    const durationSeconds = Math.round(hours * 3600)
+    const endedAt = new Date()
+    const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000)
+    await supabase.from('time_entries').insert({
+      org_id: orgId,
+      client_id: task.client_id,
+      task_id: task.id,
+      user_id: userId,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      billable: true,
+    })
+  }
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
   // re-runs the server component and gives us a new initialTasks array, but useState's
@@ -476,6 +496,7 @@ export default function TasksClient({
         elapsed={timer.elapsedFor(t.id)}
         startTimer={() => timer.startForTask(t)}
         stopTimer={() => timer.stopRunning()}
+        addManualTime={(hours) => addManualTimeForTask(t, hours)}
       />
     )
   }
@@ -1001,6 +1022,7 @@ function TaskRow({
   elapsed,
   startTimer,
   stopTimer,
+  addManualTime,
 }: {
   t: Task
   currentUserId: string
@@ -1023,6 +1045,7 @@ function TaskRow({
   elapsed: string | null
   startTimer: () => void
   stopTimer: () => void
+  addManualTime: (hours: number) => void | Promise<void>
 }) {
   if (isEditing) {
     return <TaskEditForm editForm={editForm} setEditForm={setEditForm} clients={clients} members={members} showDueDate={!t.is_auto} onCancel={cancelEdit} onSave={save} />
@@ -1087,6 +1110,7 @@ function TaskRow({
               ▶
             </button>
           ))}
+        {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
         {!t.done && (
           <button title="Snooze — push to tomorrow" className="text-xs text-sage px-1" onClick={snooze}>
             ⏭

@@ -9,6 +9,7 @@ import { useTaskTimer } from '@/lib/useTaskTimer'
 import Button from '@/components/ui/Button'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
+import QuickAddTime from '@/components/QuickAddTime'
 import {
   AVATAR_COLORS,
   formatDate,
@@ -93,6 +94,25 @@ export default function DashboardClient({
   const [clients] = useState<Client[]>(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const timer = useTaskTimer(supabase, orgId, userId)
+
+  // Logs a fixed duration against a task directly, for when someone forgot to run the timer —
+  // an already-completed entry (started_at/ended_at both set), not a running one, so it doesn't
+  // touch `timer` at all and can't collide with an actually-running timer on the same task.
+  async function addManualTimeForTask(task: Task, hours: number) {
+    const durationSeconds = Math.round(hours * 3600)
+    const endedAt = new Date()
+    const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000)
+    await supabase.from('time_entries').insert({
+      org_id: orgId,
+      client_id: task.client_id,
+      task_id: task.id,
+      user_id: userId,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      billable: true,
+    })
+  }
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
   // re-runs the server component and gives us a new initialTasks array, but useState's
@@ -417,6 +437,7 @@ export default function DashboardClient({
                 elapsed={timer.elapsedFor(t.id)}
                 startTimer={() => timer.startForTask(t)}
                 stopTimer={() => timer.stopRunning()}
+                addManualTime={(hours) => addManualTimeForTask(t, hours)}
                 isEditing={editingTaskId === t.id}
                 editForm={editForm}
                 setEditForm={setEditForm}
@@ -445,6 +466,7 @@ export default function DashboardClient({
                     elapsed={timer.elapsedFor(t.id)}
                     startTimer={() => timer.startForTask(t)}
                     stopTimer={() => timer.stopRunning()}
+                    addManualTime={(hours) => addManualTimeForTask(t, hours)}
                     isEditing={editingTaskId === t.id}
                     editForm={editForm}
                     setEditForm={setEditForm}
@@ -474,6 +496,7 @@ export default function DashboardClient({
                   elapsed={null}
                   startTimer={() => {}}
                   stopTimer={() => {}}
+                  addManualTime={() => {}}
                   isEditing={editingTaskId === t.id}
                   editForm={editForm}
                   setEditForm={setEditForm}
@@ -671,6 +694,7 @@ function SimpleTaskRow({
   elapsed,
   startTimer,
   stopTimer,
+  addManualTime,
   isEditing,
   editForm,
   setEditForm,
@@ -687,6 +711,7 @@ function SimpleTaskRow({
   elapsed: string | null
   startTimer: () => void
   stopTimer: () => void
+  addManualTime: (hours: number) => void | Promise<void>
   isEditing: boolean
   editForm: Record<string, unknown>
   setEditForm: (f: (prev: Record<string, unknown>) => Record<string, unknown>) => void
@@ -752,6 +777,7 @@ function SimpleTaskRow({
               ▶
             </button>
           ))}
+        {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
         <button title="Edit" className="text-xs text-sage px-1" onClick={startEdit}>
           ✏
         </button>
