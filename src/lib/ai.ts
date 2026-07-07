@@ -85,10 +85,19 @@ ${periodLabel}: ${params.periodStart}–${params.periodEnd}
 ${params.clientSummaries.join('\n')}`
 }
 
-export function buildScopeCreepPrompt(params: { clientName: string; hours: number; revenueCents: number; costCents: number; isEstimatedRevenue: boolean }) {
+export function buildScopeCreepPrompt(params: {
+  clientName: string
+  hours: number
+  revenueCents: number
+  effectiveRateCents: number
+  targetRateCents: number
+  isEstimatedRevenue: boolean
+  periodLabel: string
+}) {
   const revenue = (params.revenueCents / 100).toFixed(0)
-  const cost = (params.costCents / 100).toFixed(0)
-  return `You are an agency operations assistant. A client is costing more in delivered hours than they're paying for this month.
-Client: ${params.clientName}. Hours logged this month: ${params.hours.toFixed(1)}. Revenue this month: $${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Cost of hours delivered: $${cost}.
+  const effectiveRate = (params.effectiveRateCents / 100).toFixed(0)
+  const targetRate = (params.targetRateCents / 100).toFixed(0)
+  return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate — the account is consuming more time than its revenue supports at that target.
+Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: $${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Effective rate realized: $${effectiveRate}/hr, vs a target of $${targetRate}/hr.
 In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers.`
 }

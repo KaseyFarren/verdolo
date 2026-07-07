@@ -61,7 +61,7 @@ export default function GeneralClient({
       <Row title="Desktop notifications" subtitle="EOD alert + morning summary">
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
-      <Row title="Hourly cost rate" subtitle="Used to compute per-client margin in Reports → Profitability">
+      <Row title="Target hourly rate" subtitle="What you want to realize per hour — compared against effective rate in Reports → Profitability and Revenue">
         <div className="flex items-center gap-1">
           <span className="text-sm text-sage">$</span>
           <input

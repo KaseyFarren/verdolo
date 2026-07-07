@@ -35,6 +35,10 @@ function formatHours(seconds: number) {
 function fmtMoney(cents: number) {
   return `$${centsToDollars(cents).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
+function formatRateDelta(centsPerHour: number) {
+  const sign = centsPerHour >= 0 ? '+' : '−'
+  return `${sign}$${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
+}
 
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
 
@@ -47,7 +51,7 @@ export default function RevenueClient({
   entries,
   members,
   tasks,
-  hourlyCostCents,
+  targetRateCents,
 }: {
   orgId: string
   period: PeriodValue
@@ -57,7 +61,7 @@ export default function RevenueClient({
   entries: Entry[]
   members: Member[]
   tasks: TaskRow[]
-  hourlyCostCents: number
+  targetRateCents: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
@@ -125,13 +129,12 @@ export default function RevenueClient({
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
         const rate = hours > 0 ? totalRevenue / hours : null
-        const costCents = Math.round(hours * hourlyCostCents)
-        const marginCents = totalRevenue - costCents
-        return { client: c, chargesTotal, totalRevenue, seconds, hours, rate, costCents, marginCents }
+        const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
+        return { client: c, chargesTotal, totalRevenue, seconds, hours, rate, rateDeltaCents }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient, isFullMonth, hourlyCostCents])
+  }, [clients, chargesByClient, hoursByClient, isFullMonth, targetRateCents])
 
   const memberRows = useMemo(() => {
     return members
@@ -175,9 +178,9 @@ export default function RevenueClient({
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
     const seconds = clientRows.reduce((s, r) => s + r.seconds, 0)
     const hours = seconds / 3600
-    const costCents = Math.round(hours * hourlyCostCents)
-    return { revenue, hours, rate: hours > 0 ? revenue / hours : null, costCents, marginCents: revenue - costCents }
-  }, [clientRows, hourlyCostCents])
+    const rate = hours > 0 ? revenue / hours : null
+    return { revenue, hours, rate, rateDeltaCents: rate !== null && targetRateCents > 0 ? rate - targetRateCents : null }
+  }, [clientRows, targetRateCents])
 
   // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period —
   // a retainer is "at risk" regardless of which week you happen to be looking at.
@@ -248,10 +251,6 @@ export default function RevenueClient({
           <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
-          <div className="text-xs text-sage mb-1">Margin</div>
-          <div className={`text-2xl font-heading font-bold ${totals.marginCents < 0 ? 'text-red-600' : ''}`}>{fmtMoney(totals.marginCents)}</div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">Hours logged</div>
           <div className="text-2xl font-heading font-bold">{totals.hours.toFixed(1)}</div>
         </div>
@@ -260,13 +259,20 @@ export default function RevenueClient({
           <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '—'}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
+          <div className="text-xs text-sage mb-1">vs. target rate</div>
+          <div className={`text-2xl font-heading font-bold ${totals.rateDeltaCents !== null && totals.rateDeltaCents < 0 ? 'text-red-600' : ''}`}>
+            {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '—'}
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">Billable utilization</div>
           <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '—'}</div>
         </div>
       </div>
-      {hourlyCostCents === 0 && (
+      {targetRateCents === 0 && (
         <div className="text-xs text-sage bg-white rounded-xl shadow-md p-3 mb-3">
-          Set an hourly cost rate in Settings → General to see accurate cost and margin figures (currently $0/hr, so margin = revenue).
+          Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here — set a target hourly rate in Settings → General to
+          see how your blended rate compares (no target set yet).
         </div>
       )}
       <div className="flex flex-wrap gap-2 mb-6">
@@ -303,8 +309,9 @@ export default function RevenueClient({
                   </span>
                   <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
-                    <span className="text-sage w-16 text-right">{r.rate ? `$${centsToDollars(r.rate)}/hr` : '—'}</span>
-                    <span className={`w-16 text-right ${r.marginCents < 0 ? 'text-red-600' : 'text-sage'}`}>{fmtMoney(r.marginCents)} mgn</span>
+                    <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
+                      {r.rate ? `$${centsToDollars(r.rate)}/hr` : '—'}
+                    </span>
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                   </span>
                 </button>

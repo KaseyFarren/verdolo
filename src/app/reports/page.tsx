@@ -140,7 +140,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         weekTimeEntries={weekTimeEntries ?? []}
         monthTimeEntries={monthTimeEntries ?? []}
         monthPaidInvoices={monthPaidInvoices ?? []}
-        hourlyCostCents={org?.settings?.hourly_cost_cents ?? 0}
+        targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
         pMonth={pMonth}
         trendMonthKeys={monthKeys}
       />

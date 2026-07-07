@@ -67,7 +67,7 @@ export default function ReportsClient({
   weekTimeEntries,
   monthTimeEntries,
   monthPaidInvoices,
-  hourlyCostCents,
+  targetRateCents,
   pMonth,
   trendMonthKeys,
 }: {
@@ -84,7 +84,7 @@ export default function ReportsClient({
   weekTimeEntries: WeekTimeEntry[]
   monthTimeEntries: MonthTimeEntry[]
   monthPaidInvoices: PaidInvoice[]
-  hourlyCostCents: number
+  targetRateCents: number
   pMonth: string
   trendMonthKeys: string[]
 }) {
@@ -161,7 +161,7 @@ export default function ReportsClient({
       const res = await fetch('/api/ai/scope-creep-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, clientId }),
+        body: JSON.stringify({ orgId, clientId, periodStart: pMonth }),
       })
       const body = await res.json()
       setScopeNotes((prev) => ({ ...prev, [clientId]: res.ok ? body.note : body.error || 'Failed to generate.' }))
@@ -215,8 +215,11 @@ export default function ReportsClient({
       .sort((a, b) => b.taskCount + b.totalSeconds / 3600 - (a.taskCount + a.totalSeconds / 3600))
   }, [clients, tasks, entries, members])
 
-  // Per-client revenue/cost/margin for one calendar month — shared by the selected-month
-  // breakdown below and by monthlyTrend (run once per month in the trailing window).
+  // Verdolo doesn't track real expenses, so there's no honest "cost"/"margin" in dollars —
+  // only hours logged vs. revenue. Effective rate (revenue ÷ hours) compared against the
+  // team's target rate gives the same "is this account worth the time it's taking" signal
+  // without pretending to know a real P&L. Shared by the selected-month breakdown below and
+  // by monthlyTrend (run once per month in the trailing window).
   function profitabilityForMonth(monthKey: string) {
     const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
     const monthInvoices = monthPaidInvoices.filter((i) => i.paid_at.slice(0, 7) === monthKey)
@@ -225,33 +228,55 @@ export default function ReportsClient({
         const hours = monthEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const revenueCents = paidCents || c.retainer_cents || 0
-        const costCents = Math.round(hours * hourlyCostCents)
-        const marginCents = revenueCents - costCents
-        return { client: c, hours, revenueCents, costCents, marginCents, isEstimatedRevenue: !paidCents }
+        const effectiveRateCents = hours > 0 ? revenueCents / hours : null
+        const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
+        return { client: c, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
-      .sort((a, b) => a.marginCents - b.marginCents)
+      .sort((a, b) => {
+        if (a.rateDeltaCents === null) return 1
+        if (b.rateDeltaCents === null) return -1
+        return a.rateDeltaCents - b.rateDeltaCents
+      })
   }
 
   const profitability = useMemo(
     () => profitabilityForMonth(pMonth),
-    [clients, monthTimeEntries, monthPaidInvoices, hourlyCostCents, pMonth],
+    [clients, monthTimeEntries, monthPaidInvoices, targetRateCents, pMonth],
   )
 
   const monthlyTrend = useMemo(() => {
     return trendMonthKeys.map((monthKey) => {
       const perClient = profitabilityForMonth(monthKey)
+      const totalRevenue = perClient.reduce((s, r) => s + r.revenueCents, 0)
+      const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
       return {
         month: monthKey,
-        revenueCents: perClient.reduce((s, r) => s + r.revenueCents, 0),
-        costCents: perClient.reduce((s, r) => s + r.costCents, 0),
-        marginCents: perClient.reduce((s, r) => s + r.marginCents, 0),
+        // An effective rate needs a denominator — a month with retainer revenue but zero
+        // logged hours has no *rate* to report, not a rate of $0 (retainer_cents is always
+        // "current", so every month trivially has revenue even before a client was active).
+        blendedRateCents: totalHours > 0 ? totalRevenue / totalHours : 0,
+        hasData: totalHours > 0,
       }
     })
-  }, [clients, monthTimeEntries, monthPaidInvoices, hourlyCostCents, trendMonthKeys])
+  }, [clients, monthTimeEntries, monthPaidInvoices, targetRateCents, trendMonthKeys])
 
   function onMonthChange(next: string) {
     router.push(`/reports?pMonth=${next}`)
+  }
+
+  function shiftMonth(monthKey: string, delta: number) {
+    const [y, m] = monthKey.split('-').map(Number)
+    const d = new Date(y, m - 1 + delta, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  function formatRate(centsPerHour: number) {
+    return `$${Math.round(centsPerHour / 100).toLocaleString()}/hr`
+  }
+  function formatRateDelta(centsPerHour: number) {
+    const sign = centsPerHour >= 0 ? '+' : '−'
+    return `${sign}$${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
   }
 
   const capacity = useMemo(() => {
@@ -505,68 +530,94 @@ export default function ReportsClient({
 
       {view === 'profitability' && (
         <div>
-          <div className="mb-6">
-            <input
-              type="month"
-              value={pMonth}
-              onChange={(e) => e.target.value && onMonthChange(e.target.value)}
-              className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm shadow-md"
-            />
+          <div className="mb-6 flex items-center gap-1 rounded-full border border-ink/10 bg-white shadow-md w-fit px-1 py-1">
+            <button
+              type="button"
+              className="w-7 h-7 rounded-full text-sage hover:text-ink hover:bg-sand/60 transition-colors"
+              onClick={() => onMonthChange(shiftMonth(pMonth, -1))}
+              aria-label="Previous month"
+            >
+              ‹
+            </button>
+            <span className="px-2 text-sm font-medium min-w-[8rem] text-center">{monthLabel(`${pMonth}-01`)}</span>
+            <button
+              type="button"
+              className="w-7 h-7 rounded-full text-sage hover:text-ink hover:bg-sand/60 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              onClick={() => onMonthChange(shiftMonth(pMonth, 1))}
+              disabled={pMonth >= todayKey().slice(0, 7)}
+              aria-label="Next month"
+            >
+              ›
+            </button>
           </div>
 
-          {hourlyCostCents === 0 && (
+          {targetRateCents === 0 && (
             <div className="text-sm text-sage bg-white rounded-xl shadow-md p-3 mb-4">
-              Set an hourly cost rate in Settings → General to see cost and margin figures (currently $0/hr, so margin = revenue).
+              Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here — set a target hourly rate in Settings → General to
+              see how each account&apos;s effective rate compares (no target set yet).
             </div>
           )}
 
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Revenue vs. cost · last 6 months</div>
-            {monthlyTrend.every((m) => m.revenueCents === 0 && m.costCents === 0) ? (
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Effective rate · last 6 months</div>
+            {monthlyTrend.every((m) => !m.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
             ) : (
               <div className="rounded-2xl bg-white shadow-md p-4">
                 <TrendLineChart
                   months={trendMonthKeys}
-                  formatValue={(cents) => `$${centsToDollars(cents)}`}
+                  formatValue={(cents) => formatRate(cents)}
+                  referenceLine={targetRateCents > 0 ? { value: targetRateCents, label: `Target ${formatRate(targetRateCents)}` } : undefined}
                   series={[
-                    { key: 'revenue', label: 'Revenue', color: '#dd6b2c', values: monthlyTrend.map((m) => m.revenueCents) },
-                    { key: 'cost', label: 'Cost', color: '#4a3aa7', values: monthlyTrend.map((m) => m.costCents) },
-                    { key: 'margin', label: 'Margin', color: '#1f9d68', values: monthlyTrend.map((m) => m.marginCents) },
+                    {
+                      key: 'rate',
+                      label: 'Effective rate',
+                      color: '#898781',
+                      values: monthlyTrend.map((m) => m.blendedRateCents),
+                      pointColors:
+                        targetRateCents > 0
+                          ? monthlyTrend.map((m) => (!m.hasData ? '#c3c2b7' : m.blendedRateCents >= targetRateCents ? '#2a78d6' : '#e05070'))
+                          : undefined,
+                    },
                   ]}
                 />
               </div>
             )}
           </div>
 
-          {profitability.length > 0 && (
+          {targetRateCents > 0 && profitability.some((r) => r.rateDeltaCents !== null) && (
             <div className="mb-8">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Margin by client · {monthLabel(`${pMonth}-01`)}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Effective rate by client · {monthLabel(`${pMonth}-01`)}</div>
               <div className="rounded-2xl bg-white shadow-md p-4">
                 <DivergingBarChart
-                  items={profitability.map((r) => ({ id: r.client.id, label: r.client.name, valueCents: r.marginCents }))}
-                  formatValue={(cents) => `$${centsToDollars(cents)}`}
+                  items={profitability
+                    .filter((r) => r.rateDeltaCents !== null)
+                    .map((r) => ({ id: r.client.id, label: r.client.name, valueCents: r.rateDeltaCents as number }))}
+                  formatValue={(cents) => formatRateDelta(cents)}
                 />
               </div>
             </div>
           )}
 
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Margin by client, in detail · {monthLabel(`${pMonth}-01`)}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Client detail · {monthLabel(`${pMonth}-01`)}</div>
           {profitability.length === 0 ? (
             <div className="text-sm text-sage py-3">No revenue or logged time in {monthLabel(`${pMonth}-01`)} yet.</div>
           ) : (
             <div className="space-y-3">
               {profitability.map((r) => {
-                const isNegative = r.marginCents < 0
+                const isBelowTarget = targetRateCents > 0 && r.rateDeltaCents !== null && r.rateDeltaCents < 0
                 return (
-                  <div key={r.client.id} className={`rounded-2xl bg-white shadow-md p-4 ${isNegative ? 'border-l-4 border-red-400' : ''}`}>
+                  <div key={r.client.id} className={`rounded-2xl bg-white shadow-md p-4 ${isBelowTarget ? 'border-l-4 border-red-400' : ''}`}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold text-ink">{r.client.name}</div>
-                        {isNegative && <span className="text-[10px] rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
+                        {isBelowTarget && <span className="text-[10px] rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
                       </div>
-                      <div className={`text-sm font-semibold ${isNegative ? 'text-red-600' : 'text-green'}`}>
-                        ${centsToDollars(r.marginCents)} margin
+                      <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
+                        {r.effectiveRateCents !== null ? formatRate(r.effectiveRateCents) : 'No hours logged'}
+                        {targetRateCents > 0 && r.rateDeltaCents !== null && (
+                          <span className="text-xs font-normal text-sage ml-1">({formatRateDelta(r.rateDeltaCents)} vs target)</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sage">
@@ -575,9 +626,8 @@ export default function ReportsClient({
                         {r.isEstimatedRevenue && ' (retainer, est.)'}
                       </span>
                       <span>{r.hours.toFixed(1)}h logged</span>
-                      <span>Cost ${centsToDollars(r.costCents)}</span>
                     </div>
-                    {isNegative && (
+                    {isBelowTarget && (
                       <div className="mt-2">
                         {scopeNotes[r.client.id] ? (
                           <div className="text-xs text-ink bg-red-50/60 rounded-lg p-2">{scopeNotes[r.client.id]}</div>

@@ -7,6 +7,9 @@ export type TrendSeries = {
   label: string
   color: string
   values: number[]
+  // Per-point marker color override (e.g. above/below a target) — the connecting line still
+  // uses `color`, only the dots pick this up. Same length as `values` when provided.
+  pointColors?: string[]
 }
 
 const WIDTH = 640
@@ -43,15 +46,17 @@ export default function TrendLineChart({
   months,
   series,
   formatValue,
+  referenceLine,
 }: {
   months: string[]
   series: TrendSeries[]
   formatValue: (cents: number) => string
+  referenceLine?: { value: number; label: string }
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
-  const allValues = series.flatMap((s) => s.values)
+  const allValues = [...series.flatMap((s) => s.values), ...(referenceLine ? [referenceLine.value] : [])]
   const yMin = Math.min(0, ...allValues)
   const yMax = Math.max(1, ...allValues)
   const ticks = niceTicks(yMin, yMax, 4)
@@ -79,14 +84,16 @@ export default function TrendLineChart({
 
   return (
     <div className="relative">
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-        {series.map((s) => (
-          <div key={s.key} className="flex items-center gap-1.5 text-xs text-sage">
-            <span className="inline-block w-3 h-0.5 rounded-full" style={{ background: s.color }} />
-            {s.label}
-          </div>
-        ))}
-      </div>
+      {series.length > 1 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+          {series.map((s) => (
+            <div key={s.key} className="flex items-center gap-1.5 text-xs text-sage">
+              <span className="inline-block w-3 h-0.5 rounded-full" style={{ background: s.color }} />
+              {s.label}
+            </div>
+          ))}
+        </div>
+      )}
 
       <svg
         ref={svgRef}
@@ -110,6 +117,23 @@ export default function TrendLineChart({
           </text>
         ))}
 
+        {referenceLine && (
+          <g>
+            <line
+              x1={PAD_LEFT}
+              x2={WIDTH - PAD_RIGHT}
+              y1={yAt(referenceLine.value)}
+              y2={yAt(referenceLine.value)}
+              stroke="#898781"
+              strokeWidth={1.5}
+              strokeDasharray="4 3"
+            />
+            <text x={PAD_LEFT + 4} y={yAt(referenceLine.value) - 5} fontSize={10} fill="#898781">
+              {referenceLine.label}
+            </text>
+          </g>
+        )}
+
         {hoverIdx !== null && (
           <line
             x1={xAt(hoverIdx)}
@@ -126,12 +150,15 @@ export default function TrendLineChart({
           return (
             <g key={s.key}>
               <polyline points={points} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              {s.values.map((v, i) => (
-                <g key={i}>
-                  <circle cx={xAt(i)} cy={yAt(v)} r={i === hoverIdx ? 6 : 5} fill="#fff" />
-                  <circle cx={xAt(i)} cy={yAt(v)} r={i === hoverIdx ? 4.5 : 3.5} fill={s.color} />
-                </g>
-              ))}
+              {s.values.map((v, i) => {
+                const dotColor = s.pointColors?.[i] ?? s.color
+                return (
+                  <g key={i}>
+                    <circle cx={xAt(i)} cy={yAt(v)} r={i === hoverIdx ? 6 : 5} fill="#fff" />
+                    <circle cx={xAt(i)} cy={yAt(v)} r={i === hoverIdx ? 4.5 : 3.5} fill={dotColor} />
+                  </g>
+                )
+              })}
             </g>
           )
         })}
@@ -170,12 +197,21 @@ export default function TrendLineChart({
           {series.map((s) => (
             <div key={s.key} className="flex items-center gap-1.5 justify-between">
               <span className="flex items-center gap-1.5 text-sage">
-                <span className="inline-block w-2.5 h-0.5 rounded-full" style={{ background: s.color }} />
+                <span className="inline-block w-2.5 h-0.5 rounded-full" style={{ background: s.pointColors?.[hoverIdx] ?? s.color }} />
                 {s.label}
               </span>
               <span className="font-semibold text-ink ml-3">{formatValue(s.values[hoverIdx])}</span>
             </div>
           ))}
+          {referenceLine && (
+            <div className="flex items-center gap-1.5 justify-between mt-1 pt-1 border-t border-ink/10">
+              <span className="flex items-center gap-1.5 text-sage">
+                <span className="inline-block w-2.5 h-0.5 rounded-full border-t border-dashed border-sage" style={{ background: 'transparent' }} />
+                {referenceLine.label}
+              </span>
+              <span className="font-semibold text-ink ml-3">{formatValue(referenceLine.value)}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
