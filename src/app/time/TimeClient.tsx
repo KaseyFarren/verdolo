@@ -771,7 +771,10 @@ export default function TimeClient({
         <div className="text-xs font-semibold uppercase tracking-wide text-sage">Entries</div>
         <div className="flex items-center gap-3">
           {isAdmin && (
-            <button onClick={() => setShowClearOld((v) => !v)} className="text-xs text-sage hover:text-ink transition-colors">
+            <button
+              onClick={() => setShowClearOld((v) => !v)}
+              className={showClearOld ? 'text-xs text-sage hover:text-ink transition-colors' : 'text-xs text-red-600 hover:text-red-700 transition-colors'}
+            >
               {showClearOld ? 'Cancel' : 'Clear old entries'}
             </button>
           )}

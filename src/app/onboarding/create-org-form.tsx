@@ -20,7 +20,7 @@ export default function CreateOrgForm() {
     const { error } = await supabase.rpc('create_org', { org_name: orgName })
 
     if (error) {
-      setError(error.message)
+      setError('Something went wrong creating your agency. Please try again.')
       setLoading(false)
       return
     }

@@ -6,6 +6,9 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import CustomSelect from '@/components/ui/CustomSelect'
+import PeriodSelector from '@/components/ui/PeriodSelector'
+import { periodBounds, type PeriodValue } from '@/lib/period'
 import {
   AVATAR_COLORS,
   PLATFORMS,
@@ -45,9 +48,9 @@ type Client = {
   contact_domain: string | null
   primary_contact_id: string | null
 }
-type Note = { id: string; client_id: string; text: string; created_at: string }
-type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string }
-type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string }
+type Note = { id: string; client_id: string; text: string; created_at: string; author_id: string | null }
+type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string; assigned_to: string | null }
+type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string; generated_by: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type Invoice = {
   id: string
@@ -131,6 +134,10 @@ export default function ClientsClient({
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
   const [noteInput, setNoteInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState('')
+  const [timelineType, setTimelineType] = useState<'all' | 'note' | 'task' | 'message'>('all')
+  const [timelinePeriod, setTimelinePeriod] = useState<PeriodValue>({ period: 'all_time' })
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices)
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [invoiceLineItems, setInvoiceLineItems] = useState<LineItemDraft[]>([])
@@ -226,6 +233,13 @@ export default function ClientsClient({
     setNoteInput('')
   }
   async function deleteNote(id: string) {
+    const ok = await confirm({
+      title: 'Delete this note?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     await supabase.from('client_notes').delete().eq('id', id)
     setNotes((prev) => prev.filter((n) => n.id !== id))
   }
@@ -269,16 +283,23 @@ export default function ClientsClient({
     const clientNotes = notes.filter((n) => n.client_id === selected.id)
     const clientTasks = completedTasks.filter((t) => t.client_id === selected.id)
     const clientMessages = aiMessages.filter((m) => m.client_id === selected.id && m.message)
-    const timeline = [
+    const fullTimeline = [
       ...clientNotes.map((n) => ({ type: 'note' as const, ts: n.created_at, data: n })),
       ...clientTasks.map((t) => ({ type: 'task' as const, ts: t.completed_at, data: t })),
       ...clientMessages.map((m) => ({ type: 'message' as const, ts: m.created_at, data: m })),
     ].sort((a, b) => b.ts.localeCompare(a.ts))
+    const { start: periodStart, end: periodEnd } = periodBounds(timelinePeriod)
+    const timeline = fullTimeline.filter((item) => {
+      if (timelineType !== 'all' && item.type !== timelineType) return false
+      if (periodStart && item.ts < periodStart) return false
+      if (periodEnd && item.ts >= periodEnd) return false
+      return true
+    })
 
     return (
       <div>
-        <button className="text-sm text-sage mb-5" onClick={() => setSelectedId(null)}>
-          ← Clients
+        <button className="flex items-center gap-1 text-sm font-medium text-sage hover:text-ink transition-colors mb-5" onClick={() => setSelectedId(null)}>
+          <span aria-hidden>←</span> Clients
         </button>
 
         {editing ? (
@@ -481,7 +502,23 @@ export default function ClientsClient({
             Add
           </button>
         </div>
-        {timeline.length === 0 && <div className="text-sm text-sage py-3">No activity yet.</div>}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <CustomSelect
+            value={timelineType}
+            onChange={(v) => setTimelineType(v as 'all' | 'note' | 'task' | 'message')}
+            options={[
+              { value: 'all', label: 'All activity' },
+              { value: 'note', label: 'Notes' },
+              { value: 'task', label: 'Completed tasks' },
+              { value: 'message', label: 'AI messages' },
+            ]}
+            className="w-40"
+          />
+          <PeriodSelector value={timelinePeriod} onChange={setTimelinePeriod} layoutId="client-timeline-period" />
+        </div>
+        {timeline.length === 0 && (
+          <div className="text-sm text-sage py-3">{fullTimeline.length === 0 ? 'No activity yet.' : 'No activity matches these filters.'}</div>
+        )}
         <div className="flex flex-col">
           {timeline.map((item, idx) => (
             <div key={idx} className="flex gap-3 pb-4">
@@ -496,7 +533,10 @@ export default function ClientsClient({
                   <div>
                     <div className="text-sm whitespace-pre-wrap">{item.data.text}</div>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-sage">{formatNoteTime(item.data.created_at)}</span>
+                      <span className="text-xs text-sage">
+                        {formatNoteTime(item.data.created_at)}
+                        {item.data.author_id && ` · ${memberName(memberById(item.data.author_id))}`}
+                      </span>
                       <button className="text-xs text-red-600" onClick={() => deleteNote(item.data.id)}>
                         ✕
                       </button>
@@ -505,7 +545,10 @@ export default function ClientsClient({
                 )}
                 {item.type === 'message' && (
                   <div className="rounded-md bg-white px-3 py-2">
-                    <div className="text-xs text-sage mb-1 font-semibold">Message sent · {formatDate(item.data.created_at.slice(0, 10))}</div>
+                    <div className="text-xs text-sage mb-1 font-semibold">
+                      Message sent · {formatDate(item.data.created_at.slice(0, 10))}
+                      {item.data.generated_by && ` · ${memberName(memberById(item.data.generated_by))}`}
+                    </div>
                     <div className="text-sm">{item.data.message}</div>
                   </div>
                 )}
@@ -515,7 +558,11 @@ export default function ClientsClient({
                       <span className="text-green mr-1">✓</span>
                       {item.data.title}
                     </div>
-                    <div className="text-xs text-sage mt-0.5">{formatNoteTime(item.data.completed_at)}</div>
+                    <div className="text-xs text-sage mt-0.5">
+                      {formatNoteTime(item.data.completed_at)}
+                      {' · '}
+                      {item.data.assigned_to ? `Assigned to ${memberName(memberById(item.data.assigned_to))}` : 'Unassigned'}
+                    </div>
                   </div>
                 )}
               </div>
@@ -541,8 +588,36 @@ export default function ClientsClient({
 
       {canEdit && showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} />}
 
+      {clients.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <input
+            className="flex-1 min-w-[10rem] rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm"
+            placeholder="Search clients…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <CustomSelect
+            value={stageFilter}
+            onChange={setStageFilter}
+            options={[{ value: '', label: 'All stages' }, ...STAGES.map((s) => ({ value: s, label: s }))]}
+            className="w-36"
+          />
+        </div>
+      )}
+
       {clients.length === 0 && !showAdd && <div className="text-sm text-sage py-6">No clients yet.</div>}
-      {clients.map((c, i) => {
+      {(() => {
+        const q = search.trim().toLowerCase()
+        const filteredClients = clients.filter((c) => {
+          if (stageFilter && getStage(c) !== stageFilter) return false
+          if (q && !c.name.toLowerCase().includes(q) && !(c.business ?? '').toLowerCase().includes(q)) return false
+          return true
+        })
+        if (filteredClients.length === 0 && clients.length > 0) {
+          return <div className="text-sm text-sage py-6">No clients match your search.</div>
+        }
+        return filteredClients.map((c) => {
+        const i = clients.indexOf(c)
         const stage = getStage(c)
         const isChurned = stage === 'Churned'
         const hs = isChurned ? 'grey' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
@@ -570,7 +645,8 @@ export default function ClientsClient({
             <span className="text-sage/70">›</span>
           </div>
         )
-      })}
+        })
+      })()}
     </div>
   )
 }
@@ -691,7 +767,9 @@ function ClientForm({
 }) {
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
-      <div className="text-sm font-semibold mb-3">{title}</div>
+      <div className="text-sm font-semibold mb-4">{title}</div>
+
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Basics</div>
       <label className="block text-xs text-sage mb-1">Name *</label>
       <input
         className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
@@ -723,6 +801,23 @@ function ClientForm({
           onChange={(e) => setForm((f) => ({ ...f, service: e.target.value }))}
         />
       </div>
+      <label className="block text-xs text-sage mb-1">Contact email</label>
+      <input
+        type="email"
+        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        placeholder="jane@acme.com"
+        value={(form.contact_email as string) || ''}
+        onChange={(e) => setForm((f) => ({ ...f, contact_email: e.target.value }))}
+      />
+      <label className="block text-xs text-sage mb-1">Contact domain</label>
+      <input
+        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-4"
+        placeholder="acme.com"
+        value={(form.contact_domain as string) || ''}
+        onChange={(e) => setForm((f) => ({ ...f, contact_domain: e.target.value }))}
+      />
+
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">AI check-in config</div>
       <label className="block text-xs text-sage mb-1">Daily message context</label>
       <textarea
         className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
@@ -749,7 +844,7 @@ function ClientForm({
       />
       <label className="block text-xs text-sage mb-1">Check-in cadence</label>
       <select
-        className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-3"
+        className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-4"
         value={(form.cadence_days as number) || 7}
         onChange={(e) => setForm((f) => ({ ...f, cadence_days: Number(e.target.value) }))}
       >
@@ -759,6 +854,8 @@ function ClientForm({
         <option value={14}>Bi-weekly</option>
         <option value={30}>Monthly</option>
       </select>
+
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">Pipeline &amp; billing</div>
       <label className="block text-xs text-sage mb-1">Pipeline stage</label>
       <div className="flex gap-1.5 mb-3 flex-wrap">
         {STAGES.map((st) => (
@@ -776,7 +873,7 @@ function ClientForm({
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-3">
         <div>
           <label className="block text-xs text-sage mb-1">Monthly retainer ($)</label>
           <input
@@ -796,21 +893,6 @@ function ClientForm({
           />
         </div>
       </div>
-      <label className="block text-xs text-sage mb-1">Contact email</label>
-      <input
-        type="email"
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
-        placeholder="jane@acme.com"
-        value={(form.contact_email as string) || ''}
-        onChange={(e) => setForm((f) => ({ ...f, contact_email: e.target.value }))}
-      />
-      <label className="block text-xs text-sage mb-1">Contact domain</label>
-      <input
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
-        placeholder="acme.com"
-        value={(form.contact_domain as string) || ''}
-        onChange={(e) => setForm((f) => ({ ...f, contact_domain: e.target.value }))}
-      />
       <label className="block text-xs text-sage mb-1">Owner</label>
       <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact — check-ins assign to them, and replies default to their connected mailbox</div>
       <select
@@ -825,7 +907,8 @@ function ClientForm({
           </option>
         ))}
       </select>
-      <div className="flex gap-2">
+
+      <div className="flex gap-2 pt-1">
         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
           Cancel
         </button>

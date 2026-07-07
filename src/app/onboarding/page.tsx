@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import Logo from '@/components/Logo'
 import CreateOrgForm from './create-org-form'
 
 export default async function OnboardingPage() {
@@ -20,8 +21,11 @@ export default async function OnboardingPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
-      <h1 className="text-xl font-semibold">Set up your agency</h1>
-      <p className="text-sm text-sage">You&apos;re not part of an org yet — create one to get started.</p>
+      <div className="mb-2 flex justify-center">
+        <Logo size={24} />
+      </div>
+      <h1 className="text-xl font-semibold text-center">Set up your agency</h1>
+      <p className="text-sm text-sage text-center">You&apos;re not part of an org yet — create one to get started.</p>
       <CreateOrgForm />
     </main>
   )

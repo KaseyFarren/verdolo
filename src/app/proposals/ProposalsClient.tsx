@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import CustomSelect from '@/components/ui/CustomSelect'
 import { centsToDollars, dollarsToCents, formatDate } from '@/lib/agency'
 
 type Status = 'draft' | 'sent' | 'signed' | 'declined'
@@ -48,6 +49,8 @@ export default function ProposalsClient({
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<Status | ''>('')
+  const [clientFilter, setClientFilter] = useState('')
 
   function clientName(id: string) {
     return clients.find((c) => c.id === id)?.name ?? 'Unknown client'
@@ -95,10 +98,13 @@ export default function ProposalsClient({
     toast.success('Proposal deleted')
   }
 
-  const sorted = [...proposals].sort((a, b) => {
-    const order: Record<Status, number> = { draft: 0, sent: 1, signed: 2, declined: 3 }
-    return order[a.status] - order[b.status] || b.created_at.localeCompare(a.created_at)
-  })
+  const sorted = [...proposals]
+    .filter((p) => !statusFilter || p.status === statusFilter)
+    .filter((p) => !clientFilter || p.client_id === clientFilter)
+    .sort((a, b) => {
+      const order: Record<Status, number> = { draft: 0, sent: 1, signed: 2, declined: 3 }
+      return order[a.status] - order[b.status] || b.created_at.localeCompare(a.created_at)
+    })
 
   return (
     <div>
@@ -159,8 +165,25 @@ export default function ProposalsClient({
         </div>
       )}
 
+      {proposals.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <CustomSelect
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as Status | '')}
+            options={[{ value: '', label: 'All statuses' }, ...(Object.keys(STATUS_STYLE) as Status[]).map((s) => ({ value: s, label: STATUS_STYLE[s].label }))]}
+            className="w-36"
+          />
+          <CustomSelect
+            value={clientFilter}
+            onChange={setClientFilter}
+            options={[{ value: '', label: 'All clients' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+            className="w-40"
+          />
+        </div>
+      )}
+
       {sorted.length === 0 ? (
-        <div className="text-sm text-sage py-8 text-center">No proposals yet.</div>
+        <div className="text-sm text-sage py-8 text-center">{proposals.length === 0 ? 'No proposals yet.' : 'No proposals match these filters.'}</div>
       ) : (
         <div className="space-y-3">
           {sorted.map((p) => {

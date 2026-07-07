@@ -32,6 +32,7 @@ export default function MembersList({
   const confirm = useConfirm()
   const [rows, setRows] = useState(members)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   // router.refresh() after inviting gives a new `members` array, but useState's initializer
   // only runs on mount — without this, a fresh invite won't show up until a manual reload.
@@ -51,7 +52,10 @@ export default function MembersList({
     const trimmed = title.trim() || null
     if (trimmed === m.title) return
     const { data } = await supabase.from('org_members').update({ title: trimmed }).eq('id', m.id).select().single()
-    if (data) setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+    if (data) {
+      setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+      toast.success('Title updated')
+    }
   }
 
   async function removeMember(m: Member) {
@@ -71,9 +75,22 @@ export default function MembersList({
     setRemovingId(null)
   }
 
+  const q = search.trim().toLowerCase()
+  const filteredRows = rows.filter((m) => !q || memberName(m).toLowerCase().includes(q) || (m.invited_email ?? '').toLowerCase().includes(q))
+
   return (
-    <ul className="divide-y divide-white/10 rounded-2xl border border-ink/10 overflow-hidden">
-      {rows.map((m) => {
+    <div>
+      {rows.length > 4 && (
+        <input
+          className="w-full max-w-xs rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm mb-3"
+          placeholder="Search team…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
+      <ul className="divide-y divide-white/10 rounded-2xl border border-ink/10 overflow-hidden">
+      {filteredRows.length === 0 && <li className="px-3 py-4 text-sm text-sage">No teammates match your search.</li>}
+      {filteredRows.map((m) => {
         const isSelf = m.user_id === currentUserId
         const canTouch = canManage && !isSelf && (m.role !== 'owner' || canManageOwners)
         return (
@@ -132,6 +149,7 @@ export default function MembersList({
           </li>
         )
       })}
-    </ul>
+      </ul>
+    </div>
   )
 }

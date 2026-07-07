@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { formatDate, todayKey, memberName } from '@/lib/agency'
 import DatePicker from '@/components/ui/DatePicker'
+import CustomSelect from '@/components/ui/CustomSelect'
 import type { ReportRange } from './page'
 
 type Client = { id: string; name: string; retainer_cents: number | null }
@@ -93,6 +94,18 @@ export default function ReportsClient({
   const [backfillDate, setBackfillDate] = useState(todayKey())
   const [loadingBackfill, setLoadingBackfill] = useState(false)
   const [backfillResult, setBackfillResult] = useState<string | null>(null)
+  const [showBackfill, setShowBackfill] = useState(false)
+  const [libraryTypeFilter, setLibraryTypeFilter] = useState<'all' | 'week' | 'month'>('all')
+  const [justGeneratedKey, setJustGeneratedKey] = useState<string | null>(null)
+
+  function highlightReport(key: string) {
+    setExpanded((prev) => new Set(prev).add(key))
+    setJustGeneratedKey(key)
+    setTimeout(() => {
+      document.getElementById(`report-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    setTimeout(() => setJustGeneratedKey((k) => (k === key ? null : k)), 4000)
+  }
 
   async function generateRecap() {
     setLoadingRecap(true)
@@ -104,6 +117,7 @@ export default function ReportsClient({
       })
       const body = await res.json()
       setRecap(res.ok ? body.recap : body.error || 'Failed to generate.')
+      if (res.ok) highlightReport(`week:${weekAnchor}`)
       router.refresh()
     } finally {
       setLoadingRecap(false)
@@ -124,7 +138,8 @@ export default function ReportsClient({
       const body = await res.json()
       if (res.ok) {
         setBackfillResult(`Generated for ${backfillType === 'week' ? `week of ${formatDate(body.periodStart)}` : monthLabel(body.periodStart)}.`)
-        setExpanded((prev) => new Set(prev).add(`${body.periodType}:${body.periodStart}`))
+        setLibraryTypeFilter('all')
+        highlightReport(`${body.periodType}:${body.periodStart}`)
         router.refresh()
       } else {
         setBackfillResult(body.error || 'Failed to generate.')
@@ -255,17 +270,12 @@ export default function ReportsClient({
       {view === 'overview' && (
         <>
           <div className="mb-6">
-            <select
+            <CustomSelect
               value={range}
-              onChange={(e) => onRangeChange(e.target.value)}
-              className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm text-ink shadow-md"
-            >
-              {(Object.keys(RANGE_LABELS) as ReportRange[]).map((r) => (
-                <option key={r} value={r}>
-                  {RANGE_LABELS[r]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => onRangeChange(v)}
+              options={(Object.keys(RANGE_LABELS) as ReportRange[]).map((r) => ({ value: r, label: RANGE_LABELS[r] }))}
+              className="w-40"
+            />
           </div>
 
           <div className="mb-8">
@@ -286,62 +296,9 @@ export default function ReportsClient({
                 onClick={generateRecap}
                 disabled={loadingRecap || !hasApiKey}
               >
-                {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'AI generation is not available right now'}
+                {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'AI features aren’t configured on this deployment'}
               </button>
             )}
-          </div>
-
-          <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Generate a report for a past period</div>
-            <div className="rounded-xl bg-white shadow-md p-4">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <div className="flex gap-1 bg-sand/60 rounded-full p-1 w-fit">
-                  {(['week', 'month'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setBackfillType(t)}
-                      className={`relative rounded-full px-3 py-1.5 text-sm capitalize transition-colors ${
-                        backfillType === t ? 'font-medium text-ink' : 'text-sage hover:text-ink'
-                      }`}
-                    >
-                      {backfillType === t && (
-                        <motion.div
-                          layoutId="backfill-type-active"
-                          className="absolute inset-0 rounded-full bg-white"
-                          style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                        />
-                      )}
-                      <span className="relative">{t}</span>
-                    </button>
-                  ))}
-                </div>
-                {backfillType === 'week' ? (
-                  <DatePicker value={backfillDate} onChange={setBackfillDate} placeholder="Pick a date in that week…" className="w-44" />
-                ) : (
-                  <input
-                    type="month"
-                    value={backfillDate.slice(0, 7)}
-                    onChange={(e) => e.target.value && setBackfillDate(`${e.target.value}-01`)}
-                    className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm"
-                  />
-                )}
-                <button
-                  className="rounded-full bg-accent text-white shadow-md px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
-                  onClick={generateBackfill}
-                  disabled={loadingBackfill || !hasApiKey}
-                >
-                  {loadingBackfill ? 'Generating…' : 'Generate'}
-                </button>
-              </div>
-              <div className="text-xs text-sage">
-                {backfillType === 'week'
-                  ? 'Pick any date — it snaps to that date’s Monday–Sunday week.'
-                  : 'Pick any month to generate or regenerate its recap.'}
-              </div>
-              {backfillResult && <div className="text-xs text-ink mt-2">{backfillResult}</div>}
-            </div>
           </div>
 
           <div className="mb-8">
@@ -396,29 +353,119 @@ export default function ReportsClient({
           </div>
 
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Report library</div>
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Report library</div>
+              <div className="flex items-center gap-2">
+                {reports.length > 0 && (
+                  <CustomSelect
+                    value={libraryTypeFilter}
+                    onChange={(v) => setLibraryTypeFilter(v as 'all' | 'week' | 'month')}
+                    options={[
+                      { value: 'all', label: 'All' },
+                      { value: 'week', label: 'Weekly' },
+                      { value: 'month', label: 'Monthly' },
+                    ]}
+                    className="w-28"
+                  />
+                )}
+                <button
+                  type="button"
+                  className="text-xs text-sage hover:text-ink transition-colors whitespace-nowrap"
+                  onClick={() => setShowBackfill((v) => !v)}
+                >
+                  {showBackfill ? 'Cancel' : '+ Generate for a past period'}
+                </button>
+              </div>
+            </div>
+
+            {showBackfill && (
+              <div className="rounded-xl bg-white shadow-md p-4 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <div className="flex gap-1 bg-sand/60 rounded-full p-1 w-fit">
+                    {(['week', 'month'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setBackfillType(t)}
+                        className={`relative rounded-full px-3 py-1.5 text-sm capitalize transition-colors ${
+                          backfillType === t ? 'font-medium text-ink' : 'text-sage hover:text-ink'
+                        }`}
+                      >
+                        {backfillType === t && (
+                          <motion.div
+                            layoutId="backfill-type-active"
+                            className="absolute inset-0 rounded-full bg-white"
+                            style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                          />
+                        )}
+                        <span className="relative">{t}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {backfillType === 'week' ? (
+                    <DatePicker value={backfillDate} onChange={setBackfillDate} placeholder="Pick a date in that week…" className="w-44" />
+                  ) : (
+                    <input
+                      type="month"
+                      value={backfillDate.slice(0, 7)}
+                      onChange={(e) => e.target.value && setBackfillDate(`${e.target.value}-01`)}
+                      className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm"
+                    />
+                  )}
+                  <button
+                    className="rounded-full bg-accent text-white shadow-md px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
+                    onClick={generateBackfill}
+                    disabled={loadingBackfill || !hasApiKey}
+                  >
+                    {loadingBackfill ? 'Generating…' : 'Generate'}
+                  </button>
+                </div>
+                <div className="text-xs text-sage">
+                  {!hasApiKey
+                    ? 'AI features aren’t configured on this deployment.'
+                    : backfillType === 'week'
+                      ? 'Pick any date — it snaps to that date’s Monday–Sunday week.'
+                      : 'Pick any month to generate or regenerate its recap.'}
+                </div>
+                {backfillResult && <div className="text-xs text-ink mt-2">{backfillResult}</div>}
+              </div>
+            )}
+
             {reports.length === 0 ? (
               <div className="text-sm text-sage py-3">No past reports yet.</div>
             ) : (
               <div className="space-y-2">
-                {reports.map((r) => {
-                  const key = `${r.period_type}:${r.period_start}`
-                  const isOpen = expanded.has(key)
-                  return (
-                    <div key={key} className="rounded-2xl bg-white shadow-md overflow-hidden">
-                      <button
-                        className="flex w-full justify-between items-center text-left p-4 hover:bg-sand/40 transition-colors"
-                        onClick={() => toggleExpanded(key)}
+                {reports
+                  .filter((r) => libraryTypeFilter === 'all' || r.period_type === libraryTypeFilter)
+                  .map((r) => {
+                    const key = `${r.period_type}:${r.period_start}`
+                    const isOpen = expanded.has(key)
+                    const isJustGenerated = justGeneratedKey === key
+                    return (
+                      <div
+                        key={key}
+                        id={`report-${key}`}
+                        className={`rounded-2xl bg-white shadow-md overflow-hidden transition-shadow ${
+                          isJustGenerated ? 'ring-2 ring-accent' : ''
+                        }`}
                       >
-                        <span className="text-xs font-semibold text-sage">
-                          {reportLabel(r)} <span className="text-sage/50 capitalize">· {r.period_type}</span>
-                        </span>
-                        <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>
-                      </button>
-                      {isOpen && <div className="text-sm leading-relaxed text-ink px-4 pb-4">{r.content}</div>}
-                    </div>
-                  )
-                })}
+                        <button
+                          className="flex w-full justify-between items-center text-left p-4 hover:bg-sand/40 transition-colors"
+                          onClick={() => toggleExpanded(key)}
+                        >
+                          <span className="text-xs font-semibold text-sage flex items-center gap-2">
+                            {reportLabel(r)} <span className="text-sage/50 capitalize">· {r.period_type}</span>
+                            {isJustGenerated && (
+                              <span className="rounded-full bg-accent/10 text-accent px-2 py-0.5 text-[10px] font-semibold normal-case">Just generated</span>
+                            )}
+                          </span>
+                          <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>
+                        </button>
+                        {isOpen && <div className="text-sm leading-relaxed text-ink px-4 pb-4">{r.content}</div>}
+                      </div>
+                    )
+                  })}
               </div>
             )}
           </div>
@@ -467,8 +514,9 @@ export default function ReportsClient({
                             className="text-xs text-sage hover:text-ink underline disabled:opacity-50"
                             onClick={() => explainScopeCreep(r.client.id)}
                             disabled={loadingNote === r.client.id || !hasApiKey}
+                            title={hasApiKey ? undefined : 'AI features aren’t configured on this deployment'}
                           >
-                            {loadingNote === r.client.id ? 'Thinking…' : '✨ Explain with AI'}
+                            {loadingNote === r.client.id ? 'Thinking…' : hasApiKey ? '✨ Explain with AI' : 'AI unavailable'}
                           </button>
                         )}
                       </div>
