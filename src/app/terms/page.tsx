@@ -22,8 +22,8 @@ export default function TermsPage() {
       <p className="mb-6">
         Verdolo is a multi-user platform for running a client services agency: a client CRM, task and time
         tracking, calendar, and AI-assisted client messaging. Some features connect to third-party services on your
-        behalf, including Anthropic (to generate AI messages using an API key you provide) and Stripe (to process
-        subscription payments and, optionally, your own client billing).
+        behalf, including Anthropic (to generate AI messages, included with your plan and subject to monthly usage
+        limits) and Stripe (to process subscription payments and, optionally, your own client billing).
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">2. Accounts and organizations</h2>

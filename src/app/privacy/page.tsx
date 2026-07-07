@@ -29,18 +29,17 @@ export default function PrivacyPage() {
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">2. How we use it</h2>
       <p className="mb-6">
         We use this information to operate the Service: authenticate you, sync and display your organization&apos;s
-        data, generate AI client messages (via Anthropic, using an API key your organization provides — your prompts
-        and client context are sent to Anthropic to generate that message), process subscription billing through
-        Stripe, and provide customer support.
+        data, generate AI client messages (via Anthropic — your prompts and client context are sent to Anthropic to
+        generate that message, subject to a monthly usage limit included with your plan), process subscription
+        billing through Stripe, and provide customer support.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">3. Who we share it with</h2>
       <p className="mb-6">
         We don&apos;t sell your data. We share it only with the service providers that power Verdolo, each acting on
         our instructions to provide the Service: Supabase (database, authentication, file storage), Vercel (hosting),
-        Anthropic (AI message generation, only when your organization supplies an API key), and Stripe (subscription
-        billing). Other members of your organization can see Customer Data according to their role&apos;s permissions,
-        as described in-app.
+        Anthropic (AI message generation), and Stripe (subscription billing). Other members of your organization can
+        see Customer Data according to their role&apos;s permissions, as described in-app.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">4. Data retention and deletion</h2>
@@ -53,9 +52,8 @@ export default function PrivacyPage() {
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">5. Security</h2>
       <p className="mb-6">
         Data is stored with row-level security so one organization cannot access another&apos;s data. Sensitive secrets
-        (your Anthropic API key, OAuth tokens) are never exposed to the browser and are only readable by trusted
-        server-side code. No method of transmission or storage is 100% secure, and we can&apos;t guarantee absolute
-        security.
+        are never exposed to the browser and are only readable by trusted server-side code. No method of
+        transmission or storage is 100% secure, and we can&apos;t guarantee absolute security.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">6. Your rights</h2>
