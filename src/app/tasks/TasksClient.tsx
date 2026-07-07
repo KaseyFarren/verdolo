@@ -135,7 +135,7 @@ export default function TasksClient({
     const durationSeconds = Math.round(hours * 3600)
     const endedAt = new Date()
     const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000)
-    await supabase.from('time_entries').insert({
+    const { error } = await supabase.from('time_entries').insert({
       org_id: orgId,
       client_id: task.client_id,
       task_id: task.id,
@@ -145,6 +145,8 @@ export default function TasksClient({
       duration_seconds: durationSeconds,
       billable: true,
     })
+    if (error) toast.error('Failed to log time')
+    else toast.success(`${hours}h logged`)
   }
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
