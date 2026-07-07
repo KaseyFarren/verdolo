@@ -25,7 +25,30 @@ function rangeBounds(range: ReportRange) {
   return { start: thisWeekStart, end: todayKey(nextWeek) }
 }
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+function monthKeyBounds(y: number, m: number) {
+  // m is 1-indexed
+  const start = `${y}-${String(m).padStart(2, '0')}-01`
+  const next = new Date(y, m, 1)
+  const end = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`
+  return { start, end }
+}
+
+// Profitability's date filter — the picked month plus the 5 before it, so the trend chart
+// always ends on whatever month the per-client breakdown/bar chart below it is showing.
+function trendWindow(pMonth: string) {
+  const [y, m] = pMonth.split('-').map(Number)
+  const monthKeys: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(y, m - 1 - i, 1)
+    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  const [firstY, firstM] = monthKeys[0].split('-').map(Number)
+  const { start } = monthKeyBounds(firstY, firstM)
+  const { end } = monthKeyBounds(y, m)
+  return { start, end, monthKeys }
+}
+
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; pMonth?: string }> }) {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
 
   // Reports is admin/owner only — members' tasks/time_entries RLS only exposes their own rows,
@@ -33,16 +56,21 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // reasoning as the Team/Revenue gates.
   if (!isAdminRole(role)) redirect('/dashboard')
 
-  const { range: rangeParam } = await searchParams
+  const { range: rangeParam, pMonth: pMonthParam } = await searchParams
   const range: ReportRange = rangeParam === 'last_week' || rangeParam === 'this_month' ? rangeParam : 'this_week'
   const { start, end } = rangeBounds(range)
 
-  // Profitability and capacity are always calendar-month / calendar-week, independent of the
-  // "by client" range picker above — a retainer is a monthly figure and "who's overloaded"
-  // means this week, regardless of what range the user has the activity table set to.
-  const { start: monthStart, end: monthEnd } = rangeBounds('this_month')
+  // Capacity is always calendar-week, independent of the "by client" range picker above —
+  // "who's overloaded" means this week regardless of what range the activity table is set to.
   const weekAnchor = getWeekAnchor()
   const weekEnd = todayKey(new Date(new Date(weekAnchor).getTime() + 7 * 86400000))
+
+  // Profitability has its own month picker (defaults to the current month) — the trend chart
+  // covers that month plus the 5 before it, so monthTimeEntries/monthPaidInvoices below span
+  // that whole 6-month window rather than just "this month".
+  const now = new Date()
+  const pMonth = /^\d{4}-\d{2}$/.test(pMonthParam ?? '') ? (pMonthParam as string) : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { start: trendStart, end: trendEnd, monthKeys } = trendWindow(pMonth)
 
   const [
     { data: clients },
@@ -82,12 +110,18 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .lt('started_at', weekEnd),
     supabase
       .from('time_entries')
-      .select('client_id, duration_seconds')
+      .select('client_id, duration_seconds, started_at')
       .eq('org_id', orgId)
       .not('duration_seconds', 'is', null)
-      .gte('started_at', monthStart)
-      .lt('started_at', monthEnd),
-    supabase.from('invoices').select('client_id, amount_cents').eq('org_id', orgId).eq('status', 'paid').gte('paid_at', monthStart).lt('paid_at', monthEnd),
+      .gte('started_at', trendStart)
+      .lt('started_at', trendEnd),
+    supabase
+      .from('invoices')
+      .select('client_id, amount_cents, paid_at')
+      .eq('org_id', orgId)
+      .eq('status', 'paid')
+      .gte('paid_at', trendStart)
+      .lt('paid_at', trendEnd),
   ])
 
   return (
@@ -107,6 +141,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         monthTimeEntries={monthTimeEntries ?? []}
         monthPaidInvoices={monthPaidInvoices ?? []}
         hourlyCostCents={org?.settings?.hourly_cost_cents ?? 0}
+        pMonth={pMonth}
+        trendMonthKeys={monthKeys}
       />
     </AppShell>
   )

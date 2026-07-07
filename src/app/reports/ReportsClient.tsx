@@ -6,6 +6,8 @@ import { motion } from 'motion/react'
 import { formatDate, todayKey, memberName } from '@/lib/agency'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
+import TrendLineChart from '@/components/charts/TrendLineChart'
+import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 
 type Client = { id: string; name: string; retainer_cents: number | null }
@@ -13,8 +15,8 @@ type Task = { id: string; client_id: string | null; assigned_to: string | null; 
 type OpenTask = { id: string; assigned_to: string | null }
 type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: number | null }
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
-type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null }
-type PaidInvoice = { client_id: string; amount_cents: number }
+type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null; started_at: string }
+type PaidInvoice = { client_id: string; amount_cents: number; paid_at: string }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type Report = { period_type: 'week' | 'month'; period_start: string; content: string }
 
@@ -66,6 +68,8 @@ export default function ReportsClient({
   monthTimeEntries,
   monthPaidInvoices,
   hourlyCostCents,
+  pMonth,
+  trendMonthKeys,
 }: {
   orgId: string
   range: ReportRange
@@ -81,6 +85,8 @@ export default function ReportsClient({
   monthTimeEntries: MonthTimeEntry[]
   monthPaidInvoices: PaidInvoice[]
   hourlyCostCents: number
+  pMonth: string
+  trendMonthKeys: string[]
 }) {
   const router = useRouter()
   const [view, setView] = useState<View>('overview')
@@ -209,11 +215,15 @@ export default function ReportsClient({
       .sort((a, b) => b.taskCount + b.totalSeconds / 3600 - (a.taskCount + a.totalSeconds / 3600))
   }, [clients, tasks, entries, members])
 
-  const profitability = useMemo(() => {
+  // Per-client revenue/cost/margin for one calendar month — shared by the selected-month
+  // breakdown below and by monthlyTrend (run once per month in the trailing window).
+  function profitabilityForMonth(monthKey: string) {
+    const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
+    const monthInvoices = monthPaidInvoices.filter((i) => i.paid_at.slice(0, 7) === monthKey)
     return clients
       .map((c) => {
-        const hours = monthTimeEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
-        const paidCents = monthPaidInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
+        const hours = monthEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
+        const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const revenueCents = paidCents || c.retainer_cents || 0
         const costCents = Math.round(hours * hourlyCostCents)
         const marginCents = revenueCents - costCents
@@ -221,7 +231,28 @@ export default function ReportsClient({
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
       .sort((a, b) => a.marginCents - b.marginCents)
-  }, [clients, monthTimeEntries, monthPaidInvoices, hourlyCostCents])
+  }
+
+  const profitability = useMemo(
+    () => profitabilityForMonth(pMonth),
+    [clients, monthTimeEntries, monthPaidInvoices, hourlyCostCents, pMonth],
+  )
+
+  const monthlyTrend = useMemo(() => {
+    return trendMonthKeys.map((monthKey) => {
+      const perClient = profitabilityForMonth(monthKey)
+      return {
+        month: monthKey,
+        revenueCents: perClient.reduce((s, r) => s + r.revenueCents, 0),
+        costCents: perClient.reduce((s, r) => s + r.costCents, 0),
+        marginCents: perClient.reduce((s, r) => s + r.marginCents, 0),
+      }
+    })
+  }, [clients, monthTimeEntries, monthPaidInvoices, hourlyCostCents, trendMonthKeys])
+
+  function onMonthChange(next: string) {
+    router.push(`/reports?pMonth=${next}`)
+  }
 
   const capacity = useMemo(() => {
     return members
@@ -474,14 +505,55 @@ export default function ReportsClient({
 
       {view === 'profitability' && (
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Margin this month</div>
+          <div className="mb-6">
+            <input
+              type="month"
+              value={pMonth}
+              onChange={(e) => e.target.value && onMonthChange(e.target.value)}
+              className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm shadow-md"
+            />
+          </div>
+
           {hourlyCostCents === 0 && (
             <div className="text-sm text-sage bg-white rounded-xl shadow-md p-3 mb-4">
               Set an hourly cost rate in Settings → General to see cost and margin figures (currently $0/hr, so margin = revenue).
             </div>
           )}
+
+          <div className="mb-8">
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Revenue vs. cost · last 6 months</div>
+            {monthlyTrend.every((m) => m.revenueCents === 0 && m.costCents === 0) ? (
+              <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
+            ) : (
+              <div className="rounded-2xl bg-white shadow-md p-4">
+                <TrendLineChart
+                  months={trendMonthKeys}
+                  formatValue={(cents) => `$${centsToDollars(cents)}`}
+                  series={[
+                    { key: 'revenue', label: 'Revenue', color: '#dd6b2c', values: monthlyTrend.map((m) => m.revenueCents) },
+                    { key: 'cost', label: 'Cost', color: '#4a3aa7', values: monthlyTrend.map((m) => m.costCents) },
+                    { key: 'margin', label: 'Margin', color: '#1f9d68', values: monthlyTrend.map((m) => m.marginCents) },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+
+          {profitability.length > 0 && (
+            <div className="mb-8">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Margin by client · {monthLabel(`${pMonth}-01`)}</div>
+              <div className="rounded-2xl bg-white shadow-md p-4">
+                <DivergingBarChart
+                  items={profitability.map((r) => ({ id: r.client.id, label: r.client.name, valueCents: r.marginCents }))}
+                  formatValue={(cents) => `$${centsToDollars(cents)}`}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Margin by client, in detail · {monthLabel(`${pMonth}-01`)}</div>
           {profitability.length === 0 ? (
-            <div className="text-sm text-sage py-3">No revenue or logged time this month yet.</div>
+            <div className="text-sm text-sage py-3">No revenue or logged time in {monthLabel(`${pMonth}-01`)} yet.</div>
           ) : (
             <div className="space-y-3">
               {profitability.map((r) => {
