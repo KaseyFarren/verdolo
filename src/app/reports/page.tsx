@@ -98,7 +98,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .not('duration_seconds', 'is', null)
       .gte('started_at', start)
       .lt('started_at', end),
-    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
+    supabase
+      .from('org_members')
+      .select('user_id, invited_email, display_name, avatar_url, target_hours_per_week')
+      .eq('org_id', orgId)
+      .eq('status', 'active'),
     supabase.from('reports').select('period_type, period_start, content').eq('org_id', orgId).order('period_start', { ascending: false }),
     supabase.from('tasks').select('id, assigned_to').eq('org_id', orgId).eq('done', false),
     supabase

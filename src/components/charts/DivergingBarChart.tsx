@@ -8,9 +8,13 @@ const LOSS = '#e05070'
 export default function DivergingBarChart({
   items,
   formatValue,
+  positiveLabel = 'Profit',
+  negativeLabel = 'Loss',
 }: {
   items: { id: string; label: string; valueCents: number }[]
   formatValue: (cents: number) => string
+  positiveLabel?: string
+  negativeLabel?: string
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.valueCents)))
@@ -69,11 +73,11 @@ export default function DivergingBarChart({
       <div className="flex items-center gap-3 mt-3 text-[11px] text-sage">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: PROFIT }} />
-          Profit
+          {positiveLabel}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: LOSS }} />
-          Loss
+          {negativeLabel}
         </span>
       </div>
     </div>

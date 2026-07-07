@@ -17,7 +17,13 @@ type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: 
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null; started_at: string }
 type PaidInvoice = { client_id: string; amount_cents: number; paid_at: string }
-type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
+type Member = {
+  user_id: string
+  invited_email: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  target_hours_per_week?: number | null
+}
 type Report = { period_type: 'week' | 'month'; period_start: string; content: string }
 
 function monthLabel(monthStart: string) {
@@ -284,7 +290,8 @@ export default function ReportsClient({
       .map((m) => {
         const openCount = openTasks.filter((t) => t.assigned_to === m.user_id).length
         const seconds = weekTimeEntries.filter((e) => e.user_id === m.user_id).reduce((s, e) => s + (e.duration_seconds || 0), 0)
-        return { member: m, openCount, seconds }
+        const targetHours = m.target_hours_per_week ?? null
+        return { member: m, openCount, seconds, hours: seconds / 3600, targetHours }
       })
       .sort((a, b) => b.openCount - a.openCount)
   }, [members, openTasks, weekTimeEntries])
@@ -653,6 +660,29 @@ export default function ReportsClient({
 
       {view === 'capacity' && (
         <div>
+          {capacity.some((r) => r.targetHours !== null && r.targetHours > 0) && (
+            <div className="mb-8">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Hours vs. target · this week</div>
+              <div className="rounded-2xl bg-white shadow-md p-4">
+                <DivergingBarChart
+                  items={capacity
+                    .filter((r) => r.targetHours !== null && r.targetHours > 0)
+                    .map((r) => ({
+                      id: r.member.user_id,
+                      label: memberName(r.member),
+                      valueCents: ((r.targetHours as number) - r.hours) * 100,
+                    }))}
+                  formatValue={(cents) => {
+                    const hrs = Math.abs(cents) / 100
+                    return cents >= 0 ? `${hrs.toFixed(1)}h under` : `${hrs.toFixed(1)}h over`
+                  }}
+                  positiveLabel="Under target"
+                  negativeLabel="Over target"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Open workload · this week</div>
           {capacity.length === 0 ? (
             <div className="text-sm text-sage py-3">No team members yet.</div>
@@ -672,6 +702,25 @@ export default function ReportsClient({
                   <div className="h-1.5 rounded-full bg-sand overflow-hidden">
                     <div className="h-full rounded-full bg-accent" style={{ width: `${(r.openCount / maxOpenCount) * 100}%` }} />
                   </div>
+                  {r.targetHours !== null && r.targetHours > 0 && (
+                    <div className="mt-2">
+                      <div className="flex justify-between text-[11px] text-sage mb-1">
+                        <span>Hours vs. target</span>
+                        <span>
+                          {r.hours.toFixed(1)}h / {r.targetHours}h
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-sand overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, (r.hours / r.targetHours) * 100)}%`,
+                            background: r.hours > r.targetHours ? '#e05070' : 'var(--accent)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

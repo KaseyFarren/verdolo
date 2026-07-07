@@ -11,6 +11,7 @@ type Member = {
   user_id: string
   role: 'owner' | 'admin' | 'member'
   title: string | null
+  target_hours_per_week: number | null
   status: string
   invited_email: string | null
   display_name: string | null
@@ -55,6 +56,18 @@ export default function MembersList({
     if (data) {
       setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
       toast.success('Title updated')
+    }
+  }
+
+  async function saveTargetHours(m: Member, value: string) {
+    const trimmed = value.trim()
+    const parsed = trimmed === '' ? null : Math.max(0, Math.round(Number(trimmed)))
+    if (trimmed !== '' && Number.isNaN(parsed)) return
+    if (parsed === m.target_hours_per_week) return
+    const { data } = await supabase.from('org_members').update({ target_hours_per_week: parsed }).eq('id', m.id).select().single()
+    if (data) {
+      setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
+      toast.success('Target hours updated')
     }
   }
 
@@ -110,12 +123,25 @@ export default function MembersList({
                   {isSelf && <span className="text-sage"> (you)</span>}
                 </span>
                 {canManage ? (
-                  <input
-                    defaultValue={m.title ?? ''}
-                    placeholder="Add role/title…"
-                    onBlur={(e) => saveTitle(m, e.target.value)}
-                    className="block w-32 rounded border border-transparent hover:border-ink/10 focus:border-ink/10 bg-transparent px-1 -mx-1 text-xs text-sage focus:bg-white outline-none"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      defaultValue={m.title ?? ''}
+                      placeholder="Add role/title…"
+                      onBlur={(e) => saveTitle(m, e.target.value)}
+                      className="w-32 rounded border border-transparent hover:border-ink/10 focus:border-ink/10 bg-transparent px-1 -mx-1 text-xs text-sage focus:bg-white outline-none"
+                    />
+                    <span className="flex items-center gap-1 text-xs text-sage/70 shrink-0">
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={m.target_hours_per_week ?? ''}
+                        placeholder="—"
+                        onBlur={(e) => saveTargetHours(m, e.target.value)}
+                        className="w-10 rounded border border-transparent hover:border-ink/10 focus:border-ink/10 bg-transparent px-1 text-xs focus:bg-white outline-none"
+                      />
+                      hrs/wk target
+                    </span>
+                  </div>
                 ) : (
                   m.title && <span className="block text-xs text-sage">{m.title}</span>
                 )}
