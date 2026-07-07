@@ -670,14 +670,16 @@ export default function ReportsClient({
                     .map((r) => ({
                       id: r.member.user_id,
                       label: memberName(r.member),
-                      valueCents: ((r.targetHours as number) - r.hours) * 100,
+                      // Target hours is a utilization floor, not a capacity ceiling — falling
+                      // short is the problem case (red), meeting/exceeding it is fine (blue).
+                      valueCents: (r.hours - (r.targetHours as number)) * 100,
                     }))}
                   formatValue={(cents) => {
-                    const hrs = Math.abs(cents) / 100
-                    return cents >= 0 ? `${hrs.toFixed(1)}h under` : `${hrs.toFixed(1)}h over`
+                    const hrs = cents / 100
+                    return hrs >= 0 ? `+${hrs.toFixed(1)}h over` : `${Math.abs(hrs).toFixed(1)}h under`
                   }}
-                  positiveLabel="Under target"
-                  negativeLabel="Over target"
+                  positiveLabel="On track"
+                  negativeLabel="Under target"
                 />
               </div>
             </div>
@@ -715,7 +717,7 @@ export default function ReportsClient({
                           className="h-full rounded-full"
                           style={{
                             width: `${Math.min(100, (r.hours / r.targetHours) * 100)}%`,
-                            background: r.hours > r.targetHours ? '#e05070' : 'var(--accent)',
+                            background: r.hours < r.targetHours ? '#e05070' : 'var(--accent)',
                           }}
                         />
                       </div>
