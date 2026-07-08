@@ -8,6 +8,8 @@ import { AVATAR_COLORS, formatDate, getInitials, memberName, todayKey } from '@/
 import { periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
+import IconButton from '@/components/ui/IconButton'
+import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
 
@@ -472,7 +474,7 @@ export default function TimeClient({
               const editTasks = allTasks.filter((t) => t.client_id === editClientId)
               return (
                 <div key={e.id} className="bg-white p-3">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <CustomSelect
                       value={editClientId}
                       onChange={(v) => {
@@ -524,20 +526,16 @@ export default function TimeClient({
                   <div className="text-sm">
                     {clientName(e.client_id)}
                     {e.task_id && <span className="text-sage"> · {taskTitle(e.task_id)}</span>}
-                    {!e.billable && <span className="ml-2 text-[10px] text-sage">non-billable</span>}
+                    {!e.billable && <span className="ml-2 text-xs text-sage">non-billable</span>}
                   </div>
                   {e.note && <div className="text-xs text-sage">{e.note}</div>}
                   {isAdmin && <div className="text-xs text-sage/70">{memberEmail(e.user_id)}</div>}
                 </div>
                 <div className="text-sm text-sage shrink-0">{formatDuration(e.duration_seconds || 0)}</div>
                 {canEdit && (
-                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0">
-                    <button className="text-xs text-sage px-1" onClick={() => startEdit(e)}>
-                      ✏
-                    </button>
-                    <button className="text-xs text-red-600 px-1" onClick={() => deleteEntry(e.id)}>
-                      ✕
-                    </button>
+                  <div className="flex gap-0.5 items-center opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0">
+                    <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={() => startEdit(e)} />
+                    <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={() => deleteEntry(e.id)} />
                   </div>
                 )}
               </div>
@@ -596,7 +594,7 @@ export default function TimeClient({
         ) : (
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Start a timer</div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
               <CustomSelect
                 value={timerClientId}
                 onChange={(v) => {
@@ -637,7 +635,7 @@ export default function TimeClient({
       </div>
       {showManual && (
         <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
             <CustomSelect
               value={manualClientId}
               onChange={(v) => {
@@ -755,7 +753,7 @@ export default function TimeClient({
                         .reduce((s, e) => s + (e.duration_seconds || 0), 0) + archivedSecondsFor(cr.client.id, r.member.user_id)
                     return (
                       <div key={cr.client.id} className="flex-1 min-w-[100px] basis-[100px]">
-                        <div className="text-[10px] text-sage mb-1 truncate">{cr.client.name}</div>
+                        <div className="text-xs text-sage mb-1 truncate">{cr.client.name}</div>
                         <MetricBar value={seconds} max={cr.seconds} display={seconds > 0 ? `${formatHours(seconds)}h` : '—'} />
                       </div>
                     )

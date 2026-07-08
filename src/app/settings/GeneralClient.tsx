@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section, Toggle } from '@/components/settings/SettingsUI'
+import InfoTooltip from '@/components/ui/InfoTooltip'
 
 type Settings = {
   eod_hour?: number
@@ -44,7 +45,14 @@ export default function GeneralClient({
       <Row title="Skip weekends" subtitle="No auto check-ins on Sat / Sun">
         <Toggle checked={excludeWeekends} disabled={!isAdmin} onChange={(v) => { setExcludeWeekends(v); saveSettings({ exclude_weekends: v }) }} />
       </Row>
-      <Row title="EOD reminder hour" subtitle="Show banner after this hour">
+      <Row
+        title={
+          <>
+            EOD <InfoTooltip content="End of day" /> reminder hour
+          </>
+        }
+        subtitle="Show banner after this hour"
+      >
         <select
           className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
           value={eodHour}
@@ -58,7 +66,14 @@ export default function GeneralClient({
           ))}
         </select>
       </Row>
-      <Row title="Desktop notifications" subtitle="EOD alert + morning summary">
+      <Row
+        title="Desktop notifications"
+        subtitle={
+          <>
+            EOD <InfoTooltip content="End of day" /> alert + morning summary
+          </>
+        }
+      >
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
       <Row title="Target hourly rate" subtitle="What you want to realize per hour — compared against effective rate in Reports → Profitability and Revenue">

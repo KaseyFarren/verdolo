@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import IconButton from '@/components/ui/IconButton'
+import { CheckIcon, PlusHourIcon, XIcon } from '@/components/ui/icons'
 
 export default function QuickAddTime({ onAdd }: { onAdd: (hours: number) => void | Promise<void> }) {
   const [open, setOpen] = useState(false)
@@ -22,11 +24,7 @@ export default function QuickAddTime({ onAdd }: { onAdd: (hours: number) => void
   }
 
   if (!open) {
-    return (
-      <button title="Log time manually" className="text-xs text-sage px-1" onClick={() => setOpen(true)}>
-        +h
-      </button>
-    )
+    return <IconButton label="Log time manually" tone="sage" icon={<PlusHourIcon />} onClick={() => setOpen(true)} />
   }
 
   return (
@@ -36,7 +34,7 @@ export default function QuickAddTime({ onAdd }: { onAdd: (hours: number) => void
         min="0"
         step="0.25"
         autoFocus
-        placeholder="hrs"
+        placeholder="hours"
         value={value}
         disabled={saving}
         onChange={(e) => setValue(e.target.value)}
@@ -44,14 +42,10 @@ export default function QuickAddTime({ onAdd }: { onAdd: (hours: number) => void
           if (e.key === 'Enter') confirm()
           if (e.key === 'Escape') close()
         }}
-        className="w-12 rounded border border-ink/10 bg-white px-1 py-0.5 text-xs"
+        className="w-14 rounded border border-ink/10 bg-white px-1.5 py-1 text-sm"
       />
-      <button title="Save" className="text-xs text-green px-0.5 disabled:opacity-40" onClick={confirm} disabled={saving}>
-        ✓
-      </button>
-      <button title="Cancel" className="text-xs text-sage px-0.5" onClick={close} disabled={saving}>
-        ✕
-      </button>
+      <IconButton label="Save" tone="green" icon={<CheckIcon />} onClick={confirm} disabled={saving} />
+      <IconButton label="Cancel" tone="sage" icon={<XIcon />} onClick={close} disabled={saving} />
     </span>
   )
 }

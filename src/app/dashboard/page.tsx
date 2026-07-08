@@ -15,6 +15,7 @@ export default async function DashboardPage() {
     { data: recurring },
     { data: defaults },
     { data: todayTimeEntries },
+    { data: weekTimeEntries },
     { data: members },
     { data: noteRow },
     { data: reports },
@@ -35,6 +36,14 @@ export default async function DashboardPage() {
       .eq('org_id', orgId)
       .not('duration_seconds', 'is', null)
       .gte('started_at', `${today}T00:00:00`)
+      .lt('started_at', `${tomorrow}T00:00:00`),
+    // Powers the Dashboard's "This week" team highlight card.
+    supabase
+      .from('time_entries')
+      .select('user_id, duration_seconds')
+      .eq('org_id', orgId)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', `${weekAnchor}T00:00:00`)
       .lt('started_at', `${tomorrow}T00:00:00`),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
     supabase.from('quick_notes').select('content').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
@@ -62,6 +71,7 @@ export default async function DashboardPage() {
         initialRecurring={recurring ?? []}
         initialDefaults={defaults ?? []}
         todayTimeEntries={todayTimeEntries ?? []}
+        weekTimeEntries={weekTimeEntries ?? []}
         members={members ?? []}
         initialNote={noteRow?.content ?? ''}
         hasApiKey={!!process.env.ANTHROPIC_API_KEY}

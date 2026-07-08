@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
+import ClientFiles from '@/components/ClientFiles'
 import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
 import PeriodSelector from '@/components/ui/PeriodSelector'
@@ -24,6 +25,7 @@ import {
   getStage,
   memberName,
   stageColor,
+  stageLabel,
   todayKey,
 } from '@/lib/agency'
 
@@ -383,7 +385,7 @@ export default function ClientsClient({
                     className="text-xs rounded border border-ink/10 px-2 py-1"
                     onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
                   >
-                    {isChurned ? '▶ Activate' : '⏸ Churn'}
+                    {isChurned ? '▶ Activate' : '⏸ Pause'}
                   </button>
                   <button
                     className="text-xs rounded border border-ink/10 px-2 py-1"
@@ -489,6 +491,7 @@ export default function ClientsClient({
           />
         </div>
 
+        <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />
 
         <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Activity</div>
         <div className="flex gap-2 mb-4 items-end">
@@ -599,7 +602,7 @@ export default function ClientsClient({
           <CustomSelect
             value={stageFilter}
             onChange={setStageFilter}
-            options={[{ value: '', label: 'All stages' }, ...STAGES.map((s) => ({ value: s, label: s }))]}
+            options={[{ value: '', label: 'All stages' }, ...STAGES.map((s) => ({ value: s, label: stageLabel(s) }))]}
             className="w-36"
           />
         </div>
@@ -783,7 +786,7 @@ function ClientForm({
         value={(form.business as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, business: e.target.value }))}
       />
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         <select
           className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
           value={(form.platform as string) || ''}
@@ -869,11 +872,11 @@ function ClientForm({
                 : { borderColor: 'rgba(255,255,255,0.15)', color: '#a3a3a3' }
             }
           >
-            {st}
+            {stageLabel(st)}
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         <div>
           <label className="block text-xs text-sage mb-1">Monthly retainer ($)</label>
           <input

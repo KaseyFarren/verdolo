@@ -31,7 +31,7 @@ export default function TaskEditForm({
         onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
         autoFocus
       />
-      <div className="grid grid-cols-2 gap-2 mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
         <CustomSelect
           value={(editForm.client_id as string) || ''}
           onChange={(v) => setEditForm((f) => ({ ...f, client_id: v }))}

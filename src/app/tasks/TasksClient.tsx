@@ -12,6 +12,8 @@ import DatePicker from '@/components/ui/DatePicker'
 import AddTaskForm from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import Button from '@/components/ui/Button'
+import IconButton from '@/components/ui/IconButton'
+import { ClockArrowIcon, PauseIcon, PencilIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 
@@ -645,7 +647,7 @@ export default function TasksClient({
                 </div>
                 <div className="grid grid-cols-7 gap-1 mb-1">
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                    <div key={i} className="text-center text-[11px] text-sage py-1">
+                    <div key={i} className="text-center text-xs text-sage py-1">
                       {d}
                     </div>
                   ))}
@@ -720,7 +722,7 @@ export default function TasksClient({
                     <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
                     {unassigned.length > 0 && (
                       <>
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
                         <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
                       </>
                     )}
@@ -742,7 +744,7 @@ export default function TasksClient({
                     onChange={(e) => setRecurringForm((f) => ({ ...f, title: e.target.value }))}
                     autoFocus
                   />
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <CustomSelect
                       value={recurringForm.frequency}
                       onChange={(v) => setRecurringForm((f) => ({ ...f, frequency: v }))}
@@ -798,7 +800,7 @@ export default function TasksClient({
                           }))
                         }
                       />
-                      <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <CustomSelect
                           value={(editRecurringForm.frequency as string) || 'daily'}
                           onChange={(v) =>
@@ -839,7 +841,7 @@ export default function TasksClient({
                       <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium ${r.paused ? 'text-sage' : ''}`}>
                           {r.title}
-                          {r.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                          {r.paused && <span className="ml-2 text-xs uppercase text-sage/70">Paused</span>}
                         </div>
                         <div className="text-xs text-sage mt-0.5">
                           {recurringFrequencyLabel(r.frequency)}
@@ -847,11 +849,12 @@ export default function TasksClient({
                           {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
                         </div>
                       </div>
-                      <button className="text-xs text-sage" onClick={() => toggleRecurringPaused(r)}>
+                      <Button variant="ghost" size="sm" onClick={() => toggleRecurringPaused(r)}>
                         {r.paused ? 'Resume' : 'Pause'}
-                      </button>
-                      <button
-                        className="text-xs text-sage"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setEditingRecurringId(r.id)
                           setEditRecurringForm({
@@ -862,10 +865,10 @@ export default function TasksClient({
                         }}
                       >
                         Edit
-                      </button>
-                      <button className="text-xs text-red-600" onClick={() => deleteRecurring(r.id)}>
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => deleteRecurring(r.id)}>
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -885,7 +888,7 @@ export default function TasksClient({
                     onChange={(e) => setDefaultForm((f) => ({ ...f, title: e.target.value }))}
                     autoFocus
                   />
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <CustomSelect value={defaultForm.priority} onChange={(v) => setDefaultForm((f) => ({ ...f, priority: v }))} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
                     <CustomSelect
                       value={defaultForm.assignedTo}
@@ -924,7 +927,7 @@ export default function TasksClient({
                           }))
                         }
                       />
-                      <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <CustomSelect
                           value={(editDefaultForm.priority as string) || 'Medium'}
                           onChange={(v) => setEditDefaultForm((f) => ({ ...f, priority: v }))}
@@ -964,18 +967,19 @@ export default function TasksClient({
                       <div className="flex-1 min-w-0">
                         <div className={`text-sm font-medium ${d.paused ? 'text-sage' : ''}`}>
                           {d.title}
-                          {d.paused && <span className="ml-2 text-[10px] uppercase text-sage/70">Paused</span>}
+                          {d.paused && <span className="ml-2 text-xs uppercase text-sage/70">Paused</span>}
                         </div>
                         <div className="text-xs text-sage mt-0.5">
                           Every client · daily
                           {d.assigned_to ? ` · ${memberEmail(d.assigned_to)}` : ''} · {d.priority}
                         </div>
                       </div>
-                      <button className="text-xs text-sage" onClick={() => toggleDefaultPaused(d)}>
+                      <Button variant="ghost" size="sm" onClick={() => toggleDefaultPaused(d)}>
                         {d.paused ? 'Resume' : 'Pause'}
-                      </button>
-                      <button
-                        className="text-xs text-sage"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setEditingDefaultId(d.id)
                           setEditDefaultForm({
@@ -986,10 +990,10 @@ export default function TasksClient({
                         }}
                       >
                         Edit
-                      </button>
-                      <button className="text-xs text-red-600" onClick={() => deleteDefault(d.id)}>
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => deleteDefault(d.id)}>
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1077,8 +1081,8 @@ function TaskRow({
         <div className={`text-sm ${t.done ? 'line-through text-sage' : ''}`}>
           {t.title}
           {!t.quick && <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>}
-          {t.is_auto && <span className="ml-1 text-[10px] text-sage">auto</span>}
-          {t.recurring_id && <span className="ml-1 text-[10px] text-sage">↻</span>}
+          {t.is_auto && <span className="ml-1 text-xs text-sage">auto</span>}
+          {t.recurring_id && <span className="ml-1 text-xs text-sage">↻</span>}
           {isTimerRunning && (
             <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
@@ -1101,34 +1105,18 @@ function TaskRow({
         </div>
         {t.notes && !t.done && <div className="text-xs text-sage mt-1">{t.notes}</div>}
       </div>
-      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+      <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
         {!t.done &&
           (isTimerRunning ? (
-            <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>
-              ■
-            </button>
+            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
           ) : (
-            <button title="Start timer" className="text-xs text-sage px-1" onClick={startTimer}>
-              ▶
-            </button>
+            <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
           ))}
         {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-        {!t.done && (
-          <button title="Snooze — push to tomorrow" className="text-xs text-sage px-1" onClick={snooze}>
-            ⏭
-          </button>
-        )}
-        {!t.done && skip && (
-          <button title="Skip this occurrence" className="text-xs text-sage px-1" onClick={skip}>
-            ⤼
-          </button>
-        )}
-        <button className="text-xs text-sage px-1" onClick={startEdit}>
-          ✏
-        </button>
-        <button className="text-xs text-red-600 px-1" onClick={del}>
-          ✕
-        </button>
+        {!t.done && <IconButton label="Snooze — push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
+        {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
+        <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
+        <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
       </div>
     </motion.div>
   )

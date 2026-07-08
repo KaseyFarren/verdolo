@@ -9,6 +9,7 @@ import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
 import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
+import InfoTooltip from '@/components/ui/InfoTooltip'
 
 type Client = { id: string; name: string; retainer_cents: number | null }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
@@ -566,7 +567,9 @@ export default function ReportsClient({
           )}
 
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Effective rate · last 6 months</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+              Effective rate · last 6 months <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
+            </div>
             {monthlyTrend.every((m) => !m.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
             ) : (
@@ -594,7 +597,10 @@ export default function ReportsClient({
 
           {targetRateCents > 0 && profitability.some((r) => r.rateDeltaCents !== null) && (
             <div className="mb-8">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Effective rate by client · {monthLabel(`${pMonth}-01`)}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+                Effective rate by client · {monthLabel(`${pMonth}-01`)}{' '}
+                <InfoTooltip content="Each client's revenue divided by hours logged, compared to your target hourly rate" />
+              </div>
               <div className="rounded-2xl bg-white shadow-md p-4">
                 <DivergingBarChart
                   items={profitability

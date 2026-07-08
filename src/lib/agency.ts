@@ -20,6 +20,11 @@ export function getStage(client: { stage?: string | null; status?: string | null
   return (client.stage as Stage) || (client.status === 'inactive' ? 'Churned' : 'Active')
 }
 
+/** Display-only relabel — the stored/compared value stays 'Churned', users just read "Paused". */
+export function stageLabel(stage: string) {
+  return stage === 'Churned' ? 'Paused' : stage
+}
+
 export function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -39,6 +44,22 @@ export function getWeekAnchor(d = new Date()) {
   const monday = new Date(d)
   monday.setDate(d.getDate() + diffToMonday)
   return todayKey(monday)
+}
+
+/** Sums `valueFn(item)` per key (via `keyFn`) and returns the highest-total key/value pair —
+ * e.g. the teammate with the most hours logged or tasks completed this week. */
+export function topByKey<T>(items: T[], keyFn: (item: T) => string | null | undefined, valueFn: (item: T) => number) {
+  const totals = new Map<string, number>()
+  for (const item of items) {
+    const key = keyFn(item)
+    if (!key) continue
+    totals.set(key, (totals.get(key) ?? 0) + valueFn(item))
+  }
+  let top: { key: string; total: number } | null = null
+  for (const [key, total] of totals) {
+    if (total > 0 && (!top || total > top.total)) top = { key, total }
+  }
+  return top
 }
 
 export function formatDate(iso?: string | null) {

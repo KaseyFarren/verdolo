@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getOffsetDate, todayKey } from './agency'
 
 export type RunningTimer = { id: string; task_id: string | null; client_id: string | null; started_at: string }
 
@@ -10,6 +11,9 @@ export type RunningTimer = { id: string; task_id: string | null; client_id: stri
 export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: string) {
   const [running, setRunning] = useState<RunningTimer | null>(null)
   const [now, setNow] = useState<number | null>(null)
+  // Seconds already logged today per task, from entries that were already stopped — added to the
+  // live elapsed time so pausing and resuming a task shows a running total instead of resetting to 0.
+  const [todaySeconds, setTodaySeconds] = useState<Record<string, number>>({})
 
   useEffect(() => {
     supabase
@@ -20,6 +24,26 @@ export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: st
       .is('ended_at', null)
       .maybeSingle()
       .then(({ data }) => setRunning(data as RunningTimer | null))
+
+    const today = todayKey()
+    const tomorrow = getOffsetDate(1)
+    supabase
+      .from('time_entries')
+      .select('task_id, duration_seconds')
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .not('task_id', 'is', null)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', `${today}T00:00:00`)
+      .lt('started_at', `${tomorrow}T00:00:00`)
+      .then(({ data }) => {
+        const totals: Record<string, number> = {}
+        for (const row of data ?? []) {
+          if (!row.task_id) continue
+          totals[row.task_id] = (totals[row.task_id] ?? 0) + (row.duration_seconds ?? 0)
+        }
+        setTodaySeconds(totals)
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -39,6 +63,10 @@ export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: st
     const startedAt = new Date(running.started_at)
     const durationSeconds = Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000))
     await supabase.from('time_entries').update({ ended_at: endedAt.toISOString(), duration_seconds: durationSeconds }).eq('id', running.id)
+    if (running.task_id) {
+      const taskId = running.task_id
+      setTodaySeconds((prev) => ({ ...prev, [taskId]: (prev[taskId] ?? 0) + durationSeconds }))
+    }
     setRunning(null)
     return durationSeconds
   }
@@ -62,7 +90,8 @@ export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: st
 
   function elapsedFor(taskId: string) {
     if (!running || running.task_id !== taskId || !now) return null
-    const seconds = Math.max(0, Math.floor((now - new Date(running.started_at).getTime()) / 1000))
+    const liveSeconds = Math.max(0, Math.floor((now - new Date(running.started_at).getTime()) / 1000))
+    const seconds = (todaySeconds[taskId] ?? 0) + liveSeconds
     const h = Math.floor(seconds / 3600)
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60

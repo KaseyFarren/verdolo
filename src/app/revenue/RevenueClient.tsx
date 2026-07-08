@@ -10,6 +10,7 @@ import PeriodSelector from '@/components/ui/PeriodSelector'
 import { AVATAR_COLORS, centsToDollars, dollarsToCents, getInitials, getStage, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
 import { isFullCalendarMonth, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
+import InfoTooltip from '@/components/ui/InfoTooltip'
 
 type Client = { id: string; name: string; retainer_cents: number | null; stage: string | null; status: string | null }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
@@ -247,7 +248,9 @@ export default function RevenueClient({
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
-          <div className="text-xs text-sage mb-1">MRR</div>
+          <div className="text-xs text-sage mb-1">
+            MRR <InfoTooltip content="Monthly recurring revenue — sum of active clients' monthly retainers" />
+          </div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
@@ -255,17 +258,23 @@ export default function RevenueClient({
           <div className="text-2xl font-heading font-bold">{totals.hours.toFixed(1)}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
-          <div className="text-xs text-sage mb-1">Blended rate</div>
+          <div className="text-xs text-sage mb-1">
+            Blended rate <InfoTooltip content="Total revenue divided by total hours logged, across all clients" />
+          </div>
           <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '—'}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
-          <div className="text-xs text-sage mb-1">vs. target rate</div>
+          <div className="text-xs text-sage mb-1">
+            vs. target rate <InfoTooltip content="Blended rate compared to the target hourly rate set in Settings → General" />
+          </div>
           <div className={`text-2xl font-heading font-bold ${totals.rateDeltaCents !== null && totals.rateDeltaCents < 0 ? 'text-red-600' : ''}`}>
             {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '—'}
           </div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
-          <div className="text-xs text-sage mb-1">Billable utilization</div>
+          <div className="text-xs text-sage mb-1">
+            Billable utilization <InfoTooltip content="Share of logged hours marked billable" />
+          </div>
           <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '—'}</div>
         </div>
       </div>

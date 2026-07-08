@@ -60,7 +60,7 @@ export default function AddTaskForm({
         }}
         autoFocus
       />
-      <div className="grid grid-cols-2 gap-2 mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
         <input
           type="date"
           className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"

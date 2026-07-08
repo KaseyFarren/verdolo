@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section } from '@/components/settings/SettingsUI'
+import { PipetteIcon } from '@/components/ui/icons'
 
 const ACCENT_PRESETS = ['#dd6b2c', '#1f3320', '#e98a4f', '#5d6b5c', '#c9973c', '#8a6a3c']
 
@@ -46,12 +47,17 @@ export default function AppearanceClient({
               aria-label={c}
             />
           ))}
-          <input
-            type="color"
-            value={accentColor}
-            onChange={(e) => saveAccentColor(e.target.value)}
-            className="h-6 w-6 rounded-full border-0 bg-transparent p-0 cursor-pointer"
-          />
+          <div className="relative h-6 w-6" title="Pick a custom color">
+            <input
+              type="color"
+              value={accentColor}
+              onChange={(e) => saveAccentColor(e.target.value)}
+              className="h-6 w-6 rounded-full border-0 bg-transparent p-0 cursor-pointer"
+            />
+            <span className="pointer-events-none absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-ink shadow">
+              <PipetteIcon size={9} />
+            </span>
+          </div>
         </div>
       </Row>
     </Section>

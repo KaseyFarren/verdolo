@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import Button from '@/components/ui/Button'
+import IconButton from '@/components/ui/IconButton'
+import { PauseIcon, PencilIcon, PlayIcon } from '@/components/ui/icons'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
@@ -17,9 +19,11 @@ import {
   getInitials,
   getOffsetDate,
   getStage,
+  getWeekAnchor,
   memberName,
   sortTasks,
   todayKey,
+  topByKey,
 } from '@/lib/agency'
 
 type Client = {
@@ -51,6 +55,7 @@ type Task = {
 type Recurring = { id: string; title: string; client_id: string | null; priority: string; frequency: string; notes: string | null }
 type DefaultTemplate = { id: string; title: string; priority: string; assigned_to: string | null; notes: string | null; auto_type: string | null; paused: boolean }
 type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seconds: number | null }
+type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
 function formatHoursMins(seconds: number) {
@@ -69,6 +74,7 @@ export default function DashboardClient({
   initialRecurring,
   initialDefaults,
   todayTimeEntries,
+  weekTimeEntries,
   members,
   initialNote,
   hasApiKey,
@@ -84,6 +90,7 @@ export default function DashboardClient({
   initialRecurring: Recurring[]
   initialDefaults: DefaultTemplate[]
   todayTimeEntries: TodayTimeEntry[]
+  weekTimeEntries: WeekTimeEntry[]
   members: Member[]
   initialNote: string
   hasApiKey: boolean
@@ -195,6 +202,20 @@ export default function DashboardClient({
         }))
         .filter((r) => r.seconds > 0)
         .sort((a, b) => b.seconds - a.seconds)
+
+  // Lightweight team recognition — no notifications/points infra, just this week's leader by
+  // hours logged and by tasks completed, computed from data already fetched for other panels.
+  const weekAnchor = getWeekAnchor()
+  const topHours = isAdmin ? topByKey(weekTimeEntries, (e) => e.user_id, (e) => e.duration_seconds || 0) : null
+  const topTasks = isAdmin
+    ? topByKey(
+        tasks.filter((t) => t.done && t.completed_at && t.completed_at >= weekAnchor),
+        (t) => t.assigned_to,
+        () => 1
+      )
+    : null
+  const topHoursLabel = topHours ? memberName(members.find((m) => m.user_id === topHours.key)) : null
+  const topTasksLabel = topTasks ? memberName(members.find((m) => m.user_id === topTasks.key)) : null
 
   // Dashboard is everyone's personal "my day" view, not the full org workload (that's the
   // Tasks page) — scope to tasks assigned to me + unassigned/shared ones, even for admins/owners
@@ -457,7 +478,7 @@ export default function DashboardClient({
           </AnimatePresence>
           {dashPendingUnassigned.length > 0 && (
             <>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
               <AnimatePresence initial={false}>
                 {dashPendingUnassigned.map((t) => (
                   <SimpleTaskRow
@@ -532,10 +553,28 @@ export default function DashboardClient({
             )}
           </div>
 
+          {isAdmin && (topHoursLabel || topTasksLabel) && (
+            <div className="rounded-2xl bg-white shadow-md p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">This week</div>
+              {topHoursLabel && (
+                <div className="flex justify-between items-center py-1 text-sm">
+                  <span className="text-ink truncate pr-2">🏆 {topHoursLabel} logged the most hours</span>
+                  <span className="font-medium text-ink shrink-0">{formatHoursMins(topHours!.total)}</span>
+                </div>
+              )}
+              {topTasksLabel && (
+                <div className="flex justify-between items-center py-1 text-sm">
+                  <span className="text-ink truncate pr-2">✅ {topTasksLabel} completed the most tasks</span>
+                  <span className="font-medium text-ink shrink-0">{topTasks!.total}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="rounded-2xl bg-white shadow-md p-4 flex flex-col flex-1 min-h-[220px]">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-sage">Quick notes</div>
-              <span className="text-[10px] text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
+              <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
             </div>
             <textarea
               className="flex-1 w-full min-h-[160px] resize-none bg-transparent text-sm text-ink outline-none placeholder:text-sage/60"
@@ -550,7 +589,7 @@ export default function DashboardClient({
       <div className="mt-8 pt-6 border-t border-ink/10">
         <div className="flex flex-wrap justify-between items-center gap-y-1 mb-2">
           <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sage hover:text-ink" onClick={() => setShowMessages((v) => !v)}>
-            <span className="text-[10px]">{showMessages ? '▾' : '▸'}</span> Client messages
+            <span className="text-xs">{showMessages ? '▾' : '▸'}</span> Client messages
           </button>
           <div className="flex items-center gap-3">
             <span className="text-xs text-sage">
@@ -769,21 +808,15 @@ function SimpleTaskRow({
         </div>
         {clientName && <div className="text-xs text-sage mt-0.5">{clientName}</div>}
       </div>
-      <div className={`flex gap-1 shrink-0 ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+      <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
         {!t.done &&
           (isTimerRunning ? (
-            <button title="Stop timer" className="text-xs text-green px-1" onClick={stopTimer}>
-              ■
-            </button>
+            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
           ) : (
-            <button title="Start timer" className="text-xs text-sage px-1" onClick={startTimer}>
-              ▶
-            </button>
+            <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
           ))}
         {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-        <button title="Edit" className="text-xs text-sage px-1" onClick={startEdit}>
-          ✏
-        </button>
+        <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
       </div>
     </motion.div>
   )

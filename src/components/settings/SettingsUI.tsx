@@ -7,7 +7,15 @@ export function Section({ label, children }: { label: string; children: React.Re
   )
 }
 
-export function Row({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+export function Row({
+  title,
+  subtitle,
+  children,
+}: {
+  title: React.ReactNode
+  subtitle: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-ink/10 last:border-b-0 last:pb-0 first:pt-0">
       <div>
