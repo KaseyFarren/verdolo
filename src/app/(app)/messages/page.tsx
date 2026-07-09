@@ -35,7 +35,7 @@ export default async function MessagesPage() {
 
   const allThreadIds = [teamThread?.id, ...dmThreadIds].filter((id): id is string => Boolean(id))
 
-  const [{ data: recentMessages }, { data: reads }] =
+  const [{ data: recentMessages }, { data: reads }, { data: mentionMessages }] =
     allThreadIds.length > 0
       ? await Promise.all([
           supabase
@@ -44,14 +44,25 @@ export default async function MessagesPage() {
             .in('thread_id', allThreadIds)
             .order('created_at', { ascending: false }),
           supabase.from('message_reads').select('thread_id, last_read_at').eq('user_id', user.id).in('thread_id', allThreadIds),
+          supabase
+            .from('messages')
+            .select('thread_id, created_at')
+            .in('thread_id', allThreadIds)
+            .contains('mentioned_user_ids', [user.id])
+            .order('created_at', { ascending: false }),
         ])
-      : [{ data: [] }, { data: [] }]
+      : [{ data: [] }, { data: [] }, { data: [] }]
 
   const lastMessageAtByThread: Record<string, string> = {}
   for (const row of recentMessages ?? []) {
     if (!lastMessageAtByThread[row.thread_id]) lastMessageAtByThread[row.thread_id] = row.created_at
   }
   const lastReadAtByThread = Object.fromEntries((reads ?? []).map((r) => [r.thread_id, r.last_read_at]))
+
+  const lastMentionAtByThread: Record<string, string> = {}
+  for (const row of mentionMessages ?? []) {
+    if (!lastMentionAtByThread[row.thread_id]) lastMentionAtByThread[row.thread_id] = row.created_at
+  }
 
   return (
     <MessagesClient
@@ -62,6 +73,7 @@ export default async function MessagesPage() {
       dmThreadByUser={Object.fromEntries(dmThreadByUser)}
       lastMessageAtByThread={lastMessageAtByThread}
       lastReadAtByThread={lastReadAtByThread}
+      lastMentionAtByThread={lastMentionAtByThread}
     />
   )
 }

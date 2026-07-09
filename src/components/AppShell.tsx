@@ -9,6 +9,7 @@ import { ConfirmProvider } from '@/components/ConfirmDialog'
 import { PinLockProvider, usePinLock } from '@/components/PinLock'
 import QuickCapture from '@/components/QuickCapture'
 import TourProvider from '@/components/TourProvider'
+import NotificationSound from '@/components/NotificationSound'
 
 const NAV = [
   { href: '/dashboard', icon: '🏠', label: 'Dashboard', tour: 'nav-dashboard' },
@@ -155,6 +156,7 @@ export default function AppShell({
           </div>
           <QuickCapture orgId={orgId} userId={userId} />
           <TourProvider orgId={orgId} role={role} />
+          <NotificationSound orgId={orgId} userId={userId} />
         </div>
       </ConfirmProvider>
     </PinLockProvider>

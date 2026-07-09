@@ -29,8 +29,18 @@ type Message = {
   attachment_type: string | null
   attachment_size_bytes: number | null
   attachment_signed_url?: string | null
+  mentioned_user_ids: string[]
   reactions: Reaction[]
 }
+
+// Matches a trailing "@partial" token at the end of the draft - mentions can only be composed
+// at the end of the input (a plain single-line <input>, not a cursor-aware textarea), which
+// covers the common "type @ then a name" flow without needing mid-string cursor tracking.
+const MENTION_TRIGGER = /(?:^|\s)@(\w*)$/
+const ALL_MENTION_ID = 'all'
+const ALL_MENTION_NAME = 'all'
+
+type MentionOption = { id: string; name: string; avatar_url?: string | null; isAll?: boolean }
 
 function formatFileSize(bytes: number | null) {
   if (!bytes) return ''
@@ -92,6 +102,7 @@ export default function MessagesClient({
   dmThreadByUser,
   lastMessageAtByThread: initialLastMessageAt,
   lastReadAtByThread: initialLastReadAt,
+  lastMentionAtByThread: initialLastMentionAt,
 }: {
   orgId: string
   userId: string
@@ -100,6 +111,7 @@ export default function MessagesClient({
   dmThreadByUser: Record<string, string>
   lastMessageAtByThread: Record<string, string>
   lastReadAtByThread: Record<string, string>
+  lastMentionAtByThread: Record<string, string>
 }) {
   const supabase = useMemo(() => createClient(), [])
   const memberMap = useMemo(() => new Map(members.map((m) => [m.user_id, m])), [members])
@@ -111,8 +123,10 @@ export default function MessagesClient({
   const [messagesByThread, setMessagesByThread] = useState<Record<string, Message[]>>({})
   const [lastMessageAtByThread, setLastMessageAtByThread] = useState(initialLastMessageAt)
   const [lastReadAtByThread, setLastReadAtByThread] = useState(initialLastReadAt)
+  const [lastMentionAtByThread, setLastMentionAtByThread] = useState(initialLastMentionAt)
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState('')
+  const [mentionCandidates, setMentionCandidates] = useState<MentionOption[]>([])
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -159,7 +173,9 @@ export default function MessagesClient({
       const [{ data: msgs }, { data: reactions }] = await Promise.all([
         supabase
           .from('messages')
-          .select('id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes')
+          .select(
+            'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
+          )
           .eq('thread_id', threadId)
           .order('created_at', { ascending: true }),
         supabase.from('message_reactions').select('id, message_id, emoji, user_id').eq('thread_id', threadId),
@@ -196,6 +212,9 @@ export default function MessagesClient({
         const incoming = payload.new as Omit<Message, 'reactions'>
         const withReactions: Message = { ...incoming, reactions: [] }
         setLastMessageAtByThread((prev) => ({ ...prev, [incoming.thread_id]: incoming.created_at }))
+        if (incoming.mentioned_user_ids?.includes(userId)) {
+          setLastMentionAtByThread((prev) => ({ ...prev, [incoming.thread_id]: incoming.created_at }))
+        }
         setMessagesByThread((prev) => {
           if (!loadedThreads.current.has(incoming.thread_id)) return prev
           const list = prev[incoming.thread_id] ?? []
@@ -251,6 +270,14 @@ export default function MessagesClient({
     return !lastRead || new Date(lastRead) < new Date(lastMessage)
   }
 
+  function hasUnreadMention(threadId: string | null | undefined) {
+    if (!threadId) return false
+    const lastMention = lastMentionAtByThread[threadId]
+    if (!lastMention) return false
+    const lastRead = lastReadAtByThread[threadId]
+    return !lastRead || new Date(lastRead) < new Date(lastMention)
+  }
+
   function openTeamChannel() {
     setActiveContactId(null)
     setActiveThreadId(teamThreadId)
@@ -294,11 +321,26 @@ export default function MessagesClient({
       }
     }
 
+    const mentionedUserIds = new Set<string>()
+    for (const c of mentionCandidates) {
+      if (!body.includes(`@${c.name}`)) continue
+      if (c.id === ALL_MENTION_ID) {
+        if (activeIsTeam) {
+          for (const m of members) if (m.user_id !== userId) mentionedUserIds.add(m.user_id)
+        } else if (activeContactId) {
+          mentionedUserIds.add(activeContactId)
+        }
+      } else {
+        mentionedUserIds.add(c.id)
+      }
+    }
+
     setDraft('')
     setPendingFile(null)
+    setMentionCandidates([])
     const { data, error } = await supabase
       .from('messages')
-      .insert({ thread_id: activeThreadId, org_id: orgId, sender_id: userId, body, ...(attachment ?? {}) })
+      .insert({ thread_id: activeThreadId, org_id: orgId, sender_id: userId, body, mentioned_user_ids: [...mentionedUserIds], ...(attachment ?? {}) })
       .select()
       .single()
     setSending(false)
@@ -364,8 +406,55 @@ export default function MessagesClient({
     return memberMap.get(senderId)?.avatar_url ?? null
   }
 
+  function insertMention(option: MentionOption) {
+    setDraft((prev) => prev.replace(MENTION_TRIGGER, (m) => (m.startsWith(' ') ? ' ' : '') + `@${option.name} `))
+    setMentionCandidates((prev) => [...prev, option])
+  }
+
+  // Splits a message body on any mentioned member's "@Name" (longest names first, so "Sam" can't
+  // shadow a match inside "Sam Osei") plus a literal "@all" token, and wraps matches in a
+  // highlighted span.
+  function renderBody(m: Message) {
+    if (!m.mentioned_user_ids?.length) return m.body
+    const names = [...new Set(m.mentioned_user_ids.map((id) => memberName(memberMap.get(id))).filter((n) => n && n !== '-'))].sort(
+      (a, b) => b.length - a.length
+    )
+    const hasAllToken = /(?:^|\s)@all\b/.test(m.body)
+    const alternatives = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    if (hasAllToken) alternatives.unshift(ALL_MENTION_NAME)
+    if (alternatives.length === 0) return m.body
+    const pattern = new RegExp(`@(${alternatives.join('|')})\\b`, 'g')
+    const parts: React.ReactNode[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(m.body))) {
+      if (match.index > lastIndex) parts.push(m.body.slice(lastIndex, match.index))
+      parts.push(
+        <span key={match.index} className={`font-semibold ${m.sender_id === userId ? 'text-white' : 'text-accent'}`}>
+          @{match[1]}
+        </span>
+      )
+      lastIndex = match.index + match[0].length
+    }
+    parts.push(m.body.slice(lastIndex))
+    return parts
+  }
+
   const activeIsTeam = activeThreadId === teamThreadId
   const messages = (activeThreadId && messagesByThread[activeThreadId]) || []
+  const mentionMatch = draft.match(MENTION_TRIGGER)
+  const mentionQuery = mentionMatch?.[1] ?? null
+  const mentionResults: MentionOption[] =
+    mentionQuery !== null
+      ? [
+          ...(ALL_MENTION_NAME.includes(mentionQuery.toLowerCase()) || 'everyone'.includes(mentionQuery.toLowerCase())
+            ? [{ id: ALL_MENTION_ID, name: ALL_MENTION_NAME, isAll: true }]
+            : []),
+          ...contacts
+            .filter((c) => memberName(c).toLowerCase().includes(mentionQuery.toLowerCase()))
+            .map((c) => ({ id: c.user_id, name: memberName(c), avatar_url: c.avatar_url })),
+        ]
+      : []
 
   return (
     <div className="mb-6">
@@ -384,7 +473,12 @@ export default function MessagesClient({
           >
             <span>💬</span>
             <span className="flex-1">Team</span>
-            {!activeIsTeam && unread(teamThreadId) && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
+            {!activeIsTeam && hasUnreadMention(teamThreadId) && (
+              <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
+            )}
+            {!activeIsTeam && !hasUnreadMention(teamThreadId) && unread(teamThreadId) && (
+              <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+            )}
           </button>
 
           <div className="px-3 pt-3 pb-1 text-xs font-medium text-sage uppercase tracking-wide">Direct messages</div>
@@ -408,7 +502,10 @@ export default function MessagesClient({
                   </span>
                 )}
                 <span className="truncate flex-1">{memberName(c)}</span>
-                {!active && unread(threadId) && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
+                {!active && hasUnreadMention(threadId) && (
+                  <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
+                )}
+                {!active && !hasUnreadMention(threadId) && unread(threadId) && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
               </button>
             )
           })}
@@ -453,7 +550,7 @@ export default function MessagesClient({
                             own ? 'bg-accent text-white' : 'bg-sand text-ink'
                           }`}
                         >
-                          {m.body && <div>{m.body}</div>}
+                          {m.body && <div>{renderBody(m)}</div>}
                           {m.attachment_path &&
                             (m.attachment_type?.startsWith('image/') ? (
                               m.attachment_signed_url ? (
@@ -566,13 +663,46 @@ export default function MessagesClient({
                 }}
               />
             </label>
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={activeIsTeam ? 'Message the team…' : 'Type a message…'}
-              className="flex-1 rounded-lg border border-ink/15 px-3 py-2 text-sm outline-none focus:border-accent"
-              disabled={!activeThreadId}
-            />
+            <div className="relative flex-1">
+              {mentionQuery !== null && mentionResults.length > 0 && (
+                <div className="absolute bottom-full mb-1 left-0 w-56 max-h-48 overflow-y-auto rounded-lg border border-ink/10 bg-white shadow-md py-1 z-10">
+                  {mentionResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => insertMention(c)}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-sand flex items-center gap-2"
+                    >
+                      {c.isAll ? (
+                        <span className="h-5 w-5 rounded-full bg-accent/15 text-accent text-xs font-bold flex items-center justify-center shrink-0">
+                          @
+                        </span>
+                      ) : c.avatar_url ? (
+                        <img src={c.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <span className="h-5 w-5 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0">
+                          {getInitials(c.name)}
+                        </span>
+                      )}
+                      <span className="truncate">{c.isAll ? 'Everyone' : c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && mentionQuery !== null && mentionResults.length > 0) {
+                    e.preventDefault()
+                    insertMention(mentionResults[0])
+                  }
+                }}
+                placeholder={activeIsTeam ? 'Message the team… (@ to mention)' : 'Type a message…'}
+                className="w-full rounded-lg border border-ink/15 px-3 py-2 text-sm outline-none focus:border-accent"
+                disabled={!activeThreadId}
+              />
+            </div>
             <button
               type="submit"
               disabled={(!draft.trim() && !pendingFile) || !activeThreadId || sending}
