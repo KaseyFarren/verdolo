@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful } from '@/lib/agency'
-import { monthElapsedFraction } from '@/lib/period'
+import { monthElapsedFraction, billingCycleElapsedFraction } from '@/lib/period'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
@@ -12,7 +12,7 @@ import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
-type Client = { id: string; name: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null }
+type Client = { id: string; name: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
 type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: number | null }
@@ -237,13 +237,19 @@ export default function ReportsClient({
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
+        // A fully-elapsed or future month prorates by calendar bounds regardless of billing day
+        // (the retainer was either fully realized already or hasn't started); only the currently
+        // in-progress month uses the client's own billing-cycle day to determine how much of
+        // their retainer has "renewed" so far.
+        const isCurrentMonth = monthKey === todayKey().slice(0, 7)
+        const retainerFraction = isCurrentMonth ? billingCycleElapsedFraction(c.billing_day || 1) : monthElapsedFraction(monthKey)
         const estimatedCents = isHourly
           ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-          : Math.round((c.retainer_cents || 0) * monthElapsedFraction(monthKey))
+          : Math.round((c.retainer_cents || 0) * retainerFraction)
         const revenueCents = paidCents || estimatedCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
         const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        const isPartialMonth = monthElapsedFraction(monthKey) < 1
+        const isPartialMonth = retainerFraction < 1
         return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)

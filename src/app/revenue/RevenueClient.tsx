@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, isRateComparisonMeaningful, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { isFullCalendarMonth, monthElapsedFraction, type PeriodValue } from '@/lib/period'
+import { isFullCalendarMonth, billingCycleElapsedFraction, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
@@ -18,6 +18,7 @@ type Client = {
   retainer_cents: number | null
   billing_mode: string | null
   hourly_rate_cents: number | null
+  billing_day: number | null
   stage: string | null
   status: string | null
 }
@@ -148,9 +149,11 @@ export default function RevenueClient({
         // figure, so only a full calendar month period can honestly include one; a week or
         // custom range only counts what was actually billed/logged in it
         const hourlyRevenue = isHourly ? Math.round(((billableHoursByClient.get(c.id) || 0) / 3600) * (c.hourly_rate_cents || 0)) : 0
-        // A retainer is a full-month figure, but if the selected month is still in progress,
-        // attributing all of it yet gives a misleadingly high revenue-per-hour-logged-so-far.
-        const retainerFraction = period.period === 'this_month' ? monthElapsedFraction(todayKey().slice(0, 7)) : 1
+        // A retainer is a full-cycle figure, but if the selected period is the still-in-progress
+        // current month, attributing all of it yet gives a misleadingly high revenue-per-hour-
+        // logged-so-far - prorate by how far this client's own billing cycle has gotten instead
+        // of assuming everyone renews on the 1st.
+        const retainerFraction = period.period === 'this_month' ? billingCycleElapsedFraction(c.billing_day || 1) : 1
         const retainerRevenue = !isHourly && isFullMonth ? Math.round((c.retainer_cents || 0) * retainerFraction) : 0
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,

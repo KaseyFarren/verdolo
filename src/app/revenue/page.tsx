@@ -23,7 +23,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   const rangeEnd = bounds.end as string
 
   const [{ data: clients }, { data: charges }, { data: entries }, { data: members }, { data: tasks }] = await Promise.all([
-    supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, stage, status').eq('org_id', orgId).order('name'),
+    supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId).order('name'),
     supabase
       .from('client_charges')
       .select('*')

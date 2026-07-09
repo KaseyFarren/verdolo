@@ -44,6 +44,7 @@ type Client = {
   retainer_cents: number | null
   billing_mode: string | null
   hourly_rate_cents: number | null
+  billing_day: number | null
   contract_ends: string | null
   last_contacted: string | null
   quick_note: string | null
@@ -84,6 +85,7 @@ const emptyForm = {
   billing_mode: 'retainer',
   retainer: '',
   hourly_rate: '',
+  billing_day: 1,
   contract_ends: '',
   contact_email: '',
   contact_domain: '',
@@ -196,6 +198,7 @@ export default function ClientsClient({
         billing_mode: (form.billing_mode as string) || 'retainer',
         retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
         hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
+        billing_day: Math.min(28, Math.max(1, Number(form.billing_day) || 1)),
         contract_ends: (form.contract_ends as string) || null,
         contact_email: (form.contact_email as string) || null,
         contact_domain: (form.contact_domain as string) || null,
@@ -348,6 +351,7 @@ export default function ClientsClient({
                 billing_mode: editForm.billing_mode || 'retainer',
                 retainer_cents: isHourly ? 0 : dollarsToCents((editForm.retainer as string) || '0'),
                 hourly_rate_cents: isHourly ? dollarsToCents((editForm.hourly_rate as string) || '0') : 0,
+                billing_day: Math.min(28, Math.max(1, Number(editForm.billing_day) || 1)),
                 contract_ends: editForm.contract_ends || null,
                 contact_email: editForm.contact_email || null,
                 contact_domain: editForm.contact_domain || null,
@@ -396,6 +400,9 @@ export default function ClientsClient({
                 )}
                 <div className="flex gap-3 mt-1 flex-wrap">
                   {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">${centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
+                  {selected.billing_mode !== 'hourly' && !!selected.retainer_cents && (
+                    <span className="text-xs text-sage">renews on day {selected.billing_day || 1}</span>
+                  )}
                   {selected.billing_mode === 'hourly' && !!selected.hourly_rate_cents && (
                     <span className="text-xs text-green font-semibold">${centsToDollars(selected.hourly_rate_cents).toLocaleString()}/hr</span>
                   )}
@@ -433,6 +440,7 @@ export default function ClientsClient({
                         billing_mode: selected.billing_mode || 'retainer',
                         retainer: selected.retainer_cents ? centsToDollars(selected.retainer_cents) : '',
                         hourly_rate: selected.hourly_rate_cents ? centsToDollars(selected.hourly_rate_cents) : '',
+                        billing_day: selected.billing_day || 1,
                         contract_ends: selected.contract_ends || '',
                         contact_email: selected.contact_email || '',
                         contact_domain: selected.contact_domain || '',
@@ -953,6 +961,22 @@ function ClientForm({
           />
         </div>
       </div>
+      {form.billing_mode !== 'hourly' && (
+        <div className="mb-3">
+          <label className="block text-xs text-sage mb-1">Billing day of month</label>
+          <input
+            type="number"
+            min={1}
+            max={28}
+            className="w-24 rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            value={(form.billing_day as number) || 1}
+            onChange={(e) => setForm((f) => ({ ...f, billing_day: Math.min(28, Math.max(1, Number(e.target.value) || 1)) }))}
+          />
+          <div className="text-xs text-sage/70 mt-1">
+            Day the retainer renews - drives how &quot;this month&quot; is prorated in Reports and Revenue.
+          </div>
+        </div>
+      )}
       <label className="block text-xs text-sage mb-1">Owner</label>
       <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact - check-ins assign to them, and replies default to their connected mailbox</div>
       <select
