@@ -29,7 +29,10 @@ export async function callClaude(apiKey: string, body: Record<string, unknown>) 
 }
 
 export function extractText(response: { content?: { text?: string }[] }) {
-  return (response.content?.map((b) => b.text || '').join('') || '').trim()
+  const text = (response.content?.map((b) => b.text || '').join('') || '').trim()
+  // Models slip past the "do not use em dashes" prompt instruction often enough that this
+  // needs a hard guarantee, not just an ask - the user wants hyphens only, never em dashes.
+  return text.replace(/\s*—\s*/g, ' - ')
 }
 
 function ctxLine(c: ClientCtx, prior?: PriorContext) {
