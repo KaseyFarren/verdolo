@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     { data: noteRow },
     { data: reports },
     { data: sentTodayRows },
+    { data: weekCompletedTasks },
   ] = await Promise.all([
     supabase
       .from('clients')
@@ -58,6 +59,15 @@ export default async function DashboardPage() {
     // from a same-day auto-checkin task existing/being done - that task can lag or be missing
     // (e.g. right after mount), which made "Copy & mark sent" look like it did nothing.
     supabase.from('ai_message_log').select('client_id').eq('org_id', orgId).gte('created_at', `${today}T00:00:00`).lt('created_at', `${tomorrow}T00:00:00`),
+    // Powers the "This week" completed-tasks count independent of archive status - archiving
+    // hides a task from the working list but shouldn't erase it from this week's tally.
+    supabase
+      .from('tasks')
+      .select('assigned_to')
+      .eq('org_id', orgId)
+      .eq('done', true)
+      .gte('completed_at', `${weekAnchor}T00:00:00`)
+      .lt('completed_at', `${tomorrow}T00:00:00`),
   ])
 
   return (
@@ -78,6 +88,7 @@ export default async function DashboardPage() {
         excludeWeekends={org?.settings?.exclude_weekends ?? true}
         hasRecapThisWeek={!!reports?.some((r) => r.period_start === weekAnchor)}
         initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
+        weekCompletedTasks={weekCompletedTasks ?? []}
       />
     </AppShell>
   )

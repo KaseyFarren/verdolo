@@ -19,7 +19,6 @@ import {
   getInitials,
   getOffsetDate,
   getStage,
-  getWeekAnchor,
   memberName,
   sortTasks,
   todayKey,
@@ -56,6 +55,7 @@ type Recurring = { id: string; title: string; client_id: string | null; priority
 type DefaultTemplate = { id: string; title: string; priority: string; assigned_to: string | null; notes: string | null; auto_type: string | null; paused: boolean }
 type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seconds: number | null }
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
+type WeekCompletedTask = { assigned_to: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 
 function formatHoursMins(seconds: number) {
@@ -81,6 +81,7 @@ export default function DashboardClient({
   excludeWeekends,
   hasRecapThisWeek,
   initialSentToday,
+  weekCompletedTasks,
 }: {
   orgId: string
   userId: string
@@ -97,6 +98,7 @@ export default function DashboardClient({
   excludeWeekends: boolean
   hasRecapThisWeek: boolean
   initialSentToday: string[]
+  weekCompletedTasks: WeekCompletedTask[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [clients] = useState<Client[]>(initialClients)
@@ -205,15 +207,8 @@ export default function DashboardClient({
 
   // Lightweight team recognition - no notifications/points infra, just this week's leader by
   // hours logged and by tasks completed, computed from data already fetched for other panels.
-  const weekAnchor = getWeekAnchor()
   const topHours = isAdmin ? topByKey(weekTimeEntries, (e) => e.user_id, (e) => e.duration_seconds || 0) : null
-  const topTasks = isAdmin
-    ? topByKey(
-        tasks.filter((t) => t.done && t.completed_at && t.completed_at >= weekAnchor),
-        (t) => t.assigned_to,
-        () => 1
-      )
-    : null
+  const topTasks = isAdmin ? topByKey(weekCompletedTasks, (t) => t.assigned_to, () => 1) : null
   const topHoursLabel = topHours ? memberName(members.find((m) => m.user_id === topHours.key)) : null
   const topTasksLabel = topTasks ? memberName(members.find((m) => m.user_id === topTasks.key)) : null
 
