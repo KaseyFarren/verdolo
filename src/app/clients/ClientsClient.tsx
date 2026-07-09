@@ -335,6 +335,7 @@ export default function ClientsClient({
           <span aria-hidden>←</span> Clients
         </button>
 
+        <div className="flex flex-col gap-5">
         {editing ? (
           <ClientForm
             title={`Edit ${selected.name}`}
@@ -367,7 +368,7 @@ export default function ClientsClient({
             currencySign={currencySign}
           />
         ) : (
-          <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
+          <div className="rounded-lg border border-ink/10 bg-white p-4">
             <div className="flex gap-4 items-start">
               <div className="relative shrink-0">
                 <Avatar name={selected.name} index={clients.indexOf(selected)} size={48} />
@@ -422,15 +423,15 @@ export default function ClientsClient({
                 {selected.notes && <div className="text-xs text-sage mt-2 italic">{selected.notes}</div>}
               </div>
               {canEdit && (
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1.5 shrink-0 items-center">
                   <button
-                    className="text-xs rounded border border-ink/10 px-2 py-1"
+                    className={`text-xs rounded-lg px-2.5 py-1.5 font-medium text-white shadow-sm ${isChurned ? 'bg-green' : 'bg-red-600'}`}
                     onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
                   >
                     {isChurned ? '▶ Activate' : '⏸ Pause'}
                   </button>
                   <button
-                    className="text-xs rounded border border-ink/10 px-2 py-1"
+                    className="text-xs rounded-lg px-2.5 py-1.5 font-medium text-white shadow-sm bg-accent"
                     onClick={() => {
                       setEditing(true)
                       setEditForm({
@@ -456,7 +457,11 @@ export default function ClientsClient({
                   >
                     Edit
                   </button>
-                  <button className="text-xs text-red-600 px-1" onClick={() => deleteClient(selected.id)}>
+                  <button
+                    className="text-xs text-sage/60 hover:text-red-600 px-1.5 ml-1"
+                    onClick={() => deleteClient(selected.id)}
+                    title="Delete client"
+                  >
                     ✕
                   </button>
                 </div>
@@ -466,8 +471,8 @@ export default function ClientsClient({
         )}
 
         {canEdit && (
-          <div className="mb-5">
-            <div className="flex items-center justify-between mb-2">
+          <div className="rounded-lg border border-ink/10 bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-sage">Billing</div>
               {!showInvoiceForm && stripeConnectStatus === 'active' && (
                 <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={() => openInvoiceForm(selected)}>
@@ -496,7 +501,7 @@ export default function ClientsClient({
             {invoices
               .filter((inv) => inv.client_id === selected.id)
               .map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between py-2 border-b border-ink/5 text-sm">
+                <div key={inv.id} className="flex items-center justify-between py-2 border-b border-ink/5 last:border-b-0 text-sm">
                   <div>
                     <span className="font-medium">{currencySign}{centsToDollars(inv.amount_cents).toLocaleString()}</span>
                     {inv.sent_at && <span className="text-xs text-sage ml-2">Sent {formatDate(inv.sent_at.slice(0, 10))}</span>}
@@ -514,8 +519,8 @@ export default function ClientsClient({
           </div>
         )}
 
-        <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Quick note</div>
+        <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Quick note</div>
           <textarea
             className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
             placeholder="Jot anything down…"
@@ -529,86 +534,102 @@ export default function ClientsClient({
           />
         </div>
 
-        <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />
+        <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />
+        </div>
 
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Activity</div>
-        <div className="flex gap-2 mb-4 items-end">
-          <textarea
-            className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
-            placeholder="Add a note…"
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-          />
-          <button className="rounded bg-accent text-white shadow-md px-3 py-2 text-sm font-medium shrink-0" onClick={() => addNote(selected.id, noteInput)}>
-            Add
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <CustomSelect
-            value={timelineType}
-            onChange={(v) => setTimelineType(v as 'all' | 'note' | 'task' | 'message')}
-            options={[
-              { value: 'all', label: 'All activity' },
-              { value: 'note', label: 'Notes' },
-              { value: 'task', label: 'Completed tasks' },
-              { value: 'message', label: 'AI messages' },
-            ]}
-            className="w-40"
-          />
-          <PeriodSelector value={timelinePeriod} onChange={setTimelinePeriod} layoutId="client-timeline-period" />
-        </div>
-        {timeline.length === 0 && (
-          <div className="text-sm text-sage py-3">{fullTimeline.length === 0 ? 'No activity yet.' : 'No activity matches these filters.'}</div>
-        )}
-        <div className="flex flex-col">
-          {timeline.map((item, idx) => (
-            <div key={idx} className="flex gap-3 pb-4">
-              <div className="flex flex-col items-center shrink-0">
-                <div className="h-7 w-7 rounded-full bg-white border border-ink/10 flex items-center justify-center text-sm">
-                  {item.type === 'note' ? '📝' : item.type === 'message' ? '💬' : '✓'}
-                </div>
-                {idx < timeline.length - 1 && <div className="w-px flex-1 bg-ink/5 mt-1" />}
-              </div>
-              <div className="flex-1 min-w-0 pt-0.5">
-                {item.type === 'note' && (
-                  <div>
-                    <div className="text-sm whitespace-pre-wrap">{item.data.text}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-sage">
-                        {formatNoteTime(item.data.created_at)}
-                        {item.data.author_id && ` · ${memberName(memberById(item.data.author_id))}`}
-                      </span>
-                      <button className="text-xs text-red-600" onClick={() => deleteNote(item.data.id)}>
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {item.type === 'message' && (
-                  <div className="rounded-md bg-white px-3 py-2">
-                    <div className="text-xs text-sage mb-1 font-semibold">
-                      Message sent · {formatDate(item.data.created_at.slice(0, 10))}
-                      {item.data.generated_by && ` · ${memberName(memberById(item.data.generated_by))}`}
-                    </div>
-                    <div className="text-sm">{item.data.message}</div>
-                  </div>
-                )}
-                {item.type === 'task' && (
-                  <div>
-                    <div className="text-sm text-sage">
-                      <span className="text-green mr-1">✓</span>
-                      {item.data.title}
-                    </div>
-                    <div className="text-xs text-sage mt-0.5">
-                      {formatNoteTime(item.data.completed_at)}
-                      {' · '}
-                      {item.data.assigned_to ? `Assigned to ${memberName(memberById(item.data.assigned_to))}` : 'Unassigned'}
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage">Activity</div>
+            <div className="flex gap-2 text-xs text-sage">
+              <span>{clientNotes.length} note{clientNotes.length === 1 ? '' : 's'}</span>
+              <span>·</span>
+              <span>{clientTasks.length} task{clientTasks.length === 1 ? '' : 's'}</span>
+              <span>·</span>
+              <span>{clientMessages.length} message{clientMessages.length === 1 ? '' : 's'}</span>
             </div>
-          ))}
+          </div>
+          <div className="flex gap-2 mb-4 items-end">
+            <textarea
+              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
+              placeholder="Add a note…"
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+            />
+            <button className="rounded bg-accent text-white shadow-md px-3 py-2 text-sm font-medium shrink-0" onClick={() => addNote(selected.id, noteInput)}>
+              Add
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <CustomSelect
+              value={timelineType}
+              onChange={(v) => setTimelineType(v as 'all' | 'note' | 'task' | 'message')}
+              options={[
+                { value: 'all', label: 'All activity' },
+                { value: 'note', label: 'Notes' },
+                { value: 'task', label: 'Completed tasks' },
+                { value: 'message', label: 'AI messages' },
+              ]}
+              className="w-40"
+            />
+            <PeriodSelector value={timelinePeriod} onChange={setTimelinePeriod} layoutId="client-timeline-period" />
+          </div>
+          {timeline.length === 0 && (
+            <div className="text-sm text-sage py-3">{fullTimeline.length === 0 ? 'No activity yet.' : 'No activity matches these filters.'}</div>
+          )}
+          {timeline.length > 0 && (
+            <div className="flex flex-col max-h-[420px] overflow-y-auto pr-1 border-t border-ink/5 pt-3">
+              {timeline.map((item, idx) => (
+                <div key={idx} className="flex gap-3 pb-4">
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className="h-7 w-7 rounded-full bg-white border border-ink/10 flex items-center justify-center text-sm">
+                      {item.type === 'note' ? '📝' : item.type === 'message' ? '💬' : '✓'}
+                    </div>
+                    {idx < timeline.length - 1 && <div className="w-px flex-1 bg-ink/5 mt-1" />}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    {item.type === 'note' && (
+                      <div>
+                        <div className="text-sm whitespace-pre-wrap">{item.data.text}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-sage">
+                            {formatNoteTime(item.data.created_at)}
+                            {item.data.author_id && ` · ${memberName(memberById(item.data.author_id))}`}
+                          </span>
+                          <button className="text-xs text-red-600" onClick={() => deleteNote(item.data.id)}>
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {item.type === 'message' && (
+                      <div className="rounded-md bg-sand px-3 py-2">
+                        <div className="text-xs text-sage mb-1 font-semibold">
+                          Message sent · {formatDate(item.data.created_at.slice(0, 10))}
+                          {item.data.generated_by && ` · ${memberName(memberById(item.data.generated_by))}`}
+                        </div>
+                        <div className="text-sm">{item.data.message}</div>
+                      </div>
+                    )}
+                    {item.type === 'task' && (
+                      <div>
+                        <div className="text-sm text-sage">
+                          <span className="text-green mr-1">✓</span>
+                          {item.data.title}
+                        </div>
+                        <div className="text-xs text-sage mt-0.5">
+                          {formatNoteTime(item.data.completed_at)}
+                          {' · '}
+                          {item.data.assigned_to ? `Assigned to ${memberName(memberById(item.data.assigned_to))}` : 'Unassigned'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         </div>
       </div>
     )
