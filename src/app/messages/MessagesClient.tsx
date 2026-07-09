@@ -7,6 +7,7 @@ import { getInitials, memberName } from '@/lib/agency'
 import { FileIcon, ImageFileIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIcon } from '@/components/ui/icons'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 type Member = {
   user_id: string
@@ -552,7 +553,13 @@ export default function MessagesClient({
                 disabled={sending}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) setPendingFile(file)
+                  if (file) {
+                    if (file.size > MAX_ATTACHMENT_BYTES) {
+                      toast.error(`That file is too large - attachments are limited to ${formatFileSize(MAX_ATTACHMENT_BYTES)}`)
+                    } else {
+                      setPendingFile(file)
+                    }
+                  }
                   e.target.value = ''
                 }}
               />

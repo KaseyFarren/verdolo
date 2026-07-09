@@ -10,6 +10,8 @@ import { FileIcon, ImageFileIcon, PdfFileIcon, SheetFileIcon, TrashIcon, UploadC
 
 type ClientFile = { id: string; file_name: string; storage_path: string; size_bytes: number | null; created_at: string }
 
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+
 function formatSize(bytes: number | null) {
   if (!bytes) return ''
   if (bytes < 1024) return `${bytes} B`
@@ -103,7 +105,13 @@ export default function ClientFiles({
               disabled={uploading}
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) setPending({ file, name: file.name })
+                if (file) {
+                  if (file.size > MAX_FILE_BYTES) {
+                    toast.error(`That file is too large - uploads are limited to ${formatSize(MAX_FILE_BYTES)}`)
+                  } else {
+                    setPending({ file, name: file.name })
+                  }
+                }
                 e.target.value = ''
               }}
             />
