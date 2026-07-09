@@ -6,6 +6,7 @@ import { motion } from 'motion/react'
 import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
 import { monthElapsedFraction, billingCycleElapsedFraction } from '@/lib/period'
 import DatePicker from '@/components/ui/DatePicker'
+import MonthPicker from '@/components/ui/MonthPicker'
 import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
 import DivergingBarChart from '@/components/charts/DivergingBarChart'
@@ -486,11 +487,11 @@ export default function ReportsClient({
                   {backfillType === 'week' ? (
                     <DatePicker value={backfillDate} onChange={setBackfillDate} placeholder="Pick a date in that week…" className="w-44" />
                   ) : (
-                    <input
-                      type="month"
+                    <MonthPicker
                       value={backfillDate.slice(0, 7)}
-                      onChange={(e) => e.target.value && setBackfillDate(`${e.target.value}-01`)}
-                      className="rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm"
+                      onChange={(v) => setBackfillDate(`${v}-01`)}
+                      placeholder="Pick a month…"
+                      className="w-44"
                     />
                   )}
                   <button
