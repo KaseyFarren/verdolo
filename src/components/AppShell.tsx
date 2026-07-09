@@ -102,6 +102,13 @@ export default function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
+                    // These routes have no loading.tsx and are fully dynamic (per-org RLS
+                    // queries via headers()), so Next can't prefetch just a static shell - it
+                    // runs the full page (org context + every Promise.all query) to prefetch
+                    // at all. With the sidebar now a persistent layout instead of remounting
+                    // per page, that fired for all ~10 routes on every navigation. Not worth
+                    // the Supabase load for data that's stale again in seconds anyway.
+                    prefetch={false}
                     data-tour={item.tour}
                     className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                       active ? 'text-white font-medium' : 'text-cream/70 hover:text-white'
