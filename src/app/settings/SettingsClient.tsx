@@ -47,7 +47,6 @@ export default function SettingsClient({
   seatsPurchased,
   activeMemberCount,
   hasStripeCustomer,
-  stripeConnectStatus,
 }: {
   orgId: string
   userId: string
@@ -62,7 +61,6 @@ export default function SettingsClient({
   seatsPurchased: number
   activeMemberCount: number
   hasStripeCustomer: boolean
-  stripeConnectStatus: 'not_connected' | 'pending' | 'active'
 }) {
   const searchParams = useSearchParams()
   const requestedView = searchParams.get('view') as View | null
@@ -101,7 +99,7 @@ export default function SettingsClient({
           {view === 'appearance' && <AppearanceClient orgId={orgId} isAdmin={isAdmin} initialAccentColor={initialAccentColor} />}
           {view === 'voice' && <VoiceClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
           {view === 'integrations' && (
-            <IntegrationsClient orgId={orgId} isOwner={role === 'owner'} aiCredits={aiCredits} stripeConnectStatus={stripeConnectStatus} />
+            <IntegrationsClient aiCredits={aiCredits} />
           )}
           {view === 'security' && <SecurityClient />}
           {view === 'data' && <DataClient orgId={orgId} isAdmin={isAdmin} />}

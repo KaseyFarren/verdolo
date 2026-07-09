@@ -431,15 +431,7 @@ export default function ClientsClient({
               )}
             </div>
 
-            {stripeConnectStatus !== 'active' && (
-              <div className="text-sm text-sage py-2">
-                Connect Stripe in{' '}
-                <Link href="/settings?view=integrations" className="underline">
-                  Settings → Integrations
-                </Link>{' '}
-                to invoice this client.
-              </div>
-            )}
+            {stripeConnectStatus !== 'active' && <div className="text-sm text-sage py-2">Client invoicing is coming soon.</div>}
 
             {showInvoiceForm && (
               <InvoiceForm

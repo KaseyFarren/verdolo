@@ -31,7 +31,6 @@ export default async function SettingsPage() {
         seatsPurchased={org?.seats_purchased ?? 1}
         activeMemberCount={activeMemberCount ?? 0}
         hasStripeCustomer={!!org?.stripe_customer_id}
-        stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
       />
     </AppShell>
   )
