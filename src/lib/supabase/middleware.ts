@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/create-account']
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/create-account', '/accept-invite']
 
 export async function updateSession(request: NextRequest) {
   let pendingCookies: { name: string; value: string; options?: CookieOptions }[] = []

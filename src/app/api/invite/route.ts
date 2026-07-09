@@ -52,8 +52,15 @@ export async function POST(request: Request) {
     }
   }
 
+  // Supabase's invite email delivers the session as a URL hash fragment, not a PKCE `code`
+  // query param (there's no code_verifier in the invitee's browser to redeem one, since they
+  // never initiated the request) - /auth/callback only handles the PKCE flow, so it always
+  // fell through to its /login fallback for invites specifically. /accept-invite is a
+  // dedicated client-side page that lets the browser client pick up the hash fragment itself,
+  // and doubles as the "set your password" step invited users otherwise never get (without it
+  // they'd have no way to log back in once their initial invite session expires).
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/dashboard`,
+    redirectTo: `${origin}/accept-invite`,
   })
 
   if (inviteError || !invited.user) {
