@@ -2,19 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import Button from '@/components/ui/Button'
 
 export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; canInviteOwner: boolean }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'member' | 'admin' | 'owner'>('member')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'sent'>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'loading'>('idle')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setStatus('loading')
-    setError(null)
 
     const res = await fetch('/api/invite', {
       method: 'POST',
@@ -24,12 +23,13 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
     const body = await res.json()
 
     if (!res.ok) {
-      setError(body.error ?? 'Invite failed')
-      setStatus('error')
+      toast.error(body.error ?? 'Invite failed')
+      setStatus('idle')
       return
     }
 
-    setStatus('sent')
+    toast.success('Invite sent')
+    setStatus('idle')
     setEmail('')
     router.refresh()
   }
@@ -59,8 +59,6 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
           {status === 'loading' ? 'Sending…' : 'Invite'}
         </Button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {status === 'sent' && <p className="mt-2 text-sm text-green">Invite sent.</p>}
     </section>
   )
 }

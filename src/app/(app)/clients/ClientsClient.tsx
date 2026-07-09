@@ -158,7 +158,6 @@ export default function ClientsClient({
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [invoiceLineItems, setInvoiceLineItems] = useState<LineItemDraft[]>([])
   const [sendingInvoice, setSendingInvoice] = useState(false)
-  const [invoiceError, setInvoiceError] = useState<string | null>(null)
 
   useEffect(() => {
     setInvoices(initialInvoices)
@@ -284,13 +283,11 @@ export default function ClientsClient({
       items.push({ description: charge.description, amount_cents: charge.amount_cents, quantity: 1, chargeId: charge.id })
     }
     setInvoiceLineItems(items)
-    setInvoiceError(null)
     setShowInvoiceForm(true)
   }
 
   async function sendInvoice(clientId: string) {
     setSendingInvoice(true)
-    setInvoiceError(null)
     const res = await fetch('/api/billing/invoices/create-and-send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -298,7 +295,7 @@ export default function ClientsClient({
     })
     const body = await res.json()
     if (!res.ok) {
-      setInvoiceError(body.error ?? 'Failed to send invoice')
+      toast.error(body.error ?? 'Failed to send invoice')
     } else {
       setInvoices((prev) => [body.invoice as Invoice, ...prev])
       setShowInvoiceForm(false)
@@ -490,7 +487,6 @@ export default function ClientsClient({
                 onCancel={() => setShowInvoiceForm(false)}
                 onSend={() => sendInvoice(selected.id)}
                 sending={sendingInvoice}
-                error={invoiceError}
                 currencySign={currencySign}
               />
             )}
@@ -748,7 +744,6 @@ function InvoiceForm({
   onCancel,
   onSend,
   sending,
-  error,
   currencySign,
 }: {
   lineItems: LineItemDraft[]
@@ -756,7 +751,6 @@ function InvoiceForm({
   onCancel: () => void
   onSend: () => void
   sending: boolean
-  error: string | null
   currencySign: string
 }) {
   const total = lineItems.reduce((sum, item) => sum + item.amount_cents * (item.quantity || 1), 0)
@@ -811,7 +805,6 @@ function InvoiceForm({
           </button>
         </div>
       </div>
-      {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
     </div>
   )
 }

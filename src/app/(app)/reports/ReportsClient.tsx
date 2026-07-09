@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
+import { toast } from 'sonner'
 import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
 import { monthElapsedFraction, billingCycleElapsedFraction } from '@/lib/period'
 import DatePicker from '@/components/ui/DatePicker'
@@ -134,9 +135,13 @@ export default function ReportsClient({
         body: JSON.stringify({ orgId, periodType: 'week' }),
       })
       const body = await res.json()
-      setRecap(res.ok ? body.recap : body.error || 'Failed to generate.')
-      if (res.ok) highlightReport(`week:${weekAnchor}`)
-      router.refresh()
+      if (res.ok) {
+        setRecap(body.recap)
+        highlightReport(`week:${weekAnchor}`)
+        router.refresh()
+      } else {
+        toast.error(body.error || 'Failed to generate recap')
+      }
     } finally {
       setLoadingRecap(false)
     }
@@ -160,7 +165,7 @@ export default function ReportsClient({
         highlightReport(`${body.periodType}:${body.periodStart}`)
         router.refresh()
       } else {
-        setBackfillResult(body.error || 'Failed to generate.')
+        toast.error(body.error || 'Failed to generate')
       }
     } finally {
       setLoadingBackfill(false)
@@ -176,7 +181,8 @@ export default function ReportsClient({
         body: JSON.stringify({ orgId, clientId, periodStart: pMonth }),
       })
       const body = await res.json()
-      setScopeNotes((prev) => ({ ...prev, [clientId]: res.ok ? body.note : body.error || 'Failed to generate.' }))
+      if (res.ok) setScopeNotes((prev) => ({ ...prev, [clientId]: body.note }))
+      else toast.error(body.error || 'Failed to generate note')
     } finally {
       setLoadingNote(null)
     }

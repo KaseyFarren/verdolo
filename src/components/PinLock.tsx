@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { toast } from 'sonner'
 import Button from '@/components/ui/Button'
 
 // Lightweight per-device app-lock - like a phone lock screen, not a real auth replacement.
@@ -111,6 +112,7 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
     } else {
       setError(true)
       setEntry('')
+      toast.error('Incorrect PIN')
     }
   }
 
@@ -154,7 +156,6 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
                   error ? 'border-red-400' : 'border-cream/20 focus:ring-1 focus:ring-accent'
                 }`}
               />
-              {error && <div className="text-xs text-red-400 mb-3">Incorrect PIN</div>}
               <Button variant="primary" className="w-full" onClick={submit} disabled={!entry}>
                 Unlock
               </Button>

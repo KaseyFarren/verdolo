@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Logo from '@/components/Logo'
@@ -38,7 +39,6 @@ export default function CreateAccountForm({
   const [polling, setPolling] = useState(initialStatus === 'not_found' && !!sessionId)
   const [orgName, setOrgName] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const attempts = useRef(0)
 
@@ -66,17 +66,16 @@ export default function CreateAccountForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError(null)
 
     const supabase = createClient()
     const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
     if (signUpError) {
-      setError(signUpError.message)
+      toast.error(signUpError.message)
       setLoading(false)
       return
     }
     if (!data.session) {
-      setError('Check your email to confirm your account, then come back to this link to finish setup.')
+      toast.error('Check your email to confirm your account, then come back to this link to finish setup.')
       setLoading(false)
       return
     }
@@ -86,7 +85,7 @@ export default function CreateAccountForm({
       p_org_name: orgName,
     })
     if (claimError) {
-      setError('This link is no longer valid. Contact support to finish setting up your account.')
+      toast.error('This link is no longer valid. Contact support to finish setting up your account.')
       setLoading(false)
       return
     }
@@ -156,7 +155,6 @@ export default function CreateAccountForm({
           required
           className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Setting up...' : 'Create account'}
         </Button>

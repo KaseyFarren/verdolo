@@ -55,6 +55,7 @@ export default function ClientFiles({
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (!error) setFiles((data as ClientFile[]) ?? [])
+        else toast.error('Could not load files')
       })
   }, [supabase, clientId])
 

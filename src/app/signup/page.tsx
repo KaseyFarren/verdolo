@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Logo from '@/components/Logo'
@@ -11,7 +12,6 @@ export default function SignupPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [checkEmail, setCheckEmail] = useState(false)
   const [loading, setLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
@@ -19,17 +19,16 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!agreed) {
-      setError('Please agree to the Terms of Service and Privacy Policy to continue.')
+      toast.error('Please agree to the Terms of Service and Privacy Policy to continue.')
       return
     }
     setLoading(true)
-    setError(null)
 
     const supabase = createClient()
     const { data, error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      setError(error.message)
+      toast.error(error.message)
       setLoading(false)
       return
     }
@@ -105,7 +104,6 @@ export default function SignupPage() {
             .
           </span>
         </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Creating…' : 'Sign up'}
         </Button>

@@ -145,7 +145,6 @@ export default function DashboardClient({
   const [focusInputs, setFocusInputs] = useState<Record<string, string>>({})
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingOne, setLoadingOne] = useState<string | null>(null)
-  const [genError, setGenError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showMessages, setShowMessages] = useState(true)
   const [sentClientIds, setSentClientIds] = useState<Set<string>>(new Set(initialSentToday))
@@ -272,7 +271,6 @@ export default function DashboardClient({
 
   async function generateAll() {
     setLoadingAll(true)
-    setGenError(null)
     try {
       const res = await fetch('/api/ai/daily-messages', {
         method: 'POST',
@@ -288,7 +286,7 @@ export default function DashboardClient({
         }
         setDraftMessages((prev) => ({ ...prev, ...next }))
       } else {
-        setGenError(body.error || 'Generation failed')
+        toast.error(body.error || 'Generation failed')
       }
     } finally {
       setLoadingAll(false)
@@ -297,7 +295,6 @@ export default function DashboardClient({
 
   async function generateOne(clientId: string) {
     setLoadingOne(clientId)
-    setGenError(null)
     try {
       const res = await fetch('/api/ai/one-message', {
         method: 'POST',
@@ -306,7 +303,7 @@ export default function DashboardClient({
       })
       const body = await res.json()
       if (res.ok) setDraftMessages((prev) => ({ ...prev, [clientId]: body.message }))
-      else setGenError(body.error || 'Generation failed')
+      else toast.error(body.error || 'Generation failed')
     } finally {
       setLoadingOne(null)
     }
@@ -317,7 +314,9 @@ export default function DashboardClient({
     if (!message) return
     try {
       await navigator.clipboard.writeText(message)
-    } catch {}
+    } catch {
+      toast.error('Could not copy to clipboard - copy the message manually below')
+    }
     setCopiedId(client.id)
     setTimeout(() => setCopiedId(null), 2000)
 
@@ -612,7 +611,6 @@ export default function DashboardClient({
           </div>
         </div>
         {showMessages && !hasApiKey && <div className="text-sm text-sage py-2">AI check-ins aren&apos;t available right now - try again shortly.</div>}
-        {showMessages && genError && <div className="text-sm text-red-600 py-2">{genError}</div>}
         {showMessages && activeClients.map((c, i) => {
           const sent = isSentToday(c.id)
           const isGen = loadingOne === c.id

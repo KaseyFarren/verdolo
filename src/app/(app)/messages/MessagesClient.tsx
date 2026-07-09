@@ -339,6 +339,8 @@ export default function MessagesClient({
             m.reactions.some((r) => r.id === data.id) ? m : { ...m, reactions: [...m.reactions, { id: data.id, emoji: data.emoji, user_id: data.user_id }] }
           )
         )
+      } else if (error) {
+        toast.error('Could not add reaction')
       }
     }
   }

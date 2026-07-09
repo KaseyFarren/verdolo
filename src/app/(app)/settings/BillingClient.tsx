@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 type Status = 'trialing' | 'active' | 'past_due' | 'canceled' | null
 
@@ -24,7 +25,6 @@ export default function BillingClient({
   planType: 'subscription' | 'lifetime'
 }) {
   const [loading, setLoading] = useState<'checkout' | 'portal' | 'seats' | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [seatsInput, setSeatsInput] = useState(seatsPurchased)
 
   const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0
@@ -32,7 +32,6 @@ export default function BillingClient({
 
   async function startCheckout() {
     setLoading('checkout')
-    setError(null)
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +39,7 @@ export default function BillingClient({
     })
     const body = await res.json()
     if (!res.ok) {
-      setError(body.error ?? 'Could not start checkout')
+      toast.error(body.error ?? 'Could not start checkout')
       setLoading(null)
       return
     }
@@ -49,7 +48,6 @@ export default function BillingClient({
 
   async function openPortal() {
     setLoading('portal')
-    setError(null)
     const res = await fetch('/api/billing/portal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -57,7 +55,7 @@ export default function BillingClient({
     })
     const body = await res.json()
     if (!res.ok) {
-      setError(body.error ?? 'Could not open billing portal')
+      toast.error(body.error ?? 'Could not open billing portal')
       setLoading(null)
       return
     }
@@ -66,7 +64,6 @@ export default function BillingClient({
 
   async function updateSeats() {
     setLoading('seats')
-    setError(null)
     try {
       const res = await fetch('/api/billing/seats', {
         method: 'POST',
@@ -75,13 +72,13 @@ export default function BillingClient({
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(body.error ?? 'Could not update seats')
+        toast.error(body.error ?? 'Could not update seats')
         setLoading(null)
         return
       }
       window.location.reload()
     } catch {
-      setError('Could not update seats - please try again')
+      toast.error('Could not update seats - please try again')
       setLoading(null)
     }
   }
@@ -129,8 +126,6 @@ export default function BillingClient({
           {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
         </div>
       </div>
-
-      {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
 
       <div className="flex gap-2 mb-6">
         {(!hasStripeCustomer || subscriptionStatus === 'canceled' || trialExpired) && (

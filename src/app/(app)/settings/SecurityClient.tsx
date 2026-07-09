@@ -22,23 +22,21 @@ function PasswordSection() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function changePassword() {
-    setError(null)
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters')
+      toast.error('Password must be at least 6 characters')
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('Passwords don’t match')
+      toast.error('Passwords don’t match')
       return
     }
     setSaving(true)
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
     setSaving(false)
     if (updateError) {
-      setError(updateError.message)
+      toast.error(updateError.message)
       return
     }
     setNewPassword('')
@@ -67,7 +65,6 @@ function PasswordSection() {
             className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
           />
         </div>
-        {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
         <Button variant="primary" onClick={changePassword} disabled={saving || !newPassword}>
           {saving ? 'Updating…' : 'Update password'}
         </Button>
@@ -83,7 +80,6 @@ function PinSection() {
   const [newPin, setNewPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [changing, setChanging] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setHasPin(hasPinSet())
@@ -91,13 +87,12 @@ function PinSection() {
   }, [])
 
   async function savePin() {
-    setError(null)
     if (!/^\d{4,6}$/.test(newPin)) {
-      setError('PIN must be 4-6 digits')
+      toast.error('PIN must be 4-6 digits')
       return
     }
     if (newPin !== confirmPin) {
-      setError('PINs don’t match')
+      toast.error('PINs don’t match')
       return
     }
     await setPin(newPin)
@@ -162,9 +157,8 @@ function PinSection() {
               className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm"
             />
           </div>
-          {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
           <div className="flex gap-2">
-            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => { setChanging(false); setError(null) }}>
+            <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setChanging(false)}>
               Cancel
             </button>
             <Button variant="primary" className="!px-3 !py-1.5" onClick={savePin}>
