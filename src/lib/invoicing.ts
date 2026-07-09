@@ -4,7 +4,7 @@ import { getStripe, connectAccount } from '@/lib/stripe'
 
 export type LineItem = { description: string; amount_cents: number; quantity: number; chargeId?: string }
 
-/** Shared by the manual "Create Invoice" route and the recurring-retainer cron —
+/** Shared by the manual "Create Invoice" route and the recurring-retainer cron -
  * creates the Stripe customer/invoice on the agency's connected account, sends it,
  * and records the result in `invoices`. Callers own auth/permission checks. */
 export async function createAndSendInvoice({

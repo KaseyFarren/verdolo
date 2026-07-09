@@ -31,7 +31,7 @@ export default function VoiceClient({ orgId, isAdmin, settings }: { orgId: strin
     <Section label="Voice & Tone">
       <div className="text-sm font-medium">Brand voice</div>
       <div className="text-xs text-sage mt-0.5 mb-2">
-        Describe how your agency should sound — this guides every AI-generated weekly recap and client message.
+        Describe how your agency should sound - this guides every AI-generated weekly recap and client message.
       </div>
       <textarea
         className="w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm min-h-[110px]"

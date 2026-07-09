@@ -75,7 +75,7 @@ export default function ProposalsClient({
     return clientList.find((c) => c.id === id)?.name ?? 'Unknown client'
   }
 
-  // Proposals often go out to prospects who aren't clients yet — creating one inline (as a
+  // Proposals often go out to prospects who aren't clients yet - creating one inline (as a
   // 'Lead' in the existing pipeline stage) avoids forcing a separate trip to Clients first.
   async function resolveClientId(): Promise<string | null> {
     if (clientMode === 'existing') return form.client_id || null

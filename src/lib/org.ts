@@ -19,7 +19,7 @@ export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
   const supabase = await createClient()
 
   // Middleware already validated the session with a real network round trip and passed the
-  // result via headers — reuse it instead of paying for a second auth.getUser() round trip.
+  // result via headers - reuse it instead of paying for a second auth.getUser() round trip.
   // Falls back to calling it directly if the request somehow bypassed middleware.
   const headerList = await headers()
   const headerUserId = headerList.get('x-user-id')

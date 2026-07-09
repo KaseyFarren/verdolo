@@ -35,7 +35,7 @@ export default function IntegrationsClient({
           <IntegrationIcon name="anthropic" />
           <div>
             <div className="text-sm font-medium">AI generation</div>
-            <div className="text-xs text-sage">Included with your plan — no API key to manage.</div>
+            <div className="text-xs text-sage">Included with your plan - no API key to manage.</div>
           </div>
         </div>
         <div className="flex items-center justify-between text-xs text-sage mb-1">

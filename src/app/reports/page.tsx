@@ -33,7 +33,7 @@ function monthKeyBounds(y: number, m: number) {
   return { start, end }
 }
 
-// Profitability's date filter — the picked month plus the 5 before it, so the trend chart
+// Profitability's date filter - the picked month plus the 5 before it, so the trend chart
 // always ends on whatever month the per-client breakdown/bar chart below it is showing.
 function trendWindow(pMonth: string) {
   const [y, m] = pMonth.split('-').map(Number)
@@ -51,7 +51,7 @@ function trendWindow(pMonth: string) {
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; pMonth?: string }> }) {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
 
-  // Reports is admin/owner only — members' tasks/time_entries RLS only exposes their own rows,
+  // Reports is admin/owner only - members' tasks/time_entries RLS only exposes their own rows,
   // so an org-wide per-client report would be misleadingly incomplete for a member. Same
   // reasoning as the Team/Revenue gates.
   if (!isAdminRole(role)) redirect('/dashboard')
@@ -60,12 +60,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const range: ReportRange = rangeParam === 'last_week' || rangeParam === 'this_month' ? rangeParam : 'this_week'
   const { start, end } = rangeBounds(range)
 
-  // Capacity is always calendar-week, independent of the "by client" range picker above —
+  // Capacity is always calendar-week, independent of the "by client" range picker above -
   // "who's overloaded" means this week regardless of what range the activity table is set to.
   const weekAnchor = getWeekAnchor()
   const weekEnd = todayKey(new Date(new Date(weekAnchor).getTime() + 7 * 86400000))
 
-  // Profitability has its own month picker (defaults to the current month) — the trend chart
+  // Profitability has its own month picker (defaults to the current month) - the trend chart
   // covers that month plus the 5 before it, so monthTimeEntries/monthPaidInvoices below span
   // that whole 6-month window rather than just "this month".
   const now = new Date()

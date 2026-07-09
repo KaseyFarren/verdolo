@@ -1,4 +1,4 @@
--- Client file storage — brand guides, docs, and other reference files attached to a client.
+-- Client file storage - brand guides, docs, and other reference files attached to a client.
 
 create table client_files (
   id uuid primary key default gen_random_uuid(),
@@ -18,7 +18,7 @@ create policy client_files_select on client_files for select using (is_org_membe
 create policy client_files_insert on client_files for insert with check (is_org_member(org_id));
 create policy client_files_delete on client_files for delete using (is_org_member(org_id));
 
--- private bucket (client docs may be sensitive) — path convention: {org_id}/{client_id}/{filename}
+-- private bucket (client docs may be sensitive) - path convention: {org_id}/{client_id}/{filename}
 insert into storage.buckets (id, name, public)
 values ('client-files', 'client-files', false)
 on conflict (id) do nothing;

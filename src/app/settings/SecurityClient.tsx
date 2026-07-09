@@ -123,7 +123,7 @@ function PinSection() {
 
   return (
     <Section label="Device PIN lock">
-      <Row title="Device PIN lock" subtitle="Locks this browser after inactivity — a quick deterrent, not a replacement for your login">
+      <Row title="Device PIN lock" subtitle="Locks this browser after inactivity - a quick deterrent, not a replacement for your login">
         {hasPin && !changing ? (
           <div className="flex items-center gap-2">
             <span className="text-xs text-green">● PIN set</span>

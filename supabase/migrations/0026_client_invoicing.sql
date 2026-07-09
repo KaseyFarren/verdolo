@@ -17,6 +17,6 @@ alter table invoices add column if not exists paid_at timestamptz;
 alter table client_charges add column if not exists invoice_id uuid references invoices(id) on delete set null;
 
 -- RLS already covers this table (0001_init.sql: invoices_select for org members,
--- invoices_write admin+owner) — matches the intended permission model exactly, nothing to add.
+-- invoices_write admin+owner) - matches the intended permission model exactly, nothing to add.
 
 create index if not exists invoices_stripe_invoice_id_idx on invoices(stripe_invoice_id);

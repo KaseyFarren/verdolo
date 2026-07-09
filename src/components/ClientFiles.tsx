@@ -112,7 +112,7 @@ export default function ClientFiles({
       </div>
 
       {files.length === 0 ? (
-        <div className="text-sm text-sage py-2">No files yet — brand guides, docs, or other reference material.</div>
+        <div className="text-sm text-sage py-2">No files yet - brand guides, docs, or other reference material.</div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {files.map((f) => (
@@ -167,7 +167,7 @@ export default function ClientFiles({
                 </div>
                 <div className="text-sm font-semibold">Name this file</div>
               </div>
-              <div className="text-xs text-sage mb-4">This is how it&rsquo;ll show up in the file library — rename it to whatever&rsquo;s clearest.</div>
+              <div className="text-xs text-sage mb-4">This is how it&rsquo;ll show up in the file library - rename it to whatever&rsquo;s clearest.</div>
               <input
                 className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-4"
                 value={pending.name}

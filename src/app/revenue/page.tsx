@@ -10,7 +10,7 @@ const VALID_PERIODS: Period[] = ['this_month', 'last_month', 'this_week', 'last_
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<{ period?: string; start?: string; end?: string }> }) {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
 
-  // revenue is owner-only — redirect server-side before any revenue data is fetched, rather
+  // revenue is owner-only - redirect server-side before any revenue data is fetched, rather
   // than relying on a client-side check (Server Component props still serialize to the client
   // regardless of what's rendered, same reasoning as stripRetainer() in lib/agency.ts)
   if (role !== 'owner') redirect('/dashboard')
@@ -39,7 +39,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .lt('started_at', rangeEnd),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role, title').eq('org_id', orgId).eq('status', 'active'),
     // original_due_date is frozen at creation (see migration 0020) so this can't be gamed by
-    // pushing due_date forward — completed/overdue/late counters always reflect the original commitment
+    // pushing due_date forward - completed/overdue/late counters always reflect the original commitment
     supabase
       .from('tasks')
       .select('assigned_to, done, completed_at, original_due_date')

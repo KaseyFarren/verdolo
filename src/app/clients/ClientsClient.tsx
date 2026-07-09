@@ -122,7 +122,7 @@ export default function ClientsClient({
   const [notes, setNotes] = useState<Note[]>(initialNotes)
 
   // router.refresh() gives a new initialClients/initialNotes array, but useState's initializer
-  // only runs on mount — without this, the prop update never reaches local state.
+  // only runs on mount - without this, the prop update never reaches local state.
   useEffect(() => {
     setClients(initialClients)
   }, [initialClients])
@@ -897,7 +897,7 @@ function ClientForm({
         </div>
       </div>
       <label className="block text-xs text-sage mb-1">Owner</label>
-      <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact — check-ins assign to them, and replies default to their connected mailbox</div>
+      <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact - check-ins assign to them, and replies default to their connected mailbox</div>
       <select
         className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-4"
         value={(form.owner as string) || ''}

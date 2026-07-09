@@ -35,7 +35,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Middleware already validated this session with Supabase's auth server (a real network
-  // round trip) — pass the result down via headers so requireOrgContext() doesn't have to
+  // round trip) - pass the result down via headers so requireOrgContext() doesn't have to
   // pay for a second, redundant getUser() call on every page.
   if (user) {
     request.headers.set('x-user-id', user.id)

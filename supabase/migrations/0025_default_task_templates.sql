@@ -1,6 +1,6 @@
 -- Generalizes the previously-hardcoded "Daily check-in" auto-task into a configurable
 -- list of "default tasks" that fan out to every client, every day (mirrors recurring_templates
--- but always daily and always all-clients — no client_id/frequency needed).
+-- but always daily and always all-clients - no client_id/frequency needed).
 
 create table default_task_templates (
   id uuid primary key default gen_random_uuid(),

@@ -137,7 +137,7 @@ export default function ReportsClient({
     }
   }
 
-  // Backfills or regenerates a report for any past week/month, not just "this week" — the fix
+  // Backfills or regenerates a report for any past week/month, not just "this week" - the fix
   // for forgetting to generate one on time. Lands in the Report library below via router.refresh().
   async function generateBackfill() {
     setLoadingBackfill(true)
@@ -222,7 +222,7 @@ export default function ReportsClient({
       .sort((a, b) => b.taskCount + b.totalSeconds / 3600 - (a.taskCount + a.totalSeconds / 3600))
   }, [clients, tasks, entries, members])
 
-  // Verdolo doesn't track real expenses, so there's no honest "cost"/"margin" in dollars —
+  // Verdolo doesn't track real expenses, so there's no honest "cost"/"margin" in dollars -
   // only hours logged vs. revenue. Effective rate (revenue ÷ hours) compared against the
   // team's target rate gives the same "is this account worth the time it's taking" signal
   // without pretending to know a real P&L. Shared by the selected-month breakdown below and
@@ -259,7 +259,7 @@ export default function ReportsClient({
       const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
       return {
         month: monthKey,
-        // An effective rate needs a denominator — a month with retainer revenue but zero
+        // An effective rate needs a denominator - a month with retainer revenue but zero
         // logged hours has no *rate* to report, not a rate of $0 (retainer_cents is always
         // "current", so every month trivially has revenue even before a client was active).
         blendedRateCents: totalHours > 0 ? totalRevenue / totalHours : 0,
@@ -386,7 +386,7 @@ export default function ReportsClient({
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Tasks by who</div>
                         {r.byAssignee.length === 0 ? (
-                          <div className="text-xs text-sage">—</div>
+                          <div className="text-xs text-sage">-</div>
                         ) : (
                           r.byAssignee.map((a) => (
                             <div key={a.label} className="flex justify-between text-xs py-0.5">
@@ -399,7 +399,7 @@ export default function ReportsClient({
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Time by who</div>
                         {r.byLogger.length === 0 ? (
-                          <div className="text-xs text-sage">—</div>
+                          <div className="text-xs text-sage">-</div>
                         ) : (
                           r.byLogger.map((l) => (
                             <div key={l.label} className="flex justify-between text-xs py-0.5">
@@ -489,7 +489,7 @@ export default function ReportsClient({
                   {!hasApiKey
                     ? 'AI features aren’t configured on this deployment.'
                     : backfillType === 'week'
-                      ? 'Pick any date — it snaps to that date’s Monday–Sunday week.'
+                      ? 'Pick any date - it snaps to that date’s Monday–Sunday week.'
                       : 'Pick any month to generate or regenerate its recap.'}
                 </div>
                 {backfillResult && <div className="text-xs text-ink mt-2">{backfillResult}</div>}
@@ -561,7 +561,7 @@ export default function ReportsClient({
 
           {targetRateCents === 0 && (
             <div className="text-sm text-sage bg-white rounded-xl shadow-md p-3 mb-4">
-              Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here — set a target hourly rate in Settings → General to
+              Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here - set a target hourly rate in Settings → General to
               see how each account&apos;s effective rate compares (no target set yet).
             </div>
           )}
@@ -676,7 +676,7 @@ export default function ReportsClient({
                     .map((r) => ({
                       id: r.member.user_id,
                       label: memberName(r.member),
-                      // Target hours is a utilization floor, not a capacity ceiling — falling
+                      // Target hours is a utilization floor, not a capacity ceiling - falling
                       // short is the problem case (red), meeting/exceeding it is fine (blue).
                       valueCents: (r.hours - (r.targetHours as number)) * 100,
                     }))}

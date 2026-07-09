@@ -28,5 +28,5 @@ create policy reports_select on reports for select using (is_org_member(org_id))
 create policy reports_insert on reports for insert with check (is_org_member(org_id));
 create policy reports_update on reports for update using (is_org_member(org_id));
 -- weekly_reports never had a delete policy (RLS default-denies with no matching policy), so a
--- bad or wrongly-dated backfilled report could never be removed by anyone — admins can now.
+-- bad or wrongly-dated backfilled report could never be removed by anyone - admins can now.
 create policy reports_delete on reports for delete using (is_org_admin(org_id));

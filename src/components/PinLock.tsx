@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import Button from '@/components/ui/Button'
 
-// Lightweight per-device app-lock — like a phone lock screen, not a real auth replacement.
+// Lightweight per-device app-lock - like a phone lock screen, not a real auth replacement.
 // Supabase login is what actually protects the data; this just deters a shoulder-surf or
 // someone picking up an unattended, already-logged-in laptop. Everything lives in
 // localStorage: nothing here is synced across devices or verified server-side.
@@ -74,7 +74,7 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
 
     function bump() {
       const now = Date.now()
-      // throttle localStorage writes to once every 10s — this fires on every mousemove otherwise
+      // throttle localStorage writes to once every 10s - this fires on every mousemove otherwise
       if (now - lastWrite.current > 10000) {
         lastWrite.current = now
         localStorage.setItem(LAST_ACTIVITY_KEY, String(now))

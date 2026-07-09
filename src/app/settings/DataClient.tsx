@@ -54,7 +54,7 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
 
   return (
     <Section label="Data">
-      <Row title="Export all data (JSON)" subtitle="Full backup — clients, tasks, notes">
+      <Row title="Export all data (JSON)" subtitle="Full backup - clients, tasks, notes">
         <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={exportJSON}>
           Export
         </button>

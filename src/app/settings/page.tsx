@@ -4,7 +4,7 @@ import { getAiCreditStatus } from '@/lib/aiCredits'
 import SettingsClient from './SettingsClient'
 
 export default async function SettingsPage() {
-  // whole Settings section skips the paywall — an org with a lapsed subscription still
+  // whole Settings section skips the paywall - an org with a lapsed subscription still
   // needs to reach every section here (not just get bounced straight to Billing) to fix it
   const { supabase, user, orgId, role, org } = await requireOrgContext({ skipPaywall: true })
   const isAdmin = isAdminRole(role)

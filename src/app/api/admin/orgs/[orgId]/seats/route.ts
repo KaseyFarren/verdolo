@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAppOwnerApi } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Deliberately diverges from /api/billing/seats: this is a support "comp seats" action —
+// Deliberately diverges from /api/billing/seats: this is a support "comp seats" action -
 // it updates seats_purchased directly and never touches Stripe, since the whole point is
 // granting extra capacity without billing the customer more.
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
 
   if (seats < (activeCount || 0)) {
     return NextResponse.json(
-      { error: `This org has ${activeCount} active members — can't set seats below that` },
+      { error: `This org has ${activeCount} active members - can't set seats below that` },
       { status: 400 }
     )
   }

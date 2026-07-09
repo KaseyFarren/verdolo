@@ -133,7 +133,7 @@ async function main() {
   }
   console.log(`  imported ${msgCount} messages`)
 
-  console.log('\nDone. Note: recurring task templates and quick notes were not in the old export format and were not migrated — recreate any recurring tasks manually in Tasks → Recurring.')
+  console.log('\nDone. Note: recurring task templates and quick notes were not in the old export format and were not migrated - recreate any recurring tasks manually in Tasks → Recurring.')
 }
 
 main()

@@ -10,7 +10,7 @@ export type PeriodValue = {
 }
 
 export type PeriodBounds = {
-  // inclusive start / exclusive end, YYYY-MM-DD — null means unbounded (all_time)
+  // inclusive start / exclusive end, YYYY-MM-DD - null means unbounded (all_time)
   start: string | null
   end: string | null
   label: string
@@ -67,7 +67,7 @@ export function periodBounds(value: PeriodValue): PeriodBounds {
   }
 }
 
-/** Retainers are monthly figures — only a full-calendar-month period can honestly include them. */
+/** Retainers are monthly figures - only a full-calendar-month period can honestly include them. */
 export function isFullCalendarMonth(value: PeriodValue) {
   return value.period === 'this_month' || value.period === 'last_month'
 }

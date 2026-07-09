@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // seat cap only applies once billing is live (active/past_due) — trials (local or Stripe)
+  // seat cap only applies once billing is live (active/past_due) - trials (local or Stripe)
   // stay unlimited so a team can fully evaluate the product before paying for seats
   const { data: org } = await admin.from('orgs').select('subscription_status, seats_purchased').eq('id', orgId).single()
   if (org && (org.subscription_status === 'active' || org.subscription_status === 'past_due')) {

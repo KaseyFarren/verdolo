@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const { data: client } = await supabase.from('clients').select('id, name, retainer_cents').eq('id', clientId).eq('org_id', orgId).single()
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
 
-  // periodStart (YYYY-MM) is the month the caller is actually looking at in Profitability —
+  // periodStart (YYYY-MM) is the month the caller is actually looking at in Profitability -
   // without it this always explained "this month", silently wrong once month navigation exists.
   const now = new Date()
   const [y, m] = /^\d{4}-\d{2}$/.test(periodStart ?? '') ? periodStart.split('-').map(Number) : [now.getFullYear(), now.getMonth() + 1]

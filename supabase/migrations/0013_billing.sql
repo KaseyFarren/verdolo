@@ -1,7 +1,7 @@
 -- Per-seat subscription billing: 14-day free trial starting at org creation, then requires an
 -- active Stripe subscription. seats_purchased caps active org_members and is only ever written
 -- by server-side code (create_org RPC, Stripe webhook handler, /api/billing/seats) using the
--- service-role client or a security-definer function — never by a direct client-side update —
+-- service-role client or a security-definer function - never by a direct client-side update -
 -- so no RLS change is needed on `orgs` for these columns.
 
 alter table orgs add column if not exists stripe_customer_id text;

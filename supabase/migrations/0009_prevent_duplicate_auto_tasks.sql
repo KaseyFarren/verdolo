@@ -21,6 +21,6 @@ with ranked_recurring as (
 delete from tasks where id in (select id from ranked_recurring where rn > 1);
 
 -- NULLs never conflict in a unique constraint, so this only constrains rows that
--- actually have auto_type/recurring_id set — regular manually-created tasks are unaffected.
+-- actually have auto_type/recurring_id set - regular manually-created tasks are unaffected.
 alter table tasks add constraint tasks_auto_checkin_unique unique (org_id, client_id, due_date, auto_type);
 alter table tasks add constraint tasks_recurring_instance_unique unique (org_id, recurring_id, due_date);

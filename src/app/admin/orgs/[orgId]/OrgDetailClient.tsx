@@ -36,7 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
@@ -163,7 +163,7 @@ export default function OrgDetailClient({
           </div>
           <div>
             <div className="text-xs text-sage">Subscription ID</div>
-            <div className="font-mono text-xs truncate">{org.stripe_subscription_id ?? '—'}</div>
+            <div className="font-mono text-xs truncate">{org.stripe_subscription_id ?? '-'}</div>
           </div>
         </div>
 
@@ -230,7 +230,7 @@ export default function OrgDetailClient({
           <tbody>
             {members.map((m) => (
               <tr key={m.id} className="border-b border-ink/5 last:border-0">
-                <td className="px-2 py-2">{m.invited_email ?? '—'}</td>
+                <td className="px-2 py-2">{m.invited_email ?? '-'}</td>
                 <td className="px-2 py-2 text-sage">{m.role}</td>
                 <td className="px-2 py-2 text-sage">{m.status}</td>
                 <td className="px-2 py-2 text-sage">{formatDate(m.joined_at)}</td>

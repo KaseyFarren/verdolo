@@ -13,7 +13,7 @@ function mapStatus(stripeStatus: Stripe.Subscription.Status): 'trialing' | 'acti
 async function syncSubscription(subscription: Stripe.Subscription) {
   const admin = createAdminClient()
   const orgId = subscription.metadata?.org_id
-  // current_period_end moved to the subscription item in recent Stripe API versions —
+  // current_period_end moved to the subscription item in recent Stripe API versions -
   // it no longer exists on the top-level Subscription object.
   const item = subscription.items.data[0]
   const seats = item?.quantity ?? 1

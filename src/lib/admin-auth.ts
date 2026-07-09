@@ -12,7 +12,7 @@ export function isAppOwnerEmail(email?: string | null) {
   return allowlist.includes(email.toLowerCase())
 }
 
-// For Server Components/layouts under /admin — proxy.ts passes x-user-id/x-user-email
+// For Server Components/layouts under /admin - proxy.ts passes x-user-id/x-user-email
 // headers for page routes, so reuse them instead of a second auth round trip (same
 // shortcut requireOrgContext uses in src/lib/org.ts).
 export async function requireAppOwnerPage() {
@@ -35,7 +35,7 @@ export async function requireAppOwnerPage() {
   return { user: { id: user.id, email: user.email ?? '' } }
 }
 
-// For Route Handlers under /api/admin — proxy.ts excludes /api entirely (so
+// For Route Handlers under /api/admin - proxy.ts excludes /api entirely (so
 // Stripe/cron webhook POSTs without a session cookie aren't redirected to /login),
 // meaning there's no x-user-id header shortcut here; always calls getUser() directly.
 export async function requireAppOwnerApi() {

@@ -24,7 +24,7 @@ function periodHasElapsed(resetAt: string) {
   return reset.getUTCFullYear() !== now.getUTCFullYear() || reset.getUTCMonth() !== now.getUTCMonth()
 }
 
-/** Read-only status for display (Settings) — never writes, so a page view can't itself reset the counter. */
+/** Read-only status for display (Settings) - never writes, so a page view can't itself reset the counter. */
 export async function getAiCreditStatus(orgId: string) {
   const admin = createAdminClient()
   const [{ data: org }, seatCount] = await Promise.all([

@@ -5,7 +5,7 @@ import { isAuthorizedCronRequest } from '@/lib/cronAuth'
 import { getStage } from '@/lib/agency'
 
 // Runs on the 1st of the month (see vercel.json). For every org with Stripe Connect active,
-// invoices every non-churned client with a non-zero retainer — the same line-item shape
+// invoices every non-churned client with a non-zero retainer - the same line-item shape
 // (retainer + any unbilled client_charges) as the manual "Create Invoice" flow in
 // ClientsClient.tsx, just headless. Skips a client if it's already been invoiced this month
 // (source = 'recurring'), so a re-run or a slow cron doesn't double-bill.

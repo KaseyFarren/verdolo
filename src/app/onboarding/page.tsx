@@ -25,7 +25,7 @@ export default async function OnboardingPage() {
         <Logo size={24} />
       </div>
       <h1 className="text-xl font-semibold text-center">Set up your agency</h1>
-      <p className="text-sm text-sage text-center">You&apos;re not part of an org yet — create one to get started.</p>
+      <p className="text-sm text-sage text-center">You&apos;re not part of an org yet - create one to get started.</p>
       <CreateOrgForm />
     </main>
   )

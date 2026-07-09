@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const newTrialEndsAt = new Date(base.getTime() + days * 86400000).toISOString()
 
   const update: Record<string, unknown> = { trial_ends_at: newTrialEndsAt }
-  // Only flip status to trialing for orgs with no real Stripe subscription — an org
+  // Only flip status to trialing for orgs with no real Stripe subscription - an org
   // that's actually subscribed keeps whatever status the billing webhook says.
   if (!org.stripe_subscription_id) update.subscription_status = 'trialing'
 

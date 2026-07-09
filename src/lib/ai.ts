@@ -52,13 +52,13 @@ function ctxLine(c: ClientCtx, prior?: PriorContext) {
 }
 
 function voiceLine(brandVoice?: string | null) {
-  return brandVoice?.trim() ? `Brand voice — write in this voice: ${brandVoice.trim()}\n` : ''
+  return brandVoice?.trim() ? `Brand voice - write in this voice: ${brandVoice.trim()}\n` : ''
 }
 
 export function buildDailyMessagesPrompt(clients: (ClientCtx & { priorContext?: PriorContext })[], brandVoice?: string | null) {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return `You are a professional agency assistant. Today is ${dateStr}.
-${voiceLine(brandVoice)}For each client, write a short friendly daily check-in message (3-5 sentences), ready to send as-is. Match tone to their platform. Sound human, not corporate.
+${voiceLine(brandVoice)}For each client, write a short friendly daily check-in message (3-5 sentences), ready to send as-is. Match tone to their platform. Sound human, not corporate. Do not use em dashes.
 Clients:
 ${clients.map((c, i) => `${i + 1}. ${ctxLine(c, c.priorContext)}`).join('\n')}
 Return ONLY valid JSON, no markdown:
@@ -68,7 +68,7 @@ Return ONLY valid JSON, no markdown:
 export function buildSingleMessagePrompt(client: ClientCtx, prior: PriorContext, todaysFocus?: string, brandVoice?: string | null) {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const focus = todaysFocus ? `Today specifically cover: ${todaysFocus}. ` : ''
-  return `Write one short friendly check-in message (3-5 sentences) for today (${dateStr}). ${voiceLine(brandVoice)}${focus}${ctxLine(client, prior)}. Return ONLY the message text, nothing else.`
+  return `Write one short friendly check-in message (3-5 sentences) for today (${dateStr}). ${voiceLine(brandVoice)}${focus}${ctxLine(client, prior)}. Do not use em dashes. Return ONLY the message text, nothing else.`
 }
 
 export function buildRecapPrompt(params: {
@@ -79,7 +79,7 @@ export function buildRecapPrompt(params: {
   brandVoice?: string | null
 }) {
   const periodLabel = params.periodType === 'week' ? 'Week' : 'Month'
-  return `You are an agency operations assistant. Write a concise ${params.periodType}ly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers.
+  return `You are an agency operations assistant. Write a concise ${params.periodType}ly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers. Do not use em dashes.
 ${voiceLine(params.brandVoice)}
 ${periodLabel}: ${params.periodStart}–${params.periodEnd}
 ${params.clientSummaries.join('\n')}`
@@ -97,7 +97,7 @@ export function buildScopeCreepPrompt(params: {
   const revenue = (params.revenueCents / 100).toFixed(0)
   const effectiveRate = (params.effectiveRateCents / 100).toFixed(0)
   const targetRate = (params.targetRateCents / 100).toFixed(0)
-  return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate — the account is consuming more time than its revenue supports at that target.
+  return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate - the account is consuming more time than its revenue supports at that target.
 Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: $${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Effective rate realized: $${effectiveRate}/hr, vs a target of $${targetRate}/hr.
-In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers.`
+In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers. Do not use em dashes.`
 }

@@ -29,7 +29,7 @@ export default function GeneralClient({
   const [hourlyCost, setHourlyCost] = useState(String((settings.hourly_cost_cents ?? 0) / 100))
   const [saved, setSaved] = useState(false)
 
-  // Spread the full settings object (not just this component's own fields) — otherwise saving
+  // Spread the full settings object (not just this component's own fields) - otherwise saving
   // here would silently wipe out settings owned by other tabs (e.g. VoiceClient's brand_voice)
   // since the jsonb column is replaced wholesale, not merged, on every write.
   async function saveSettings(next: Partial<Settings>) {
@@ -76,7 +76,7 @@ export default function GeneralClient({
       >
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
-      <Row title="Target hourly rate" subtitle="What you want to realize per hour — compared against effective rate in Reports → Profitability and Revenue">
+      <Row title="Target hourly rate" subtitle="What you want to realize per hour - compared against effective rate in Reports → Profitability and Revenue">
         <div className="flex items-center gap-1">
           <span className="text-sm text-sage">$</span>
           <input

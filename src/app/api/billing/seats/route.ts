@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   ])
   if (!org) return NextResponse.json({ error: 'Org not found' }, { status: 404 })
   if (seats < (activeCount || 0)) {
-    return NextResponse.json({ error: `You have ${activeCount} active members — remove someone before lowering seats below that` }, { status: 400 })
+    return NextResponse.json({ error: `You have ${activeCount} active members - remove someone before lowering seats below that` }, { status: 400 })
   }
 
   if (org.stripe_subscription_id) {

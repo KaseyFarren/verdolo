@@ -1,4 +1,4 @@
--- Personal, private-per-user scratchpad shown on the Dashboard. One note per (org, user) —
+-- Personal, private-per-user scratchpad shown on the Dashboard. One note per (org, user) -
 -- no history/list, just a single auto-saved free-text box (confirmed with the user: personal,
 -- not shared across the team).
 create table quick_notes (

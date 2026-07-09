@@ -36,7 +36,7 @@ export default function MembersList({
   const [search, setSearch] = useState('')
 
   // router.refresh() after inviting gives a new `members` array, but useState's initializer
-  // only runs on mount — without this, a fresh invite won't show up until a manual reload.
+  // only runs on mount - without this, a fresh invite won't show up until a manual reload.
   useEffect(() => {
     setRows(members)
   }, [members])
@@ -135,7 +135,7 @@ export default function MembersList({
                         type="number"
                         min="0"
                         defaultValue={m.target_hours_per_week ?? ''}
-                        placeholder="—"
+                        placeholder="-"
                         onBlur={(e) => saveTargetHours(m, e.target.value)}
                         className="w-10 rounded border border-transparent hover:border-ink/10 focus:border-ink/10 bg-transparent px-1 text-xs focus:bg-white outline-none"
                       />

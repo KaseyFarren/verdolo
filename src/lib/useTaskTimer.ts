@@ -11,7 +11,7 @@ export type RunningTimer = { id: string; task_id: string | null; client_id: stri
 export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: string) {
   const [running, setRunning] = useState<RunningTimer | null>(null)
   const [now, setNow] = useState<number | null>(null)
-  // Seconds already logged today per task, from entries that were already stopped — added to the
+  // Seconds already logged today per task, from entries that were already stopped - added to the
   // live elapsed time so pausing and resuming a task shows a running total instead of resetting to 0.
   const [todaySeconds, setTodaySeconds] = useState<Record<string, number>>({})
 
@@ -83,7 +83,7 @@ export function useTaskTimer(supabase: SupabaseClient, orgId: string, userId: st
     if (data) setRunning(data as RunningTimer)
   }
 
-  /** Stops the timer if it belongs to this task — call when a task is marked done. */
+  /** Stops the timer if it belongs to this task - call when a task is marked done. */
   async function stopIfRunningFor(taskId: string) {
     if (running?.task_id === taskId) await stopRunning()
   }

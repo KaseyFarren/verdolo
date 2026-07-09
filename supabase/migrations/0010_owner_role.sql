@@ -47,7 +47,7 @@ create policy clients_write on clients for insert with check (is_org_admin(org_i
 drop policy if exists clients_update on clients;
 create policy clients_update on clients for update using (is_org_admin(org_id));
 
--- org_members SELECT stays is_org_member (unchanged) — tasks/time pages already resolve
+-- org_members SELECT stays is_org_member (unchanged) - tasks/time pages already resolve
 -- assignee/teammate emails for every member via this table, so restricting reads here would
 -- break task assignment for members without adding real protection. The dedicated team roster
 -- UI (/team) is instead gated at the app layer to admins/owners.

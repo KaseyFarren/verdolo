@@ -1,6 +1,6 @@
 -- Re-apply the avatars storage policies from 0011 idempotently. Profile picture uploads are
 -- failing in production with "new row violates row-level security policy" even though the
--- avatars bucket exists and the upload code path is correct — the storage.objects policies
+-- avatars bucket exists and the upload code path is correct - the storage.objects policies
 -- from 0011 most likely never fully landed. Dropping + recreating is safe to run even if they
 -- already exist correctly.
 

@@ -55,7 +55,7 @@ export default async function DashboardPage() {
       .order('period_start', { ascending: false })
       .limit(8),
     // Drives the client-messages "✓ Sent" state directly from the actual send log, rather than
-    // from a same-day auto-checkin task existing/being done — that task can lag or be missing
+    // from a same-day auto-checkin task existing/being done - that task can lag or be missing
     // (e.g. right after mount), which made "Copy & mark sent" look like it did nothing.
     supabase.from('ai_message_log').select('client_id').eq('org_id', orgId).gte('created_at', `${today}T00:00:00`).lt('created_at', `${tomorrow}T00:00:00`),
   ])

@@ -20,7 +20,7 @@ export function getStage(client: { stage?: string | null; status?: string | null
   return (client.stage as Stage) || (client.status === 'inactive' ? 'Churned' : 'Active')
 }
 
-/** Display-only relabel — the stored/compared value stays 'Churned', users just read "Paused". */
+/** Display-only relabel - the stored/compared value stays 'Churned', users just read "Paused". */
 export function stageLabel(stage: string) {
   return stage === 'Churned' ? 'Paused' : stage
 }
@@ -35,7 +35,7 @@ export function getOffsetDate(offset: number) {
   return todayKey(d)
 }
 
-/** Monday of the current week, stable across all 7 days of that week — unlike getOffsetDate(-7)
+/** Monday of the current week, stable across all 7 days of that week - unlike getOffsetDate(-7)
  * (a rolling "today minus 7" that shifts daily), this is safe to use as a storage key for
  * once-per-week data like weekly_reports. */
 export function getWeekAnchor(d = new Date()) {
@@ -46,7 +46,7 @@ export function getWeekAnchor(d = new Date()) {
   return todayKey(monday)
 }
 
-/** Sums `valueFn(item)` per key (via `keyFn`) and returns the highest-total key/value pair —
+/** Sums `valueFn(item)` per key (via `keyFn`) and returns the highest-total key/value pair -
  * e.g. the teammate with the most hours logged or tasks completed this week. */
 export function topByKey<T>(items: T[], keyFn: (item: T) => string | null | undefined, valueFn: (item: T) => number) {
   const totals = new Map<string, number>()
@@ -79,7 +79,7 @@ export function getInitials(name = '') {
 }
 
 export function memberName(member?: { display_name?: string | null; invited_email?: string | null } | null) {
-  return member?.display_name || member?.invited_email || '—'
+  return member?.display_name || member?.invited_email || '-'
 }
 
 export function greeting(d = new Date()) {
@@ -117,7 +117,7 @@ export function mrrCentsTotal(clients: { stage?: string | null; status?: string 
 }
 
 // strips retainer amounts before client rows are sent to a browser session that shouldn't see
-// revenue — server components serialize all props into the RSC payload regardless of what's
+// revenue - server components serialize all props into the RSC payload regardless of what's
 // rendered, so this has to happen before the data leaves the server, not just in the UI
 export function stripRetainer<T extends { retainer_cents?: number | null }>(clients: T[]): T[] {
   return clients.map((c) => ({ ...c, retainer_cents: null }))

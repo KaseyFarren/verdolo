@@ -103,7 +103,7 @@ export default function DashboardClient({
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const timer = useTaskTimer(supabase, orgId, userId)
 
-  // Logs a fixed duration against a task directly, for when someone forgot to run the timer —
+  // Logs a fixed duration against a task directly, for when someone forgot to run the timer -
   // an already-completed entry (started_at/ended_at both set), not a running one, so it doesn't
   // touch `timer` at all and can't collide with an actually-running timer on the same task.
   async function addManualTimeForTask(task: Task, hours: number) {
@@ -126,7 +126,7 @@ export default function DashboardClient({
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
   // re-runs the server component and gives us a new initialTasks array, but useState's
-  // initializer only runs on mount — without this, the prop update never reaches local state.
+  // initializer only runs on mount - without this, the prop update never reaches local state.
   useEffect(() => {
     setTasks(initialTasks)
   }, [initialTasks])
@@ -182,7 +182,7 @@ export default function DashboardClient({
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
-  // Team-today panel: one shared query (page.tsx), RLS does the role-scoping for free —
+  // Team-today panel: one shared query (page.tsx), RLS does the role-scoping for free -
   // admins/owners get every member's rows back, members only get their own. So the same
   // dataset is either "who logged what today" (admin) or "my time by client today" (member).
   const teamToday = isAdmin
@@ -203,7 +203,7 @@ export default function DashboardClient({
         .filter((r) => r.seconds > 0)
         .sort((a, b) => b.seconds - a.seconds)
 
-  // Lightweight team recognition — no notifications/points infra, just this week's leader by
+  // Lightweight team recognition - no notifications/points infra, just this week's leader by
   // hours logged and by tasks completed, computed from data already fetched for other panels.
   const weekAnchor = getWeekAnchor()
   const topHours = isAdmin ? topByKey(weekTimeEntries, (e) => e.user_id, (e) => e.duration_seconds || 0) : null
@@ -218,7 +218,7 @@ export default function DashboardClient({
   const topTasksLabel = topTasks ? memberName(members.find((m) => m.user_id === topTasks.key)) : null
 
   // Dashboard is everyone's personal "my day" view, not the full org workload (that's the
-  // Tasks page) — scope to tasks assigned to me + unassigned/shared ones, even for admins/owners
+  // Tasks page) - scope to tasks assigned to me + unassigned/shared ones, even for admins/owners
   // who can otherwise fetch the whole org's tasks.
   const dashTasks = sortTasks(tasks.filter((t) => t.due_date === dashDate && !t.skipped && (t.assigned_to === userId || !t.assigned_to)))
   const dashPending = dashTasks.filter((t) => !t.done)
@@ -332,7 +332,7 @@ export default function DashboardClient({
     await supabase.from('clients').update({ last_contacted: today, awaiting_reply: true }).eq('id', client.id)
 
     // Best-effort: also close out today's auto-checkin task if one exists, so it drops off
-    // the Tasks list — the "Sent" UI above no longer depends on this succeeding.
+    // the Tasks list - the "Sent" UI above no longer depends on this succeeding.
     const checkin = tasks.find((t) => t.client_id === client.id && t.is_auto && t.auto_type === 'checkin' && (t.due_date === today || (t.due_date < today && !t.done)))
     if (checkin) {
       const { data } = await supabase.from('tasks').update({ done: true, completed_at: new Date().toISOString() }).eq('id', checkin.id).select().single()
@@ -602,7 +602,7 @@ export default function DashboardClient({
             )}
           </div>
         </div>
-        {showMessages && !hasApiKey && <div className="text-sm text-sage py-2">AI check-ins aren&apos;t available right now — try again shortly.</div>}
+        {showMessages && !hasApiKey && <div className="text-sm text-sage py-2">AI check-ins aren&apos;t available right now - try again shortly.</div>}
         {showMessages && genError && <div className="text-sm text-red-600 py-2">{genError}</div>}
         {showMessages && activeClients.map((c, i) => {
           const sent = isSentToday(c.id)
@@ -789,7 +789,7 @@ function SimpleTaskRow({
     >
       <button
         onClick={onToggle}
-        title={isTimerRunning ? 'Mark done — stops the running timer' : undefined}
+        title={isTimerRunning ? 'Mark done - stops the running timer' : undefined}
         className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
           t.done ? 'bg-accent border-accent' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
         }`}

@@ -17,7 +17,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Verdolo",
-  description: "Run your agency — clients, tasks, time, and billing in one place.",
+  description: "Run your agency - clients, tasks, time, and billing in one place.",
 };
 
 export default function RootLayout({

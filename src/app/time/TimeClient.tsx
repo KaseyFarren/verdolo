@@ -93,7 +93,7 @@ export default function TimeClient({
   const [loadingMore, setLoadingMore] = useState(false)
 
   // router.refresh() re-runs the server component and gives a new initialEntries array, but
-  // useState's initializer only runs on mount — without this, the prop update never lands.
+  // useState's initializer only runs on mount - without this, the prop update never lands.
   useEffect(() => {
     setEntries(initialEntries)
     setFetchedCount(initialEntries.length)
@@ -124,9 +124,9 @@ export default function TimeClient({
   }
 
   // Filters live in the URL (?period=&start=&end=&clientId=&userId=&taskId=) so the server
-  // component re-fetches an already-filtered page — same convention as Reports' ?range= and
+  // component re-fetches an already-filtered page - same convention as Reports' ?range= and
   // Revenue's ?month=. The URL round trip has real network latency though, so the pill/dropdown
-  // controls are driven by this local, optimistically-updated copy instead of the raw props —
+  // controls are driven by this local, optimistically-updated copy instead of the raw props -
   // otherwise the active pill wouldn't move until the server responded, feeling sluggish next to
   // Settings/Tasks' purely client-side pills. `entries` etc. below still reflect the server props
   // until that response lands, same as before.
@@ -190,7 +190,7 @@ export default function TimeClient({
     return () => clearInterval(iv)
   }, [running?.id])
 
-  const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || '—'
+  const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || '-'
   const taskTitle = (id: string | null) => allTasks.find((t) => t.id === id)?.title || null
   const memberEmail = (id: string) => memberName(members.find((m) => m.user_id === id))
 
@@ -290,9 +290,9 @@ export default function TimeClient({
   const maxClearCutoff = lastDayOfPrevMonth()
 
   // Archives the totals of everything before the cutoff into time_archived_totals (so lifetime
-  // client/teammate totals stay accurate — see clients/page.tsx and totalByClient/totalByMember
+  // client/teammate totals stay accurate - see clients/page.tsx and totalByClient/totalByMember
   // above) before deleting the raw rows. Cutoff is capped to the end of last month so the
-  // current month — which Revenue reads live and month-scoped — can never be touched here.
+  // current month - which Revenue reads live and month-scoped - can never be touched here.
   async function clearOldEntries() {
     if (!clearCutoff) return
     setClearing(true)
@@ -312,7 +312,7 @@ export default function TimeClient({
       const totalSeconds = toClear.reduce((s, e) => s + (e.duration_seconds || 0), 0)
       const ok = await confirm({
         title: 'Clear old time entries?',
-        message: `This permanently deletes ${toClear.length} entr${toClear.length === 1 ? 'y' : 'ies'} totaling ${formatHours(totalSeconds)}h logged before ${formatDate(clearCutoff)}. Client and teammate totals will still include this time — only the individual entry detail is removed.`,
+        message: `This permanently deletes ${toClear.length} entr${toClear.length === 1 ? 'y' : 'ies'} totaling ${formatHours(totalSeconds)}h logged before ${formatDate(clearCutoff)}. Client and teammate totals will still include this time - only the individual entry detail is removed.`,
         confirmLabel: 'Delete entries',
         danger: true,
       })
@@ -414,7 +414,7 @@ export default function TimeClient({
 
   const completed = entries.filter((e) => e.ended_at && e.duration_seconds)
   // Folds in time_archived_totals so a "Clear old entries" sweep never changes what these
-  // summary cards show — only the raw per-entry list (below) shrinks.
+  // summary cards show - only the raw per-entry list (below) shrinks.
   const totalByClient = clients
     .map((c) => ({
       client: c,
@@ -459,7 +459,7 @@ export default function TimeClient({
   monthGroups.sort((a, b) => b.month.localeCompare(a.month))
   for (const mg of monthGroups) mg.days.sort((a, b) => b.date.localeCompare(a.date))
   // a narrow period (a week, a single custom range within one month, etc.) never needs the
-  // collapsible month wrapper — that's only useful once there's more than one month to hide
+  // collapsible month wrapper - that's only useful once there's more than one month to hide
   const spansMultipleMonths = monthGroups.length > 1
   const allDays = monthGroups.flatMap((mg) => mg.days).sort((a, b) => b.date.localeCompare(a.date))
 
@@ -708,7 +708,7 @@ export default function TimeClient({
           )}
         </div>
         {localFilters.period.period !== 'all_time' && (
-          <div className="text-xs text-sage/70 mt-2">Cleared history isn&apos;t reflected in a specific period — switch to All time for lifetime totals.</div>
+          <div className="text-xs text-sage/70 mt-2">Cleared history isn&apos;t reflected in a specific period - switch to All time for lifetime totals.</div>
         )}
       </div>
 
@@ -754,7 +754,7 @@ export default function TimeClient({
                     return (
                       <div key={cr.client.id} className="flex-1 min-w-[100px] basis-[100px]">
                         <div className="text-xs text-sage mb-1 truncate">{cr.client.name}</div>
-                        <MetricBar value={seconds} max={cr.seconds} display={seconds > 0 ? `${formatHours(seconds)}h` : '—'} />
+                        <MetricBar value={seconds} max={cr.seconds} display={seconds > 0 ? `${formatHours(seconds)}h` : '-'} />
                       </div>
                     )
                   })}
@@ -786,7 +786,7 @@ export default function TimeClient({
       {showClearOld && (
         <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
           <div className="text-xs text-sage mb-2">
-            Permanently delete entries logged before a chosen date. Client and teammate totals stay accurate — only the individual entry
+            Permanently delete entries logged before a chosen date. Client and teammate totals stay accurate - only the individual entry
             detail is removed. The current month can&apos;t be cleared this way.
           </div>
           <div className="flex items-center gap-2">

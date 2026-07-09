@@ -38,7 +38,7 @@ export default async function ClientsPage() {
       .order('snapshot_date', { ascending: true }),
   ])
 
-  // retainer amounts are revenue — members (view-only on clients) don't get them, admins/owners do
+  // retainer amounts are revenue - members (view-only on clients) don't get them, admins/owners do
   const visibleClients = canEdit ? clients ?? [] : stripRetainer(clients ?? [])
 
   return (

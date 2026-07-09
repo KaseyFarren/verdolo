@@ -5,7 +5,7 @@ import { getHealthScore, getStage, todayKey } from '@/lib/agency'
 
 // Runs daily (see vercel.json). Snapshots the live health-score computation
 // (src/lib/agency.ts getHealthScore) for every non-churned client, so a trend can be
-// charted over time — there's no way to reconstruct history before this cron started running.
+// charted over time - there's no way to reconstruct history before this cron started running.
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

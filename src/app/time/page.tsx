@@ -31,7 +31,7 @@ export default async function TimePage({
 
   // time_archived_totals only holds lifetime-to-date-of-clearing sums with no per-entry
   // timestamp, so it can only be folded into a period-scoped view when that period is "all
-  // time" — anything narrower and the archive can't be sliced to fit, so we simply don't fetch
+  // time" - anything narrower and the archive can't be sliced to fit, so we simply don't fetch
   // it (TimeClient's summary math already treats an empty archivedTotals array as zero).
   const [{ data: clients }, { data: openTasks }, { data: allTasks }, { data: entries }, { data: members }, { data: archivedTotals }] = await Promise.all([
     supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),

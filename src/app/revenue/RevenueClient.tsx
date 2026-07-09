@@ -69,7 +69,7 @@ export default function RevenueClient({
   const confirm = useConfirm()
   const [charges, setCharges] = useState<Charge[]>(initialCharges)
   // router.push to a different ?period= re-runs the server component and gives a new
-  // initialCharges array, but useState's initializer only runs on mount — without this,
+  // initialCharges array, but useState's initializer only runs on mount - without this,
   // switching periods would keep showing the previous period's charges.
   useEffect(() => {
     setCharges(initialCharges)
@@ -77,7 +77,7 @@ export default function RevenueClient({
   const isFullMonth = isFullCalendarMonth(period)
 
   // The pill itself is driven by this local, optimistically-updated copy so it slides
-  // instantly on click — the actual revenue figures below stay tied to the real `period` prop
+  // instantly on click - the actual revenue figures below stay tied to the real `period` prop
   // until router.push's server round trip lands, same as the underlying data always has.
   const [localPeriod, setLocalPeriod] = useState(period)
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function RevenueClient({
     return clients
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
-        // retainers are a monthly figure — only a full calendar month period can honestly
+        // retainers are a monthly figure - only a full calendar month period can honestly
         // include one; a week or custom range only counts what was actually billed/logged in it
         const totalRevenue = (isFullMonth ? c.retainer_cents || 0 : 0) + chargesTotal
         const seconds = hoursByClient.get(c.id) || 0
@@ -183,7 +183,7 @@ export default function RevenueClient({
     return { revenue, hours, rate, rateDeltaCents: rate !== null && targetRateCents > 0 ? rate - targetRateCents : null }
   }, [clientRows, targetRateCents])
 
-  // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period —
+  // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period -
   // a retainer is "at risk" regardless of which week you happen to be looking at.
   const mrrCents = useMemo(() => mrrCentsTotal(clients), [clients])
   const atRiskCents = useMemo(
@@ -239,7 +239,7 @@ export default function RevenueClient({
         className="mb-4"
       />
       {!isFullMonth && (
-        <div className="text-xs text-sage/70 mb-5">Retainer only counted for full-month periods — showing billables + hours actually logged in this range.</div>
+        <div className="text-xs text-sage/70 mb-5">Retainer only counted for full-month periods - showing billables + hours actually logged in this range.</div>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
@@ -249,7 +249,7 @@ export default function RevenueClient({
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">
-            MRR <InfoTooltip content="Monthly recurring revenue — sum of active clients' monthly retainers" />
+            MRR <InfoTooltip content="Monthly recurring revenue - sum of active clients' monthly retainers" />
           </div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
         </div>
@@ -261,26 +261,26 @@ export default function RevenueClient({
           <div className="text-xs text-sage mb-1">
             Blended rate <InfoTooltip content="Total revenue divided by total hours logged, across all clients" />
           </div>
-          <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '—'}</div>
+          <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '-'}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">
             vs. target rate <InfoTooltip content="Blended rate compared to the target hourly rate set in Settings → General" />
           </div>
           <div className={`text-2xl font-heading font-bold ${totals.rateDeltaCents !== null && totals.rateDeltaCents < 0 ? 'text-red-600' : ''}`}>
-            {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '—'}
+            {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '-'}
           </div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-4">
           <div className="text-xs text-sage mb-1">
             Billable utilization <InfoTooltip content="Share of logged hours marked billable" />
           </div>
-          <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '—'}</div>
+          <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '-'}</div>
         </div>
       </div>
       {targetRateCents === 0 && (
         <div className="text-xs text-sage bg-white rounded-xl shadow-md p-3 mb-3">
-          Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here — set a target hourly rate in Settings → General to
+          Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here - set a target hourly rate in Settings → General to
           see how your blended rate compares (no target set yet).
         </div>
       )}
@@ -319,7 +319,7 @@ export default function RevenueClient({
                   <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
                     <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
-                      {r.rate ? `$${centsToDollars(r.rate)}/hr` : '—'}
+                      {r.rate ? `$${centsToDollars(r.rate)}/hr` : '-'}
                     </span>
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                   </span>

@@ -12,8 +12,8 @@ function parseDate(iso: string) {
   return new Date(y, m - 1, d)
 }
 
-// `periodStart` can be any date that falls inside the target period — a week gets snapped to
-// that week's Monday, a month gets snapped to the 1st — so the caller can just hand over
+// `periodStart` can be any date that falls inside the target period - a week gets snapped to
+// that week's Monday, a month gets snapped to the 1st - so the caller can just hand over
 // whatever date the user picked in the backfill UI.
 function resolvePeriod(periodType: PeriodType, periodStart?: string) {
   if (periodType === 'week') {

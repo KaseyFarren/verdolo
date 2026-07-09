@@ -23,10 +23,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const stripe = getStripe()
   if (immediate) {
     await stripe.subscriptions.cancel(org.stripe_subscription_id)
-    // Optimistic update — the webhook's customer.subscription.deleted will also confirm this.
+    // Optimistic update - the webhook's customer.subscription.deleted will also confirm this.
     await admin.from('orgs').update({ subscription_status: 'canceled' }).eq('id', orgId)
   } else {
-    // Leave subscription_status alone — it stays active until the period actually ends,
+    // Leave subscription_status alone - it stays active until the period actually ends,
     // at which point the billing webhook syncs the final canceled state.
     await stripe.subscriptions.update(org.stripe_subscription_id, { cancel_at_period_end: true })
   }

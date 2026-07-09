@@ -130,7 +130,7 @@ export default function TasksClient({
   const [editDefaultForm, setEditDefaultForm] = useState<Record<string, unknown>>({})
   const timer = useTaskTimer(supabase, orgId, userId)
 
-  // Logs a fixed duration against a task directly, for when someone forgot to run the timer —
+  // Logs a fixed duration against a task directly, for when someone forgot to run the timer -
   // an already-completed entry (started_at/ended_at both set), not a running one, so it doesn't
   // touch `timer` at all and can't collide with an actually-running timer on the same task.
   async function addManualTimeForTask(task: Task, hours: number) {
@@ -153,14 +153,14 @@ export default function TasksClient({
 
   // router.refresh() (e.g. after the global quick-capture modal adds a task from any page)
   // re-runs the server component and gives us a new initialTasks array, but useState's
-  // initializer only runs on mount — without this, the prop update never reaches local state.
+  // initializer only runs on mount - without this, the prop update never reaches local state.
   useEffect(() => {
     setTasks(initialTasks)
   }, [initialTasks])
 
   const today = todayKey()
 
-  // Calendar view defaults to showing today's tasks rather than an empty selection — List
+  // Calendar view defaults to showing today's tasks rather than an empty selection - List
   // view's default (no date pinned, showing the Overdue/Today/Tomorrow buckets) is untouched.
   useEffect(() => {
     if (view === 'calendar' && !selectedDate) setSelectedDate(today)
@@ -368,11 +368,11 @@ export default function TasksClient({
   }
 
   // skipped instances stay in the DB (so the recurring-instance upsert won't regenerate them)
-  // but are hidden everywhere in the UI — they weren't actually done, just dismissed
+  // but are hidden everywhere in the UI - they weren't actually done, just dismissed
   const visible = tasks.filter((t) => !t.skipped)
   const overdueCount = visible.filter((t) => t.due_date < today && !t.done).length
 
-  // captures the assignee/client dimension of the current filter selection only — the
+  // captures the assignee/client dimension of the current filter selection only - the
   // date/done-status dimension (today/overdue/completed/all) is handled separately by
   // visibleBuckets() and tasksForDate() below, since those two dimensions compose independently
   // (e.g. a pinned date + an assignee filter) in a way the old single-bucket-per-chip model never needed to
@@ -609,7 +609,7 @@ export default function TasksClient({
           ))}
         </nav>
         <div className="flex-1 min-w-0">
-          {/* Always rendered in the same spot on all four tabs — the "+ New task" button never
+          {/* Always rendered in the same spot on all four tabs - the "+ New task" button never
               moves or changes as you switch tabs; only the controls to its left change. */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -734,7 +734,7 @@ export default function TasksClient({
 
           {view === 'recurring' && (
             <div>
-              <p className="text-sm text-sage mb-4">Repeats on a schedule you choose — daily, weekdays, or a specific day each week.</p>
+              <p className="text-sm text-sage mb-4">Repeats on a schedule you choose - daily, weekdays, or a specific day each week.</p>
               {showAddRecurring && (
                 <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
                   <input
@@ -878,7 +878,7 @@ export default function TasksClient({
 
           {view === 'defaults' && (
             <div>
-              <p className="text-sm text-sage mb-4">Applied automatically to every client, every day — including clients you add later.</p>
+              <p className="text-sm text-sage mb-4">Applied automatically to every client, every day - including clients you add later.</p>
               {showAddDefault && (
                 <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
                   <input
@@ -912,7 +912,7 @@ export default function TasksClient({
                   </div>
                 </div>
               )}
-              {defaults.length === 0 && !showAddDefault && <div className="text-sm text-sage py-6 text-center">No default tasks yet — every client gets these automatically, each day.</div>}
+              {defaults.length === 0 && !showAddDefault && <div className="text-sm text-sage py-6 text-center">No default tasks yet - every client gets these automatically, each day.</div>}
               {defaults.map((d) => (
                 <div key={d.id} className="border-b border-ink/10 py-2">
                   {editingDefaultId === d.id ? (
@@ -1070,7 +1070,7 @@ function TaskRow({
     >
       <button
         onClick={() => (t.done ? uncomplete() : complete())}
-        title={isTimerRunning ? 'Mark done — stops the running timer' : undefined}
+        title={isTimerRunning ? 'Mark done - stops the running timer' : undefined}
         className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
           t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
         }`}
@@ -1113,7 +1113,7 @@ function TaskRow({
             <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
           ))}
         {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-        {!t.done && <IconButton label="Snooze — push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
+        {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
         {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
         <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
         <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />

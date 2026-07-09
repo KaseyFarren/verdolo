@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Terms of Service — Verdolo' }
+export const metadata = { title: 'Terms of Service - Verdolo' }
 
 export default function TermsPage() {
   return (
@@ -10,7 +10,7 @@ export default function TermsPage() {
       </Link>
       <div className="mt-4 rounded-3xl bg-white shadow-md p-6 md:p-10 text-base leading-relaxed text-ink">
       <h1 className="mb-1 text-2xl font-semibold text-ink">Terms of Service</h1>
-      <p className="mb-8 text-sm text-sage">Last updated: [DATE — fill in when published]</p>
+      <p className="mb-8 text-sm text-sage">Last updated: [DATE - fill in when published]</p>
 
       <p className="mb-6">
         These Terms of Service (&quot;Terms&quot;) govern access to and use of Verdolo (the &quot;Service&quot;),
@@ -29,7 +29,7 @@ export default function TermsPage() {
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">2. Accounts and organizations</h2>
       <p className="mb-6">
         You must provide accurate information to create an account. Each account belongs to one organization at a
-        time. Organizations have three roles — owner, admin, and member — with different levels of access described
+        time. Organizations have three roles - owner, admin, and member - with different levels of access described
         in-app. The organization owner is responsible for managing membership and is the billing contact for that
         organization&apos;s subscription.
       </p>
@@ -85,7 +85,7 @@ export default function TermsPage() {
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">10. Governing law</h2>
-      <p className="mb-6">These Terms are governed by the laws of [JURISDICTION — fill in], without regard to conflict-of-law principles.</p>
+      <p className="mb-6">These Terms are governed by the laws of [JURISDICTION - fill in], without regard to conflict-of-law principles.</p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">11. Contact</h2>
       <p className="mb-6">

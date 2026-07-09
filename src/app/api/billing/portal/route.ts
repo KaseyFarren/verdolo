@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { data: org } = await admin.from('orgs').select('stripe_customer_id').eq('id', orgId).single()
   if (!org?.stripe_customer_id) {
-    return NextResponse.json({ error: 'No billing account yet — subscribe first' }, { status: 400 })
+    return NextResponse.json({ error: 'No billing account yet - subscribe first' }, { status: 400 })
   }
 
   const stripe = getStripe()

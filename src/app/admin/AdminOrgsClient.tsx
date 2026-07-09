@@ -25,7 +25,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
@@ -118,7 +118,7 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
                     {org.name}
                   </Link>
                 </td>
-                <td className="px-3 py-2 text-sage">{org.ownerEmail ?? '—'}</td>
+                <td className="px-3 py-2 text-sage">{org.ownerEmail ?? '-'}</td>
                 <td className="px-3 py-2">
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${

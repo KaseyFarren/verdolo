@@ -108,14 +108,14 @@ export default function BillingClient({
       <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
         {subscriptionStatus === 'trialing' && !trialExpired && (
           <div className="text-sm mb-1">
-            <span className="text-green font-semibold">Free trial</span> — {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
+            <span className="text-green font-semibold">Free trial</span> - {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
           </div>
         )}
         {(trialExpired || subscriptionStatus === 'canceled') && (
-          <div className="text-sm mb-1 text-amber-700 font-semibold">Trial ended — subscribe to continue</div>
+          <div className="text-sm mb-1 text-amber-700 font-semibold">Trial ended - subscribe to continue</div>
         )}
         {subscriptionStatus === 'active' && <div className="text-sm mb-1 text-green font-semibold">Active subscription</div>}
-        {subscriptionStatus === 'past_due' && <div className="text-sm mb-1 text-amber-700 font-semibold">Payment past due — update your payment method</div>}
+        {subscriptionStatus === 'past_due' && <div className="text-sm mb-1 text-amber-700 font-semibold">Payment past due - update your payment method</div>}
         <div className="text-xs text-sage">
           £25/seat/month · {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
         </div>

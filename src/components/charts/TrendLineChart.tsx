@@ -7,7 +7,7 @@ export type TrendSeries = {
   label: string
   color: string
   values: number[]
-  // Per-point marker color override (e.g. above/below a target) — the connecting line still
+  // Per-point marker color override (e.g. above/below a target) - the connecting line still
   // uses `color`, only the dots pick this up. Same length as `values` when provided.
   pointColors?: string[]
 }
