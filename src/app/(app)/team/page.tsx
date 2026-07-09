@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import InviteForm from './invite-form'
 import MembersList from './MembersList'
@@ -16,7 +15,7 @@ export default async function TeamPage() {
     .order('joined_at', { ascending: true })
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
+    <>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Team</h1>
         <p className="text-sm text-sage">{org?.name} · signed in as {user.email} ({role})</p>
@@ -28,6 +27,6 @@ export default async function TeamPage() {
       </section>
 
       <InviteForm orgId={orgId} canInviteOwner={role === 'owner'} />
-    </AppShell>
+    </>
   )
 }

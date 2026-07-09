@@ -1,4 +1,3 @@
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { stripBillingInfo } from '@/lib/agency'
 import TasksClient from './TasksClient'
@@ -17,18 +16,16 @@ export default async function TasksPage() {
   const visibleClients = isAdminRole(role) ? clients ?? [] : stripBillingInfo(clients ?? [])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <TasksClient
-        orgId={orgId}
-        userId={user.id}
-        isAdmin={isAdminRole(role)}
-        initialClients={visibleClients}
-        initialTasks={tasks ?? []}
-        initialRecurring={recurring ?? []}
-        initialDefaults={defaults ?? []}
-        members={members ?? []}
-        excludeWeekends={org?.settings?.exclude_weekends ?? true}
-      />
-    </AppShell>
+    <TasksClient
+      orgId={orgId}
+      userId={user.id}
+      isAdmin={isAdminRole(role)}
+      initialClients={visibleClients}
+      initialTasks={tasks ?? []}
+      initialRecurring={recurring ?? []}
+      initialDefaults={defaults ?? []}
+      members={members ?? []}
+      excludeWeekends={org?.settings?.exclude_weekends ?? true}
+    />
   )
 }

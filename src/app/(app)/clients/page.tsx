@@ -1,4 +1,3 @@
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { stripBillingInfo } from '@/lib/agency'
 import ClientsClient from './ClientsClient'
@@ -46,25 +45,23 @@ export default async function ClientsPage() {
   const visibleClients = canEdit ? clients ?? [] : stripBillingInfo(clients ?? [])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <ClientsClient
-        orgId={orgId}
-        userId={user.id}
-        canEdit={canEdit}
-        initialClients={visibleClients}
-        initialNotes={notes ?? []}
-        completedTasks={tasks ?? []}
-        aiMessages={aiMessages ?? []}
-        timeEntries={timeEntries ?? []}
-        archivedTimeTotals={archivedTimeTotals ?? []}
-        members={members ?? []}
-        invoices={invoices ?? []}
-        unbilledCharges={unbilledCharges ?? []}
-        unbilledTimeEntries={unbilledTimeEntries ?? []}
-        healthSnapshots={healthSnapshots ?? []}
-        stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
-        currency={org?.settings?.currency ?? 'usd'}
-      />
-    </AppShell>
+    <ClientsClient
+      orgId={orgId}
+      userId={user.id}
+      canEdit={canEdit}
+      initialClients={visibleClients}
+      initialNotes={notes ?? []}
+      completedTasks={tasks ?? []}
+      aiMessages={aiMessages ?? []}
+      timeEntries={timeEntries ?? []}
+      archivedTimeTotals={archivedTimeTotals ?? []}
+      members={members ?? []}
+      invoices={invoices ?? []}
+      unbilledCharges={unbilledCharges ?? []}
+      unbilledTimeEntries={unbilledTimeEntries ?? []}
+      healthSnapshots={healthSnapshots ?? []}
+      stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
+      currency={org?.settings?.currency ?? 'usd'}
+    />
   )
 }

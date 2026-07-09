@@ -1,4 +1,3 @@
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOffsetDate, getWeekAnchor, todayKey } from '@/lib/agency'
 import DashboardClient from './DashboardClient'
@@ -71,25 +70,23 @@ export default async function DashboardPage() {
   ])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <DashboardClient
-        orgId={orgId}
-        userId={user.id}
-        isAdmin={isAdminRole(role)}
-        initialClients={clients ?? []}
-        initialTasks={tasks ?? []}
-        initialRecurring={recurring ?? []}
-        initialDefaults={defaults ?? []}
-        todayTimeEntries={todayTimeEntries ?? []}
-        weekTimeEntries={weekTimeEntries ?? []}
-        members={members ?? []}
-        initialNote={noteRow?.content ?? ''}
-        hasApiKey={!!process.env.ANTHROPIC_API_KEY}
-        excludeWeekends={org?.settings?.exclude_weekends ?? true}
-        hasRecapThisWeek={!!reports?.some((r) => r.period_start === weekAnchor)}
-        initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
-        weekCompletedTasks={weekCompletedTasks ?? []}
-      />
-    </AppShell>
+    <DashboardClient
+      orgId={orgId}
+      userId={user.id}
+      isAdmin={isAdminRole(role)}
+      initialClients={clients ?? []}
+      initialTasks={tasks ?? []}
+      initialRecurring={recurring ?? []}
+      initialDefaults={defaults ?? []}
+      todayTimeEntries={todayTimeEntries ?? []}
+      weekTimeEntries={weekTimeEntries ?? []}
+      members={members ?? []}
+      initialNote={noteRow?.content ?? ''}
+      hasApiKey={!!process.env.ANTHROPIC_API_KEY}
+      excludeWeekends={org?.settings?.exclude_weekends ?? true}
+      hasRecapThisWeek={!!reports?.some((r) => r.period_start === weekAnchor)}
+      initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
+      weekCompletedTasks={weekCompletedTasks ?? []}
+    />
   )
 }

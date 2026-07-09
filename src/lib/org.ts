@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
@@ -15,7 +16,10 @@ function hasActiveAccess(org: any) {
   return false
 }
 
-export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
+// Wrapped in React's cache() so the (app) layout and a page can both call this within the
+// same request/navigation without paying for the org_members query twice - the layout needs
+// it to render AppShell's chrome, and the page needs it again for its own data fetching.
+export const getOrgContext = cache(async () => {
   const supabase = await createClient()
 
   // Middleware already validated the session with a real network round trip and passed the
@@ -42,8 +46,6 @@ export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
 
   if (!membership) redirect('/onboarding')
 
-  if (!opts?.skipPaywall && !hasActiveAccess(membership.orgs)) redirect('/settings?view=billing')
-
   return {
     supabase,
     user,
@@ -52,4 +54,10 @@ export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     org: membership.orgs as any,
   }
+})
+
+export async function requireOrgContext(opts?: { skipPaywall?: boolean }) {
+  const ctx = await getOrgContext()
+  if (!opts?.skipPaywall && !hasActiveAccess(ctx.org)) redirect('/settings?view=billing')
+  return ctx
 }

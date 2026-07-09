@@ -1,4 +1,3 @@
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getAiCreditStatus } from '@/lib/aiCredits'
 import SettingsClient from './SettingsClient'
@@ -16,23 +15,21 @@ export default async function SettingsPage() {
   ])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <SettingsClient
-        orgId={orgId}
-        userId={user.id}
-        role={role}
-        isAdmin={isAdmin}
-        settings={org?.settings ?? {}}
-        initialAccentColor={org?.accent_color ?? '#dd6b2c'}
-        initialDisplayName={membership?.display_name ?? ''}
-        aiCredits={aiCredits}
-        subscriptionStatus={org?.subscription_status ?? null}
-        trialEndsAt={org?.trial_ends_at ?? null}
-        seatsPurchased={org?.seats_purchased ?? 1}
-        activeMemberCount={activeMemberCount ?? 0}
-        hasStripeCustomer={!!org?.stripe_customer_id}
-        planType={org?.plan_type ?? 'subscription'}
-      />
-    </AppShell>
+    <SettingsClient
+      orgId={orgId}
+      userId={user.id}
+      role={role}
+      isAdmin={isAdmin}
+      settings={org?.settings ?? {}}
+      initialAccentColor={org?.accent_color ?? '#dd6b2c'}
+      initialDisplayName={membership?.display_name ?? ''}
+      aiCredits={aiCredits}
+      subscriptionStatus={org?.subscription_status ?? null}
+      trialEndsAt={org?.trial_ends_at ?? null}
+      seatsPurchased={org?.seats_purchased ?? 1}
+      activeMemberCount={activeMemberCount ?? 0}
+      hasStripeCustomer={!!org?.stripe_customer_id}
+      planType={org?.plan_type ?? 'subscription'}
+    />
   )
 }

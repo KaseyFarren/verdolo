@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import AppShell from '@/components/AppShell'
 import { requireOrgContext } from '@/lib/org'
 import { todayKey } from '@/lib/agency'
 import { periodBounds, type Period } from '@/lib/period'
@@ -8,7 +7,7 @@ import RevenueClient from './RevenueClient'
 const VALID_PERIODS: Period[] = ['this_month', 'last_month', 'this_week', 'last_week', 'custom']
 
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<{ period?: string; start?: string; end?: string }> }) {
-  const { supabase, user, orgId, role, org } = await requireOrgContext()
+  const { supabase, orgId, role, org } = await requireOrgContext()
 
   // revenue is owner-only - redirect server-side before any revenue data is fetched, rather
   // than relying on a client-side check (Server Component props still serialize to the client
@@ -50,19 +49,17 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   ])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <RevenueClient
-        orgId={orgId}
-        period={{ period, start: sp.start, end: sp.end }}
-        today={todayKey()}
-        clients={clients ?? []}
-        initialCharges={charges ?? []}
-        entries={entries ?? []}
-        members={members ?? []}
-        tasks={tasks ?? []}
-        targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
-        currency={org?.settings?.currency ?? 'usd'}
-      />
-    </AppShell>
+    <RevenueClient
+      orgId={orgId}
+      period={{ period, start: sp.start, end: sp.end }}
+      today={todayKey()}
+      clients={clients ?? []}
+      initialCharges={charges ?? []}
+      entries={entries ?? []}
+      members={members ?? []}
+      tasks={tasks ?? []}
+      targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
+      currency={org?.settings?.currency ?? 'usd'}
+    />
   )
 }

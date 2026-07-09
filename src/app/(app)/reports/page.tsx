@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getWeekAnchor, todayKey } from '@/lib/agency'
 import ReportsClient from './ReportsClient'
@@ -49,7 +48,7 @@ function trendWindow(pMonth: string) {
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; pMonth?: string }> }) {
-  const { supabase, user, orgId, role, org } = await requireOrgContext()
+  const { supabase, orgId, role, org } = await requireOrgContext()
 
   // Reports is admin/owner only - members' tasks/time_entries RLS only exposes their own rows,
   // so an org-wide per-client report would be misleadingly incomplete for a member. Same
@@ -129,26 +128,24 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   ])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <ReportsClient
-        orgId={orgId}
-        range={range}
-        clients={clients ?? []}
-        tasks={tasks ?? []}
-        entries={entries ?? []}
-        members={members ?? []}
-        reports={reports ?? []}
-        weekAnchor={weekAnchor}
-        hasApiKey={!!process.env.ANTHROPIC_API_KEY}
-        openTasks={openTasks ?? []}
-        weekTimeEntries={weekTimeEntries ?? []}
-        monthTimeEntries={monthTimeEntries ?? []}
-        monthPaidInvoices={monthPaidInvoices ?? []}
-        targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
-        pMonth={pMonth}
-        trendMonthKeys={monthKeys}
-        currency={org?.settings?.currency ?? 'usd'}
-      />
-    </AppShell>
+    <ReportsClient
+      orgId={orgId}
+      range={range}
+      clients={clients ?? []}
+      tasks={tasks ?? []}
+      entries={entries ?? []}
+      members={members ?? []}
+      reports={reports ?? []}
+      weekAnchor={weekAnchor}
+      hasApiKey={!!process.env.ANTHROPIC_API_KEY}
+      openTasks={openTasks ?? []}
+      weekTimeEntries={weekTimeEntries ?? []}
+      monthTimeEntries={monthTimeEntries ?? []}
+      monthPaidInvoices={monthPaidInvoices ?? []}
+      targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
+      pMonth={pMonth}
+      trendMonthKeys={monthKeys}
+      currency={org?.settings?.currency ?? 'usd'}
+    />
   )
 }

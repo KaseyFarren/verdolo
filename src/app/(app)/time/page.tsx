@@ -1,4 +1,3 @@
-import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { periodBounds, type Period } from '@/lib/period'
 import TimeClient from './TimeClient'
@@ -11,7 +10,7 @@ export default async function TimePage({
 }: {
   searchParams: Promise<{ period?: string; start?: string; end?: string; clientId?: string; userId?: string; taskId?: string }>
 }) {
-  const { supabase, user, orgId, role, org } = await requireOrgContext()
+  const { supabase, user, orgId, role } = await requireOrgContext()
   const isAdmin = isAdminRole(role)
 
   const sp = await searchParams
@@ -45,22 +44,20 @@ export default async function TimePage({
   ])
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <TimeClient
-        orgId={orgId}
-        userId={user.id}
-        isAdmin={isAdmin}
-        clients={clients ?? []}
-        tasks={openTasks ?? []}
-        allTasks={allTasks ?? []}
-        initialEntries={entries ?? []}
-        members={members ?? []}
-        archivedTotals={archivedTotals ?? []}
-        period={{ period, start: sp.start, end: sp.end }}
-        filterClientId={filterClientId}
-        filterUserId={filterUserId}
-        filterTaskId={filterTaskId}
-      />
-    </AppShell>
+    <TimeClient
+      orgId={orgId}
+      userId={user.id}
+      isAdmin={isAdmin}
+      clients={clients ?? []}
+      tasks={openTasks ?? []}
+      allTasks={allTasks ?? []}
+      initialEntries={entries ?? []}
+      members={members ?? []}
+      archivedTotals={archivedTotals ?? []}
+      period={{ period, start: sp.start, end: sp.end }}
+      filterClientId={filterClientId}
+      filterUserId={filterUserId}
+      filterTaskId={filterTaskId}
+    />
   )
 }

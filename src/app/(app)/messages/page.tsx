@@ -1,9 +1,8 @@
-import AppShell from '@/components/AppShell'
 import { requireOrgContext } from '@/lib/org'
 import MessagesClient from './MessagesClient'
 
 export default async function MessagesPage() {
-  const { supabase, user, orgId, role, org } = await requireOrgContext()
+  const { supabase, user, orgId } = await requireOrgContext()
 
   const [{ data: teamThread }, { data: members }, { data: dmThreads }] = await Promise.all([
     supabase.from('message_threads').select('id').eq('org_id', orgId).eq('kind', 'team').single(),
@@ -55,16 +54,14 @@ export default async function MessagesPage() {
   const lastReadAtByThread = Object.fromEntries((reads ?? []).map((r) => [r.thread_id, r.last_read_at]))
 
   return (
-    <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <MessagesClient
-        orgId={orgId}
-        userId={user.id}
-        teamThreadId={teamThread?.id ?? null}
-        members={members ?? []}
-        dmThreadByUser={Object.fromEntries(dmThreadByUser)}
-        lastMessageAtByThread={lastMessageAtByThread}
-        lastReadAtByThread={lastReadAtByThread}
-      />
-    </AppShell>
+    <MessagesClient
+      orgId={orgId}
+      userId={user.id}
+      teamThreadId={teamThread?.id ?? null}
+      members={members ?? []}
+      dmThreadByUser={Object.fromEntries(dmThreadByUser)}
+      lastMessageAtByThread={lastMessageAtByThread}
+      lastReadAtByThread={lastReadAtByThread}
+    />
   )
 }
