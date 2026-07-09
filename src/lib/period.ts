@@ -71,3 +71,16 @@ export function periodBounds(value: PeriodValue): PeriodBounds {
 export function isFullCalendarMonth(value: PeriodValue) {
   return value.period === 'this_month' || value.period === 'last_month'
 }
+
+/** Fraction of a calendar month elapsed as of today (1 for any month that's fully passed,
+ * 0 for a future month). Used to prorate monthly figures like a retainer that get attributed
+ * to an in-progress month, so revenue ÷ hours-logged-so-far doesn't spike. */
+export function monthElapsedFraction(monthKey: string): number {
+  const todayMonthKey = todayKey().slice(0, 7)
+  if (monthKey < todayMonthKey) return 1
+  if (monthKey > todayMonthKey) return 0
+  const [y, m] = monthKey.split('-').map(Number)
+  const dayOfMonth = Number(todayKey().slice(8, 10))
+  const daysInMonth = new Date(y, m, 0).getDate()
+  return dayOfMonth / daysInMonth
+}

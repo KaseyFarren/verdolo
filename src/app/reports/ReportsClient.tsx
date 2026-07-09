@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful } from '@/lib/agency'
+import { monthElapsedFraction } from '@/lib/period'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
@@ -238,11 +239,12 @@ export default function ReportsClient({
         const isHourly = c.billing_mode === 'hourly'
         const estimatedCents = isHourly
           ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-          : c.retainer_cents || 0
+          : Math.round((c.retainer_cents || 0) * monthElapsedFraction(monthKey))
         const revenueCents = paidCents || estimatedCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
         const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents }
+        const isPartialMonth = monthElapsedFraction(monthKey) < 1
+        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
       .sort((a, b) => {
@@ -575,6 +577,11 @@ export default function ReportsClient({
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
               Effective rate · last 6 months <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
             </div>
+            {pMonth === todayKey().slice(0, 7) && (
+              <div className="text-xs text-sage mb-2">
+                This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
+              </div>
+            )}
             {monthlyTrend.every((m) => !m.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
             ) : (
@@ -606,6 +613,11 @@ export default function ReportsClient({
                 Effective rate by client · {monthLabel(`${pMonth}-01`)}{' '}
                 <InfoTooltip content="Each client's revenue divided by hours logged, compared to your target hourly rate" />
               </div>
+              {pMonth === todayKey().slice(0, 7) && (
+                <div className="text-xs text-sage mb-2">
+                  This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
+                </div>
+              )}
               <div className="rounded-2xl bg-white shadow-md p-4">
                 <DivergingBarChart
                   items={profitability
@@ -645,7 +657,8 @@ export default function ReportsClient({
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sage">
                       <span>
                         Revenue ${centsToDollars(r.revenueCents)}
-                        {r.isEstimatedRevenue && (r.isHourly ? ' (hourly, est.)' : ' (retainer, est.)')}
+                        {r.isEstimatedRevenue &&
+                          (r.isHourly ? ' (hourly, est.)' : r.isPartialMonth ? ' (retainer, est., prorated)' : ' (retainer, est.)')}
                       </span>
                       <span>{r.hours.toFixed(1)}h logged</span>
                     </div>

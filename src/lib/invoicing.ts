@@ -36,7 +36,7 @@ export async function createAndSendInvoice({
 
   for (const item of lineItems) {
     await stripe.invoiceItems.create(
-      { customer: stripeCustomerId, currency: 'gbp', amount: item.amount_cents * (item.quantity || 1), description: item.description },
+      { customer: stripeCustomerId, currency: 'usd', amount: item.amount_cents * (item.quantity || 1), description: item.description },
       connectAccount(accountId)
     )
   }

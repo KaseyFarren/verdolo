@@ -117,7 +117,7 @@ export default function BillingClient({
         {subscriptionStatus === 'active' && <div className="text-sm mb-1 text-green font-semibold">Active subscription</div>}
         {subscriptionStatus === 'past_due' && <div className="text-sm mb-1 text-amber-700 font-semibold">Payment past due - update your payment method</div>}
         <div className="text-xs text-sage">
-          £25/seat/month · {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
+          $25/seat/month · {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
         </div>
       </div>
 

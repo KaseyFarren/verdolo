@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, isRateComparisonMeaningful, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { isFullCalendarMonth, type PeriodValue } from '@/lib/period'
+import { isFullCalendarMonth, monthElapsedFraction, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
@@ -148,7 +148,10 @@ export default function RevenueClient({
         // figure, so only a full calendar month period can honestly include one; a week or
         // custom range only counts what was actually billed/logged in it
         const hourlyRevenue = isHourly ? Math.round(((billableHoursByClient.get(c.id) || 0) / 3600) * (c.hourly_rate_cents || 0)) : 0
-        const retainerRevenue = !isHourly && isFullMonth ? c.retainer_cents || 0 : 0
+        // A retainer is a full-month figure, but if the selected month is still in progress,
+        // attributing all of it yet gives a misleadingly high revenue-per-hour-logged-so-far.
+        const retainerFraction = period.period === 'this_month' ? monthElapsedFraction(todayKey().slice(0, 7)) : 1
+        const retainerRevenue = !isHourly && isFullMonth ? Math.round((c.retainer_cents || 0) * retainerFraction) : 0
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows
@@ -160,7 +163,7 @@ export default function RevenueClient({
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents])
+  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period])
 
   const memberRows = useMemo(() => {
     return members
@@ -265,6 +268,11 @@ export default function RevenueClient({
       />
       {!isFullMonth && (
         <div className="text-xs text-sage/70 mb-5">Retainer only counted for full-month periods - showing billables + hours actually logged in this range.</div>
+      )}
+      {isFullMonth && period.period === 'this_month' && (
+        <div className="text-xs text-sage/70 mb-5">
+          Showing partial-month figures - retainer revenue is prorated to date and will reach full value by month end.
+        </div>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
