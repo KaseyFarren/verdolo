@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       {
         price: SEAT_PRICE_ID,
         quantity: Math.max(seatCount || 1, 1),
-        adjustable_quantity: { enabled: true, minimum: Math.max(seatCount || 1, 1) },
+        adjustable_quantity: { enabled: true, minimum: Math.max(seatCount || 1, 1), maximum: 50 },
       },
     ],
     subscription_data: trialDaysRemaining > 0 ? { trial_period_days: trialDaysRemaining, metadata: { org_id: orgId } } : { metadata: { org_id: orgId } },

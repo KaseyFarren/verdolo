@@ -8,17 +8,18 @@ import { createClient } from '@/lib/supabase/client'
 import { ConfirmProvider } from '@/components/ConfirmDialog'
 import { PinLockProvider, usePinLock } from '@/components/PinLock'
 import QuickCapture from '@/components/QuickCapture'
+import TourProvider from '@/components/TourProvider'
 
 const NAV = [
-  { href: '/dashboard', icon: '🏠', label: 'Dashboard' },
+  { href: '/dashboard', icon: '🏠', label: 'Dashboard', tour: 'nav-dashboard' },
   { href: '/tasks', icon: '✅', label: 'Tasks' },
-  { href: '/clients', icon: '👥', label: 'Clients' },
-  { href: '/proposals', icon: '📄', label: 'Proposals' },
-  { href: '/time', icon: '⏱️', label: 'Time' },
+  { href: '/clients', icon: '👥', label: 'Clients', tour: 'nav-clients' },
+  { href: '/proposals', icon: '📄', label: 'Proposals', tour: 'nav-proposals' },
+  { href: '/time', icon: '⏱️', label: 'Time', tour: 'nav-time' },
   { href: '/reports', icon: '📊', label: 'Reports', adminOnly: true },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
   { href: '/revenue', icon: '💰', label: 'Revenue', ownerOnly: true },
-  { href: '/settings', icon: '⚙️', label: 'Settings' },
+  { href: '/settings', icon: '⚙️', label: 'Settings', tour: 'nav-settings' },
 ]
 
 export default function AppShell({
@@ -62,7 +63,12 @@ export default function AppShell({
           style={accentColor ? ({ '--accent': accentColor } as React.CSSProperties) : undefined}
         >
           <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-4 bg-green text-cream shadow-md">
-            <button onClick={() => setMobileOpen(true)} className="text-xl leading-none" aria-label="Open menu">
+            <button
+              id="mobile-nav-toggle"
+              onClick={() => setMobileOpen(true)}
+              className="text-xl leading-none"
+              aria-label="Open menu"
+            >
               ☰
             </button>
             <div className="font-heading font-bold text-sm">{orgName}</div>
@@ -95,6 +101,7 @@ export default function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-tour={item.tour}
                     className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                       active ? 'text-white font-medium' : 'text-cream/70 hover:text-white'
                     }`}
@@ -139,6 +146,7 @@ export default function AppShell({
             </motion.div>
           </div>
           <QuickCapture orgId={orgId} userId={userId} />
+          <TourProvider orgId={orgId} role={role} />
         </div>
       </ConfirmProvider>
     </PinLockProvider>

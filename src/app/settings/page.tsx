@@ -31,6 +31,7 @@ export default async function SettingsPage() {
         seatsPurchased={org?.seats_purchased ?? 1}
         activeMemberCount={activeMemberCount ?? 0}
         hasStripeCustomer={!!org?.stripe_customer_id}
+        planType={org?.plan_type ?? 'subscription'}
       />
     </AppShell>
   )

@@ -6,7 +6,7 @@ export default async function AdminOrgsPage() {
 
   const { data: orgs } = await admin
     .from('orgs')
-    .select('id, name, subscription_status, seats_purchased, trial_ends_at, current_period_end, created_at, stripe_customer_id')
+    .select('id, name, subscription_status, plan_type, seats_purchased, trial_ends_at, current_period_end, created_at, stripe_customer_id')
     .order('created_at', { ascending: false })
 
   const orgIds = (orgs ?? []).map((o) => o.id)
@@ -30,6 +30,7 @@ export default async function AdminOrgsPage() {
       name: org.name,
       ownerEmail: owner?.invited_email ?? null,
       subscriptionStatus: org.subscription_status,
+      planType: org.plan_type,
       seatsPurchased: org.seats_purchased,
       activeMemberCount,
       trialEndsAt: org.trial_ends_at,

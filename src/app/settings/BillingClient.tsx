@@ -12,6 +12,7 @@ export default function BillingClient({
   seatsPurchased,
   activeMemberCount,
   hasStripeCustomer,
+  planType,
 }: {
   orgId: string
   role: 'owner' | 'admin' | 'member'
@@ -20,6 +21,7 @@ export default function BillingClient({
   seatsPurchased: number
   activeMemberCount: number
   hasStripeCustomer: boolean
+  planType: 'subscription' | 'lifetime'
 }) {
   const [loading, setLoading] = useState<'checkout' | 'portal' | 'seats' | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -114,10 +116,13 @@ export default function BillingClient({
         {(trialExpired || subscriptionStatus === 'canceled') && (
           <div className="text-sm mb-1 text-amber-700 font-semibold">Trial ended - subscribe to continue</div>
         )}
-        {subscriptionStatus === 'active' && <div className="text-sm mb-1 text-green font-semibold">Active subscription</div>}
+        {subscriptionStatus === 'active' && (
+          <div className="text-sm mb-1 text-green font-semibold">{planType === 'lifetime' ? 'Lifetime license' : 'Active subscription'}</div>
+        )}
         {subscriptionStatus === 'past_due' && <div className="text-sm mb-1 text-amber-700 font-semibold">Payment past due - update your payment method</div>}
         <div className="text-xs text-sage">
-          $25/seat/month · {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
+          {planType === 'lifetime' ? '2 seats included for life · $17/mo per additional seat' : '$47/mo (2 seats included) · $17/mo per additional seat'} ·{' '}
+          {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
         </div>
       </div>
 

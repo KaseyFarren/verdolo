@@ -47,6 +47,7 @@ export default function SettingsClient({
   seatsPurchased,
   activeMemberCount,
   hasStripeCustomer,
+  planType,
 }: {
   orgId: string
   userId: string
@@ -61,6 +62,7 @@ export default function SettingsClient({
   seatsPurchased: number
   activeMemberCount: number
   hasStripeCustomer: boolean
+  planType: 'subscription' | 'lifetime'
 }) {
   const searchParams = useSearchParams()
   const requestedView = searchParams.get('view') as View | null
@@ -112,6 +114,7 @@ export default function SettingsClient({
               seatsPurchased={seatsPurchased}
               activeMemberCount={activeMemberCount}
               hasStripeCustomer={hasStripeCustomer}
+              planType={planType}
             />
           )}
         </div>

@@ -12,6 +12,7 @@ type Org = {
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   subscription_status: string | null
+  plan_type: string | null
   trial_ends_at: string | null
   current_period_end: string | null
   seats_purchased: number
@@ -92,6 +93,14 @@ export default function OrgDetailClient({
     if (ok) toast.success(`Invite re-sent to ${email ?? 'member'}`)
   }
 
+  async function setPlanType(planType: 'subscription' | 'lifetime') {
+    const ok = await post(`/api/admin/orgs/${org.id}/set-plan-type`, { planType }, `plan-${planType}`)
+    if (ok) {
+      toast.success(planType === 'lifetime' ? 'Lifetime license granted' : 'Reverted to subscription plan')
+      router.refresh()
+    }
+  }
+
   async function cancelSubscription(immediate: boolean) {
     const confirmed = await confirm({
       title: immediate ? 'Cancel immediately?' : 'Cancel at period end?',
@@ -125,6 +134,9 @@ export default function OrgDetailClient({
           >
             {org.subscription_status ?? 'none'}
           </span>
+          {org.plan_type === 'lifetime' && (
+            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">Lifetime</span>
+          )}
         </div>
         <div className="text-xs text-sage mt-1">
           {org.id} · created {formatDate(org.created_at)}
@@ -200,6 +212,19 @@ export default function OrgDetailClient({
                 {loading === 'seats' ? 'Updating…' : 'Update'}
               </Button>
             </div>
+          </div>
+
+          <div>
+            <div className="text-xs text-sage mb-1">Plan type</div>
+            {org.plan_type === 'lifetime' ? (
+              <Button size="sm" variant="secondary" onClick={() => setPlanType('subscription')} disabled={loading !== null}>
+                {loading === 'plan-subscription' ? 'Reverting…' : 'Revert to subscription'}
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setPlanType('lifetime')} disabled={loading !== null}>
+                {loading === 'plan-lifetime' ? 'Granting…' : 'Grant lifetime license'}
+              </Button>
+            )}
           </div>
 
           {org.stripe_subscription_id && org.subscription_status !== 'canceled' && (

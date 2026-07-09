@@ -8,6 +8,7 @@ export type AdminOrgRow = {
   name: string
   ownerEmail: string | null
   subscriptionStatus: string | null
+  planType: string | null
   seatsPurchased: number
   activeMemberCount: number
   trialEndsAt: string | null
@@ -103,6 +104,7 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
             <tr className="border-b border-ink/10">
               <Th label="Org" sortableKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-3 py-2">Owner</th>
+              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-3 py-2">Plan</th>
               <Th label="Status" sortableKey="subscriptionStatus" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <Th label="Seats" sortableKey="seatsPurchased" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <Th label="Trial ends" sortableKey="trialEndsAt" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -119,6 +121,13 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-sage">{org.ownerEmail ?? '-'}</td>
+                <td className="px-3 py-2">
+                  {org.planType === 'lifetime' ? (
+                    <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">Lifetime</span>
+                  ) : (
+                    <span className="text-sage">-</span>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -138,7 +147,7 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-sage">
+                <td colSpan={8} className="px-3 py-8 text-center text-sage">
                   No orgs match &quot;{search}&quot;
                 </td>
               </tr>

@@ -53,6 +53,33 @@ export async function POST(request: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
+
+      // No org_id metadata means this didn't come from the authenticated in-app upgrade flow
+      // (src/app/api/billing/checkout/route.ts always sets it) - it's a pre-account Payment Link
+      // purchase instead. Record it in purchase_tokens; /create-account is what turns it into an
+      // org, once the buyer picks a password and agency name.
+      if (!session.metadata?.org_id) {
+        const admin = createAdminClient()
+        const isLifetime = session.mode === 'payment'
+        const subscriptionId = session.mode === 'subscription' && session.subscription
+          ? ((await getStripe().subscriptions.retrieve(session.subscription as string)).id)
+          : null
+
+        await admin.from('purchase_tokens').upsert(
+          {
+            stripe_checkout_session_id: session.id,
+            stripe_customer_id: session.customer as string,
+            stripe_subscription_id: subscriptionId,
+            plan_type: isLifetime ? 'lifetime' : 'subscription',
+            email: session.customer_details?.email ?? '',
+            seats_purchased: 2,
+            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          { onConflict: 'stripe_checkout_session_id', ignoreDuplicates: true }
+        )
+        break
+      }
+
       if (session.subscription) {
         const stripeInstance = getStripe()
         const subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string)
