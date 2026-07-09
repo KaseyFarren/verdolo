@@ -26,7 +26,7 @@ export default async function DashboardPage() {
       .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id')
       .eq('org_id', orgId)
       .order('name'),
-    supabase.from('tasks').select('*').eq('org_id', orgId),
+    supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false),
     supabase.from('recurring_templates').select('*').eq('org_id', orgId),
     supabase.from('default_task_templates').select('*').eq('org_id', orgId),
     // RLS scopes this for free: admins/owners get every member's rows, members only get their own.

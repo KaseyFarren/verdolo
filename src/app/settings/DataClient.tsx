@@ -1,15 +1,30 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Row, Section, triggerDownload } from '@/components/settings/SettingsUI'
-import { todayKey } from '@/lib/agency'
+import { formatDate, memberName, todayKey } from '@/lib/agency'
+
+type ArchivedTask = {
+  id: string
+  title: string
+  client_id: string | null
+  assigned_to: string | null
+  completed_at: string | null
+  archived_at: string | null
+}
 
 export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin: boolean }) {
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
+
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archived, setArchived] = useState<ArchivedTask[] | null>(null)
+  const [clientNames, setClientNames] = useState<Record<string, string>>({})
+  const [memberLabels, setMemberLabels] = useState<Record<string, string>>({})
 
   async function exportJSON() {
     const [{ data: clients }, { data: tasks }, { data: notes }] = await Promise.all([
@@ -30,11 +45,47 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
     triggerDownload(csv, `verdolo-clients-${todayKey()}.csv`, 'text/csv')
   }
 
+  // Archives rather than deletes - Revenue and Reports query the tasks table directly by date
+  // range, so a hard delete here used to silently zero out historical completion counts.
   async function clearCompleted() {
-    const ok = await confirm({ message: 'Clear all completed tasks?', confirmLabel: 'Clear' })
+    const ok = await confirm({
+      message: "Archive all completed tasks? They'll be hidden from your task list but kept for reporting - view or restore them anytime from Archived tasks below.",
+      confirmLabel: 'Archive',
+    })
     if (!ok) return
-    await supabase.from('tasks').delete().eq('org_id', orgId).eq('done', true)
-    toast.success('Completed tasks cleared')
+    await supabase.from('tasks').update({ archived: true, archived_at: new Date().toISOString() }).eq('org_id', orgId).eq('done', true).eq('archived', false)
+    toast.success('Completed tasks archived')
+    if (archiveOpen) loadArchived()
+  }
+
+  async function loadArchived() {
+    setArchiveLoading(true)
+    const [{ data: tasks }, { data: clients }, { data: members }] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('id, title, client_id, assigned_to, completed_at, archived_at')
+        .eq('org_id', orgId)
+        .eq('archived', true)
+        .order('archived_at', { ascending: false }),
+      supabase.from('clients').select('id, name').eq('org_id', orgId),
+      supabase.from('org_members').select('user_id, invited_email, display_name').eq('org_id', orgId),
+    ])
+    setArchived((tasks as ArchivedTask[]) ?? [])
+    setClientNames(Object.fromEntries((clients ?? []).map((c) => [c.id, c.name])))
+    setMemberLabels(Object.fromEntries((members ?? []).map((m) => [m.user_id, memberName(m)])))
+    setArchiveLoading(false)
+  }
+
+  async function toggleArchive() {
+    const next = !archiveOpen
+    setArchiveOpen(next)
+    if (next && archived === null) await loadArchived()
+  }
+
+  async function restoreTask(id: string) {
+    await supabase.from('tasks').update({ archived: false, archived_at: null }).eq('id', id)
+    setArchived((prev) => (prev ?? []).filter((t) => t.id !== id))
+    toast.success('Task restored')
   }
 
   async function resetAll() {
@@ -64,11 +115,38 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
           Export
         </button>
       </Row>
-      <Row title="Clear completed tasks" subtitle="Remove all tasks marked as done">
+      <Row title="Clear completed tasks" subtitle="Archive tasks marked as done - hides them from your task list, keeps them for reporting">
         <button className="text-xs text-red-600" onClick={clearCompleted}>
           Clear
         </button>
       </Row>
+      <Row title="Archived tasks" subtitle="View or restore tasks you've archived">
+        <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={toggleArchive}>
+          {archiveOpen ? 'Hide' : 'View'}
+        </button>
+      </Row>
+      {archiveOpen && (
+        <div className="mt-2 mb-4 rounded-lg border border-ink/10 divide-y divide-ink/5 max-h-80 overflow-y-auto">
+          {archiveLoading && <div className="text-xs text-sage p-3">Loading...</div>}
+          {!archiveLoading && archived?.length === 0 && <div className="text-xs text-sage p-3">No archived tasks.</div>}
+          {!archiveLoading &&
+            archived?.map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="truncate">{t.title}</div>
+                  <div className="text-xs text-sage truncate">
+                    {[t.client_id ? clientNames[t.client_id] : null, t.assigned_to ? memberLabels[t.assigned_to] : null, t.completed_at ? `completed ${formatDate(t.completed_at.slice(0, 10))}` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                </div>
+                <button className="text-xs shrink-0 underline" onClick={() => restoreTask(t.id)}>
+                  Restore
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
       {isAdmin && (
         <Row title="Reset all data" subtitle="Delete tasks, clients, and notes for this org">
           <button className="text-xs text-red-600" onClick={resetAll}>

@@ -169,7 +169,7 @@ export default function TasksClient({
 
   useEffect(() => {
     ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, initialDefaults, excludeWeekends).then(async () => {
-      const { data } = await supabase.from('tasks').select('*').eq('org_id', orgId).order('due_date')
+      const { data } = await supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false).order('due_date')
       if (data) setTasks(data as Task[])
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -277,7 +277,7 @@ export default function TasksClient({
   // upsert used on mount) instead of leaving it missing until the next page load.
   async function regenerateRecurringInstance(r: Recurring) {
     await ensureAutoAndRecurringTasks(supabase, orgId, clients, [r], [], excludeWeekends)
-    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
+    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false)
     if (fresh) setTasks(fresh as Task[])
   }
   async function updateRecurring(id: string, fields: Record<string, unknown>) {
@@ -335,7 +335,7 @@ export default function TasksClient({
   // leaving it missing until the next page load, mirroring regenerateRecurringInstance above.
   async function regenerateDefaultInstance(d: Default) {
     await ensureAutoAndRecurringTasks(supabase, orgId, clients, [], [d], excludeWeekends)
-    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId)
+    const { data: fresh } = await supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false)
     if (fresh) setTasks(fresh as Task[])
   }
   async function updateDefault(id: string, fields: Record<string, unknown>) {
