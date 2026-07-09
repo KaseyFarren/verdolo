@@ -625,7 +625,7 @@ export default function ReportsClient({
               </div>
               {pMonth === todayKey().slice(0, 7) && (
                 <div className="text-xs text-sage mb-2">
-                  This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
+                  This month&apos;s retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
                 </div>
               )}
               <div className="rounded-2xl bg-white shadow-md p-5">

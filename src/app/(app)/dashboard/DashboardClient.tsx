@@ -101,7 +101,7 @@ export default function DashboardClient({
   weekCompletedTasks: WeekCompletedTask[]
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const [clients] = useState<Client[]>(initialClients)
+  const [clients, setClients] = useState<Client[]>(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const timer = useTaskTimer(supabase, orgId, userId)
 
@@ -348,8 +348,22 @@ export default function DashboardClient({
     }
   }
 
+  async function markAwaitingReply(client: Client) {
+    const { error } = await supabase.from('clients').update({ awaiting_reply: true }).eq('id', client.id)
+    if (error) {
+      toast.error('Could not update reply status')
+      return
+    }
+    setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, awaiting_reply: true } : c)))
+  }
+
   async function clearAwaitingReply(client: Client) {
-    await supabase.from('clients').update({ awaiting_reply: false }).eq('id', client.id)
+    const { error } = await supabase.from('clients').update({ awaiting_reply: false }).eq('id', client.id)
+    if (error) {
+      toast.error('Could not update reply status')
+      return
+    }
+    setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, awaiting_reply: false } : c)))
   }
 
   const msgTasksDone = activeClients.filter((c) => isSentToday(c.id)).length
@@ -620,7 +634,7 @@ export default function DashboardClient({
                       Undo
                     </button>
                     {!c.awaiting_reply && (
-                      <button title="Mark awaiting reply" className="text-amber-700 hover:text-amber-800" onClick={() => clearAwaitingReply(c)}>
+                      <button title="Mark awaiting reply" className="text-amber-700 hover:text-amber-800" onClick={() => markAwaitingReply(c)}>
                         ⏳
                       </button>
                     )}

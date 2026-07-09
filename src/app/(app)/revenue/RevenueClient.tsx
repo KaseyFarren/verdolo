@@ -290,7 +290,7 @@ export default function RevenueClient({
       )}
       {isFullMonth && period.period === 'this_month' && (
         <div className="text-xs text-sage/70 mb-5">
-          Showing partial-month figures - retainer revenue is prorated to date and will reach full value by month end.
+          Showing partial-cycle figures - retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
         </div>
       )}
 
