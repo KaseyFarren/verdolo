@@ -59,7 +59,7 @@ export default function CustomSelect({
         }`}
       >
         <span className="truncate">{current?.label ?? placeholder}</span>
-        <span className={`text-sage text-[10px] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
       {open && !disabled && (
         <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg border border-ink/10 py-1">
@@ -77,7 +77,7 @@ export default function CustomSelect({
           ))}
           {groups.map((g) => (
             <div key={g.label}>
-              <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-sage">{g.label}</div>
+              <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-sage">{g.label}</div>
               {g.options.map((o) => (
                 <button
                   key={o.value}

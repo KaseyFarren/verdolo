@@ -279,27 +279,27 @@ export default function RevenueClient({
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">Total revenue</div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>
         </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">
             MRR <InfoTooltip content="Monthly recurring revenue - sum of active clients' monthly retainers" />
           </div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
         </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">Hours logged</div>
           <div className="text-2xl font-heading font-bold">{totals.hours.toFixed(1)}</div>
         </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">
             Blended rate <InfoTooltip content="Total revenue divided by total hours logged, across all clients" />
           </div>
           <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '-'}</div>
         </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">
             vs. target rate <InfoTooltip content="Blended rate compared to the target hourly rate set in Settings → General" />
           </div>
@@ -307,7 +307,7 @@ export default function RevenueClient({
             {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '-'}
           </div>
         </div>
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">
             Billable utilization <InfoTooltip content="Share of logged hours marked billable" />
           </div>
@@ -430,7 +430,7 @@ export default function RevenueClient({
           {memberRows.map((r, i) => {
             const stats = taskStatsByMember.get(r.member.user_id) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
             return (
-              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
+              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
                 <div className="flex flex-wrap items-center gap-4">
                   <Avatar member={r.member} index={i} />
                   <div className="min-w-0">
@@ -444,11 +444,11 @@ export default function RevenueClient({
                   </div>
                   <div className="sm:ml-auto flex gap-2 shrink-0">
                     <div className="w-28">
-                      <div className="text-[10px] text-sage mb-1">Hours</div>
+                      <div className="text-xs text-sage mb-1">Hours</div>
                       <MetricBar value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
                     </div>
                     <div className="w-28">
-                      <div className="text-[10px] text-sage mb-1">Revenue</div>
+                      <div className="text-xs text-sage mb-1">Revenue</div>
                       <MetricBar value={r.revenue} max={maxMemberRevenue} display={fmtMoney(Math.round(r.revenue))} />
                     </div>
                   </div>

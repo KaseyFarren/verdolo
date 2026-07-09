@@ -113,7 +113,7 @@ export default function MembersList({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={m.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="h-6 w-6 rounded-full bg-ink/5 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                <div className="h-6 w-6 rounded-full bg-ink/5 flex items-center justify-center text-xs font-semibold shrink-0">
                   {getInitials(memberName(m))}
                 </div>
               )}

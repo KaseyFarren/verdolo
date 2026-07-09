@@ -121,7 +121,7 @@ export default function AppShell({
                 </button>
                 <LockButton />
               </div>
-              <div className="mt-2 flex gap-2 text-[10px] text-cream/40">
+              <div className="mt-2 flex gap-2 text-xs text-cream/40">
                 <Link href="/terms" className="hover:text-cream/70">Terms</Link>
                 <Link href="/privacy" className="hover:text-cream/70">Privacy</Link>
               </div>

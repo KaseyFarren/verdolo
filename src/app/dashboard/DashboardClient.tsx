@@ -406,7 +406,7 @@ export default function DashboardClient({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-6 items-start pt-6 border-t border-ink/10">
-        <div className="rounded-2xl bg-white shadow-md p-4">
+        <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-sage">{dashLabel}&apos;s tasks</div>
             <button
@@ -534,7 +534,7 @@ export default function DashboardClient({
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl bg-white shadow-md p-4">
+          <div className="rounded-2xl bg-white shadow-md p-5">
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">{isAdmin ? 'Team today' : 'My time today'}</div>
             {teamToday.length === 0 ? (
               <div className="text-sm text-sage">No time logged yet today.</div>
@@ -549,24 +549,24 @@ export default function DashboardClient({
           </div>
 
           {isAdmin && (topHoursLabel || topTasksLabel) && (
-            <div className="rounded-2xl bg-white shadow-md p-4">
+            <div className="rounded-2xl bg-white shadow-md p-5">
               <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">This week</div>
               {topHoursLabel && (
-                <div className="flex justify-between items-center py-1 text-sm">
-                  <span className="text-ink truncate pr-2">🏆 {topHoursLabel} logged the most hours</span>
+                <div className="flex justify-between items-start gap-2 py-1 text-sm">
+                  <span className="text-ink min-w-0 pr-2">🏆 {topHoursLabel} logged the most hours</span>
                   <span className="font-medium text-ink shrink-0">{formatHoursMins(topHours!.total)}</span>
                 </div>
               )}
               {topTasksLabel && (
-                <div className="flex justify-between items-center py-1 text-sm">
-                  <span className="text-ink truncate pr-2">✅ {topTasksLabel} completed the most tasks</span>
+                <div className="flex justify-between items-start gap-2 py-1 text-sm">
+                  <span className="text-ink min-w-0 pr-2">✅ {topTasksLabel} completed the most tasks</span>
                   <span className="font-medium text-ink shrink-0">{topTasks!.total}</span>
                 </div>
               )}
             </div>
           )}
 
-          <div className="rounded-2xl bg-white shadow-md p-4 flex flex-col flex-1 min-h-[220px]">
+          <div className="rounded-2xl bg-white shadow-md p-5 flex flex-col flex-1 min-h-[220px]">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-sage">Quick notes</div>
               <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>

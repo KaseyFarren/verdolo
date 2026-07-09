@@ -166,7 +166,7 @@ export default function ProposalsClient({
       </div>
 
       {showAdd && (
-        <div className="rounded-2xl bg-white shadow-md p-4 mb-5 space-y-3">
+        <div className="rounded-2xl bg-white shadow-md p-5 mb-5 space-y-3">
           <div className="flex gap-1.5">
             <button
               type="button"
@@ -263,7 +263,7 @@ export default function ProposalsClient({
             const isOpen = expanded.has(p.id)
             const hasDetails = !!p.notes || !!p.doc_url
             return (
-              <div key={p.id} className="rounded-2xl bg-white shadow-md p-4">
+              <div key={p.id} className="rounded-2xl bg-white shadow-md p-5">
                 <div className="flex justify-between items-start gap-3">
                   <button
                     type="button"
@@ -272,7 +272,7 @@ export default function ProposalsClient({
                   >
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-semibold text-ink">{p.title}</div>
-                      <span className="text-[10px] font-semibold rounded-full px-2 py-0.5" style={{ color: style.color, background: style.bg }}>
+                      <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: style.color, background: style.bg }}>
                         {style.label}
                       </span>
                       {hasDetails && <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>}

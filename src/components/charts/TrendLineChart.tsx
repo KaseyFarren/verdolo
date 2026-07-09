@@ -95,10 +95,15 @@ export default function TrendLineChart({
         </div>
       )}
 
+      {/* viewBox scaling shrinks the SVG's fixed fontSize labels along with the geometry -
+          on a narrow phone the plot area can drop below half its natural width, making 10-11px
+          axis/end labels unreadably small. min-w keeps a readable floor; overflow-x-auto lets
+          the chart scroll horizontally instead of shrinking past that floor. */}
+      <div className="overflow-x-auto">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="w-full h-auto touch-none"
+        className="w-full h-auto touch-none min-w-[420px]"
         onPointerMove={onMove}
         onPointerLeave={() => setHoverIdx(null)}
       >
@@ -184,6 +189,7 @@ export default function TrendLineChart({
           })
         })()}
       </svg>
+      </div>
 
       {hoverIdx !== null && (
         <div

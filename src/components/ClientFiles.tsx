@@ -137,7 +137,7 @@ export default function ClientFiles({
                 <FileTypeIcon fileName={f.storage_path} size={17} />
               </div>
               <div className="text-xs font-medium leading-snug line-clamp-2 break-words">{f.file_name}</div>
-              <div className="text-[11px] text-sage">{formatSize(f.size_bytes)}</div>
+              <div className="text-xs text-sage">{formatSize(f.size_bytes)}</div>
             </div>
           ))}
         </div>

@@ -217,6 +217,7 @@ export default function OrgDetailClient({
 
       <div className="rounded-lg border border-ink/10 bg-white p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Members</div>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink/10">
@@ -255,6 +256,7 @@ export default function OrgDetailClient({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

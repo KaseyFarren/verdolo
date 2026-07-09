@@ -385,7 +385,7 @@ export default function ReportsClient({
             ) : (
               <div className="space-y-3">
                 {clientReports.map((r) => (
-                  <div key={r.client.id} className="rounded-2xl bg-white shadow-md p-4">
+                  <div key={r.client.id} className="rounded-2xl bg-white shadow-md p-5">
                     <div className="flex justify-between items-center mb-3">
                       <div className="text-sm font-semibold text-ink">{r.client.name}</div>
                       <div className="flex gap-3 text-xs text-sage">
@@ -397,7 +397,7 @@ export default function ReportsClient({
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Tasks by who</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-1">Tasks by who</div>
                         {r.byAssignee.length === 0 ? (
                           <div className="text-xs text-sage">-</div>
                         ) : (
@@ -410,7 +410,7 @@ export default function ReportsClient({
                         )}
                       </div>
                       <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Time by who</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-1">Time by who</div>
                         {r.byLogger.length === 0 ? (
                           <div className="text-xs text-sage">-</div>
                         ) : (
@@ -534,7 +534,7 @@ export default function ReportsClient({
                           <span className="text-xs font-semibold text-sage flex items-center gap-2">
                             {reportLabel(r)} <span className="text-sage/50 capitalize">· {r.period_type}</span>
                             {isJustGenerated && (
-                              <span className="rounded-full bg-accent/10 text-accent px-2 py-0.5 text-[10px] font-semibold normal-case">Just generated</span>
+                              <span className="rounded-full bg-accent/10 text-accent px-2 py-0.5 text-xs font-semibold normal-case">Just generated</span>
                             )}
                           </span>
                           <span className="text-xs text-sage">{isOpen ? '▾' : '▸'}</span>
@@ -591,7 +591,7 @@ export default function ReportsClient({
             {monthlyTrend.every((m) => !m.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
             ) : (
-              <div className="rounded-2xl bg-white shadow-md p-4">
+              <div className="rounded-2xl bg-white shadow-md p-5">
                 <TrendLineChart
                   months={trendMonthKeys}
                   formatValue={(cents) => formatRate(cents)}
@@ -624,7 +624,7 @@ export default function ReportsClient({
                   This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
                 </div>
               )}
-              <div className="rounded-2xl bg-white shadow-md p-4">
+              <div className="rounded-2xl bg-white shadow-md p-5">
                 <DivergingBarChart
                   items={profitability
                     .filter((r) => r.rateDeltaCents !== null)
@@ -643,11 +643,11 @@ export default function ReportsClient({
               {profitability.map((r) => {
                 const isBelowTarget = targetRateCents > 0 && r.rateDeltaCents !== null && r.rateDeltaCents < 0
                 return (
-                  <div key={r.client.id} className={`rounded-2xl bg-white shadow-md p-4 ${isBelowTarget ? 'border-l-4 border-red-400' : ''}`}>
+                  <div key={r.client.id} className={`rounded-2xl bg-white shadow-md p-5 ${isBelowTarget ? 'border-l-4 border-red-400' : ''}`}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold text-ink">{r.client.name}</div>
-                        {isBelowTarget && <span className="text-[10px] rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
+                        {isBelowTarget && <span className="text-xs rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
                       </div>
                       <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
                         {r.isHourly
@@ -697,7 +697,7 @@ export default function ReportsClient({
           {capacity.some((r) => r.targetHours !== null && r.targetHours > 0) && (
             <div className="mb-8">
               <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Hours vs. target · this week</div>
-              <div className="rounded-2xl bg-white shadow-md p-4">
+              <div className="rounded-2xl bg-white shadow-md p-5">
                 <DivergingBarChart
                   items={capacity
                     .filter((r) => r.targetHours !== null && r.targetHours > 0)
@@ -725,7 +725,7 @@ export default function ReportsClient({
           ) : (
             <div className="space-y-3">
               {capacity.map((r) => (
-                <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
+                <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-sm font-semibold text-ink">{memberName(r.member)}</div>
                     <div className="flex gap-3 text-xs text-sage">
@@ -740,7 +740,7 @@ export default function ReportsClient({
                   </div>
                   {r.targetHours !== null && r.targetHours > 0 && (
                     <div className="mt-2">
-                      <div className="flex justify-between text-[11px] text-sage mb-1">
+                      <div className="flex justify-between text-xs text-sage mb-1">
                         <span>Hours vs. target</span>
                         <span>
                           {r.hours.toFixed(1)}h / {r.targetHours}h

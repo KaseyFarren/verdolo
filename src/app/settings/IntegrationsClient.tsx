@@ -48,11 +48,11 @@ export default function IntegrationsClient({
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Integrations</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {COMING_SOON.map((p) => (
-          <div key={p.key} className="rounded-2xl bg-white shadow-md p-4 flex items-center gap-3">
+          <div key={p.key} className="rounded-2xl bg-white shadow-md p-5 flex items-center gap-3">
             <IntegrationIcon name={p.key} />
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium truncate">{p.name}</div>
-              <span className="inline-block mt-0.5 text-[10px] rounded-full bg-sand text-sage px-2 py-0.5">Coming soon</span>
+              <span className="inline-block mt-0.5 text-xs rounded-full bg-sand text-sage px-2 py-0.5">Coming soon</span>
             </div>
           </div>
         ))}

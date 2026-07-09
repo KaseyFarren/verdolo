@@ -36,7 +36,7 @@ export default function DivergingBarChart({
               onFocus={() => setHoveredId(item.id)}
               onBlur={() => setHoveredId((v) => (v === item.id ? null : v))}
             >
-              <span className="w-36 shrink-0 truncate text-xs text-ink" title={item.label}>
+              <span className="w-20 sm:w-48 shrink-0 truncate text-xs text-ink" title={item.label}>
                 {item.label}
               </span>
               <span className="relative flex-1 h-[18px]">
@@ -70,7 +70,7 @@ export default function DivergingBarChart({
           )
         })}
       </div>
-      <div className="flex items-center gap-3 mt-3 text-[11px] text-sage">
+      <div className="flex items-center gap-3 mt-3 text-xs text-sage">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: PROFIT }} />
           {positiveLabel}

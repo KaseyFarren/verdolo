@@ -747,7 +747,7 @@ export default function TimeClient({
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by teammate</div>
           <div className="space-y-3">
             {totalByMember.map((r, i) => (
-              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-4">
+              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <Avatar member={r.member} index={i} />
                   <div>

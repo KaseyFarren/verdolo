@@ -395,7 +395,7 @@ export default function ClientsClient({
                         title={`${formatDate(s.snapshot_date)}: ${s.health}`}
                       />
                     ))}
-                    <span className="text-[10px] text-sage ml-1">health, last {clientHealthTrend(selected.id).length}d</span>
+                    <span className="text-xs text-sage ml-1">health, last {clientHealthTrend(selected.id).length}d</span>
                   </div>
                 )}
                 <div className="flex gap-3 mt-1 flex-wrap">
@@ -665,7 +665,7 @@ export default function ClientsClient({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="font-medium text-sm">{c.name}</div>
-                <span className="text-[10px] font-semibold" style={{ color: stageColor(stage) }}>
+                <span className="text-xs font-semibold" style={{ color: stageColor(stage) }}>
                   {stage}
                 </span>
               </div>

@@ -30,6 +30,13 @@
   --font-sans: var(--font-inter);
   --font-heading: var(--font-syne);
 
+  /* Beta feedback: the app read slightly cramped overall. Bumping the two smallest steps
+     of the type scale here (12px→13px, 14px→15px) raises every text-xs/text-sm usage across
+     the app at once, since Tailwind's line-height vars are unitless multipliers that already
+     scale with font-size - no per-component changes needed. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+
   /* Bare `rounded` is the most common radius in the app (every plain input/select/
      textarea/secondary button uses it) - pushed to a full stadium/pill so nothing
      in the product renders a hard right angle, matching the primary-button pills. */

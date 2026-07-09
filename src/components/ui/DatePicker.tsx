@@ -67,7 +67,7 @@ export default function DatePicker({
         className="w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left"
       >
         <span className={`truncate ${value ? '' : 'text-sage'}`}>{value ? formatDate(value) : placeholder}</span>
-        <span className={`text-sage text-[10px] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-64 rounded-xl bg-white shadow-lg border border-ink/10 p-3">
@@ -82,7 +82,7 @@ export default function DatePicker({
           </div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} className="text-center text-[11px] text-sage py-1">
+              <div key={i} className="text-center text-xs text-sage py-1">
                 {d}
               </div>
             ))}
