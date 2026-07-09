@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import PeriodSelector from '@/components/ui/PeriodSelector'
-import { AVATAR_COLORS, centsToDollars, dollarsToCents, getInitials, getStage, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
 import { isFullCalendarMonth, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -129,7 +129,7 @@ export default function RevenueClient({
         const totalRevenue = (isFullMonth ? c.retainer_cents || 0 : 0) + chargesTotal
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
-        const rate = hours > 0 ? totalRevenue / hours : null
+        const rate = effectiveRate(totalRevenue, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
         return { client: c, chargesTotal, totalRevenue, seconds, hours, rate, rateDeltaCents }
       })
@@ -179,7 +179,7 @@ export default function RevenueClient({
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
     const seconds = clientRows.reduce((s, r) => s + r.seconds, 0)
     const hours = seconds / 3600
-    const rate = hours > 0 ? revenue / hours : null
+    const rate = effectiveRate(revenue, hours)
     return { revenue, hours, rate, rateDeltaCents: rate !== null && targetRateCents > 0 ? rate - targetRateCents : null }
   }, [clientRows, targetRateCents])
 

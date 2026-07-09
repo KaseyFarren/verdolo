@@ -127,6 +127,16 @@ export function centsToDollars(cents?: number | null) {
   return Math.round((cents ?? 0) / 100)
 }
 
+// Hours below this round to "0.0h" everywhere we display them (.toFixed(1)) - a stray few-second
+// timer entry (useTaskTimer.ts floors every stopped entry to a minimum of 1 second) can otherwise
+// divide revenue by a near-zero denominator and produce a nonsense rate like "$1.4M/hr" while the
+// UI still shows "0.0h logged", reading as a bug. Treat sub-threshold hours as "no rate to report."
+export const MIN_HOURS_FOR_RATE = 0.05
+
+export function effectiveRate(revenueCents: number, hours: number): number | null {
+  return hours >= MIN_HOURS_FOR_RATE ? revenueCents / hours : null
+}
+
 export function dollarsToCents(dollars: number | string) {
   return Math.round(Number(dollars || 0) * 100)
 }

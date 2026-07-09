@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
+import { effectiveRate } from '@/lib/agency'
 
 export async function POST(request: Request) {
   const { orgId, clientId, periodStart } = await request.json()
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
   const hours = (entries || []).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
   const paidCents = (paidInvoices || []).reduce((s, i) => s + i.amount_cents, 0)
   const revenueCents = paidCents || client.retainer_cents || 0
-  const effectiveRateCents = hours > 0 ? revenueCents / hours : 0
+  const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
 
   try {
     const prompt = buildScopeCreepPrompt({

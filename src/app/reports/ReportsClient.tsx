@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
-import { formatDate, todayKey, memberName } from '@/lib/agency'
+import { formatDate, todayKey, memberName, effectiveRate } from '@/lib/agency'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
@@ -235,7 +235,7 @@ export default function ReportsClient({
         const hours = monthEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const revenueCents = paidCents || c.retainer_cents || 0
-        const effectiveRateCents = hours > 0 ? revenueCents / hours : null
+        const effectiveRateCents = effectiveRate(revenueCents, hours)
         const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
         return { client: c, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents }
       })
@@ -262,8 +262,8 @@ export default function ReportsClient({
         // An effective rate needs a denominator - a month with retainer revenue but zero
         // logged hours has no *rate* to report, not a rate of $0 (retainer_cents is always
         // "current", so every month trivially has revenue even before a client was active).
-        blendedRateCents: totalHours > 0 ? totalRevenue / totalHours : 0,
-        hasData: totalHours > 0,
+        blendedRateCents: effectiveRate(totalRevenue, totalHours) ?? 0,
+        hasData: effectiveRate(totalRevenue, totalHours) !== null,
       }
     })
   }, [clients, monthTimeEntries, monthPaidInvoices, targetRateCents, trendMonthKeys])
