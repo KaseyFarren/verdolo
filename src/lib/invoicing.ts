@@ -22,8 +22,13 @@ export async function createAndSendInvoice({
   lineItems: LineItem[]
   source?: 'manual' | 'recurring'
 }) {
-  const { data: client } = await admin.from('clients').select('id, name, contact_email, stripe_customer_id').eq('id', clientId).eq('org_id', orgId).single()
+  const [{ data: client }, { data: org }] = await Promise.all([
+    admin.from('clients').select('id, name, contact_email, stripe_customer_id').eq('id', clientId).eq('org_id', orgId).single(),
+    admin.from('orgs').select('settings').eq('id', orgId).single(),
+  ])
   if (!client) throw new Error('Client not found')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currency = ((org?.settings as any)?.currency as string | undefined) || 'usd'
 
   const stripe = getStripe()
 
@@ -36,7 +41,7 @@ export async function createAndSendInvoice({
 
   for (const item of lineItems) {
     await stripe.invoiceItems.create(
-      { customer: stripeCustomerId, currency: 'usd', amount: item.amount_cents * (item.quantity || 1), description: item.description },
+      { customer: stripeCustomerId, currency, amount: item.amount_cents * (item.quantity || 1), description: item.description },
       connectAccount(accountId)
     )
   }

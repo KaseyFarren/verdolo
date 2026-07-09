@@ -7,7 +7,20 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import PeriodSelector from '@/components/ui/PeriodSelector'
-import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, isRateComparisonMeaningful, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
+import {
+  AVATAR_COLORS,
+  centsToDollars,
+  currencySymbol,
+  dollarsToCents,
+  effectiveRate,
+  getInitials,
+  getStage,
+  isRateComparisonMeaningful,
+  memberName,
+  mrrCentsTotal,
+  todayKey,
+  type Currency,
+} from '@/lib/agency'
 import { isFullCalendarMonth, billingCycleElapsedFraction, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -42,13 +55,6 @@ function Avatar({ member, index }: { member: Member; index: number }) {
 function formatHours(seconds: number) {
   return (seconds / 3600).toFixed(1)
 }
-function fmtMoney(cents: number) {
-  return `$${centsToDollars(cents).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-}
-function formatRateDelta(centsPerHour: number) {
-  const sign = centsPerHour >= 0 ? '+' : '−'
-  return `${sign}$${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
-}
 
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
 
@@ -62,6 +68,7 @@ export default function RevenueClient({
   members,
   tasks,
   targetRateCents,
+  currency,
 }: {
   orgId: string
   period: PeriodValue
@@ -72,7 +79,16 @@ export default function RevenueClient({
   members: Member[]
   tasks: TaskRow[]
   targetRateCents: number
+  currency?: Currency
 }) {
+  const currencySign = currencySymbol(currency)
+  function fmtMoney(cents: number) {
+    return `${currencySign}${centsToDollars(cents).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  }
+  function formatRateDelta(centsPerHour: number) {
+    const sign = centsPerHour >= 0 ? '+' : '−'
+    return `${sign}${currencySign}${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
+  }
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const confirm = useConfirm()
@@ -297,7 +313,7 @@ export default function RevenueClient({
           <div className="text-xs text-sage mb-1">
             Blended rate <InfoTooltip content="Total revenue divided by total hours logged, across all clients" />
           </div>
-          <div className="text-2xl font-heading font-bold">{totals.rate ? `$${centsToDollars(totals.rate)}/hr` : '-'}</div>
+          <div className="text-2xl font-heading font-bold">{totals.rate ? `${currencySign}${centsToDollars(totals.rate)}/hr` : '-'}</div>
         </div>
         <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">
@@ -351,7 +367,7 @@ export default function RevenueClient({
                   <span className="flex-1 min-w-[140px]">
                     <span className="font-medium">{r.client.name}</span>
                     {r.isHourly ? (
-                      <span className="text-sage ml-2 text-xs">${centsToDollars(r.client.hourly_rate_cents || 0)}/hr hourly</span>
+                      <span className="text-sage ml-2 text-xs">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr hourly</span>
                     ) : r.client.retainer_cents ? (
                       <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span>
                     ) : null}
@@ -360,10 +376,10 @@ export default function RevenueClient({
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
                     {isRateComparisonMeaningful(r.client) ? (
                       <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
-                        {r.rate ? `$${centsToDollars(r.rate)}/hr` : '-'}
+                        {r.rate ? `${currencySign}${centsToDollars(r.rate)}/hr` : '-'}
                       </span>
                     ) : (
-                      <span className="text-sage w-16 text-right">${centsToDollars(r.client.hourly_rate_cents || 0)}/hr</span>
+                      <span className="text-sage w-16 text-right">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr</span>
                     )}
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                   </span>
@@ -399,7 +415,7 @@ export default function RevenueClient({
                       />
                       <input
                         className="w-20 rounded border border-ink/10 bg-white px-2 py-1.5 text-xs"
-                        placeholder="$"
+                        placeholder={currencySign}
                         inputMode="decimal"
                         value={chargeAmount}
                         onChange={(e) => setChargeAmount(e.target.value)}

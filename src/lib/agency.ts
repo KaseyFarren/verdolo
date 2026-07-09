@@ -150,6 +150,24 @@ export function dollarsToCents(dollars: number | string) {
   return Math.round(Number(dollars || 0) * 100)
 }
 
+export type Currency = 'usd' | 'gbp' | 'eur'
+export const CURRENCIES: { value: Currency; label: string; symbol: string }[] = [
+  { value: 'usd', label: 'USD ($)', symbol: '$' },
+  { value: 'gbp', label: 'GBP (£)', symbol: '£' },
+  { value: 'eur', label: 'EUR (€)', symbol: '€' },
+]
+
+/** Every currency-sensitive display in the app takes an org's `settings.currency` (unset = 'usd',
+ * matching pre-currency-preference behavior for every existing org) rather than hardcoding "$" -
+ * this is a display/label preference only, not FX conversion; stored cents are never rescaled. */
+export function currencySymbol(currency?: string | null): string {
+  return CURRENCIES.find((c) => c.value === currency)?.symbol ?? '$'
+}
+
+export function formatMoney(cents?: number | null, currency?: string | null) {
+  return `${currencySymbol(currency)}${centsToDollars(cents).toLocaleString()}`
+}
+
 export function isWeekend(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
   const day = new Date(y, m - 1, d).getDay()

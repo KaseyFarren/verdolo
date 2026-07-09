@@ -85,17 +85,41 @@ export function monthElapsedFraction(monthKey: string): number {
   return dayOfMonth / daysInMonth
 }
 
+function daysInMonthOf(year: number, month1indexed: number) {
+  return new Date(year, month1indexed, 0).getDate()
+}
+
+/** A billing_day up to 31 doesn't exist in every month (Feb, and any 30-day month) - JS's Date
+ * constructor silently rolls an out-of-range day into the next month rather than erroring (e.g.
+ * `new Date(2026, 3, 31)` becomes May 1, not "April 31"), which would silently corrupt the cycle
+ * math. Clamp to the last real day of the given month instead, matching how real billing systems
+ * (Stripe included) handle a day-31 subscriber in a 30-day month - bills on the 30th, not next
+ * month. daysInMonthOf already returns the right value per-year, so this also self-adjusts for
+ * Feb in a leap year without any special-casing. */
+function clampedBillingDate(year: number, month1indexed: number, billingDay: number): Date {
+  const dim = daysInMonthOf(year, month1indexed)
+  return new Date(year, month1indexed - 1, Math.min(billingDay, dim))
+}
+
 /** Fraction of a client's current billing cycle elapsed as of today, given the day of the
- * month their retainer renews on (1-28, so every month has that day - no short-month clamping
- * needed). Unlike monthElapsedFraction this doesn't assume every client resets on the 1st: a
+ * month their retainer renews on (1-31; see clampedBillingDate for how short months are
+ * handled). Unlike monthElapsedFraction this doesn't assume every client resets on the 1st: a
  * client billed on the 15th is starting a fresh cycle on the 15th, not the 1st. Counts today as
  * a whole elapsed day (same convention as monthElapsedFraction's dayOfMonth/daysInMonth), so a
  * billing_day of 1 reproduces monthElapsedFraction exactly for clients left at the default. */
 export function billingCycleElapsedFraction(billingDay: number, today: string = todayKey()): number {
   const [y, m, d] = today.split('-').map(Number)
-  const cycleStartsThisMonth = d >= billingDay
-  const cycleStart = cycleStartsThisMonth ? new Date(y, m - 1, billingDay) : new Date(y, m - 2, billingDay)
-  const cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, billingDay)
+  const thisMonthBillingDate = clampedBillingDate(y, m, billingDay)
+  const cycleStartsThisMonth = d >= thisMonthBillingDate.getDate()
+  let cycleStart: Date
+  let cycleEnd: Date
+  if (cycleStartsThisMonth) {
+    cycleStart = thisMonthBillingDate
+    cycleEnd = m === 12 ? clampedBillingDate(y + 1, 1, billingDay) : clampedBillingDate(y, m + 1, billingDay)
+  } else {
+    cycleStart = m === 1 ? clampedBillingDate(y - 1, 12, billingDay) : clampedBillingDate(y, m - 1, billingDay)
+    cycleEnd = thisMonthBillingDate
+  }
   const now = new Date(y, m - 1, d)
   const cycleLengthDays = Math.round((cycleEnd.getTime() - cycleStart.getTime()) / 86400000)
   const elapsedDays = Math.round((now.getTime() - cycleStart.getTime()) / 86400000) + 1

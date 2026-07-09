@@ -61,6 +61,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
         members={members ?? []}
         tasks={tasks ?? []}
         targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
+        currency={org?.settings?.currency ?? 'usd'}
       />
     </AppShell>
   )

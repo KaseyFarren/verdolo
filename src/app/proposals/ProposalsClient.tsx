@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
-import { centsToDollars, dollarsToCents, formatDate } from '@/lib/agency'
+import { centsToDollars, currencySymbol, dollarsToCents, formatDate, type Currency } from '@/lib/agency'
 
 type Status = 'draft' | 'sent' | 'signed' | 'declined'
 type Proposal = {
@@ -39,12 +39,15 @@ export default function ProposalsClient({
   canEdit,
   initialProposals,
   clients,
+  currency,
 }: {
   orgId: string
   canEdit: boolean
   initialProposals: Proposal[]
   clients: Client[]
+  currency?: Currency
 }) {
+  const currencySign = currencySymbol(currency)
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals)
@@ -209,7 +212,7 @@ export default function ProposalsClient({
               type="number"
               min="0"
               className="rounded border border-ink/10 bg-white px-3 py-2 text-sm"
-              placeholder="Amount ($)"
+              placeholder={`Amount (${currencySign})`}
               value={form.amount}
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
             />
@@ -279,7 +282,7 @@ export default function ProposalsClient({
                     </div>
                     <div className="text-xs text-sage mt-0.5">
                       {clientName(p.client_id)}
-                      {p.amount_cents > 0 && ` · $${centsToDollars(p.amount_cents).toLocaleString()}`} · {formatDate(p.created_at.slice(0, 10))}
+                      {p.amount_cents > 0 && ` · ${currencySign}${centsToDollars(p.amount_cents).toLocaleString()}`} · {formatDate(p.created_at.slice(0, 10))}
                     </div>
                   </button>
                   {canEdit && (

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
-import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful } from '@/lib/agency'
+import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
 import { monthElapsedFraction, billingCycleElapsedFraction } from '@/lib/period'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -78,6 +78,7 @@ export default function ReportsClient({
   targetRateCents,
   pMonth,
   trendMonthKeys,
+  currency,
 }: {
   orgId: string
   range: ReportRange
@@ -95,7 +96,9 @@ export default function ReportsClient({
   targetRateCents: number
   pMonth: string
   trendMonthKeys: string[]
+  currency?: Currency
 }) {
+  const currencySign = currencySymbol(currency)
   const router = useRouter()
   const [view, setView] = useState<View>('overview')
   const [recap, setRecap] = useState<string | null>(reports.find((r) => r.period_type === 'week' && r.period_start === weekAnchor)?.content ?? null)
@@ -292,11 +295,11 @@ export default function ReportsClient({
   }
 
   function formatRate(centsPerHour: number) {
-    return `$${Math.round(centsPerHour / 100).toLocaleString()}/hr`
+    return `${currencySign}${Math.round(centsPerHour / 100).toLocaleString()}/hr`
   }
   function formatRateDelta(centsPerHour: number) {
     const sign = centsPerHour >= 0 ? '+' : '−'
-    return `${sign}$${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
+    return `${sign}${currencySign}${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
   }
 
   const capacity = useMemo(() => {
@@ -651,7 +654,7 @@ export default function ReportsClient({
                       </div>
                       <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
                         {r.isHourly
-                          ? `Hourly @ $${centsToDollars(r.client.hourly_rate_cents || 0)}/hr`
+                          ? `Hourly @ ${currencySign}${centsToDollars(r.client.hourly_rate_cents || 0)}/hr`
                           : r.effectiveRateCents !== null
                             ? formatRate(r.effectiveRateCents)
                             : 'No hours logged'}
@@ -662,7 +665,7 @@ export default function ReportsClient({
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sage">
                       <span>
-                        Revenue ${centsToDollars(r.revenueCents)}
+                        Revenue {currencySign}{centsToDollars(r.revenueCents)}
                         {r.isEstimatedRevenue &&
                           (r.isHourly ? ' (hourly, est.)' : r.isPartialMonth ? ' (retainer, est., prorated)' : ' (retainer, est.)')}
                       </span>

@@ -147,6 +147,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
         pMonth={pMonth}
         trendMonthKeys={monthKeys}
+        currency={org?.settings?.currency ?? 'usd'}
       />
     </AppShell>
   )

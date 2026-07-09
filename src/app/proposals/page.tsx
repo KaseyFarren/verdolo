@@ -13,7 +13,13 @@ export default async function ProposalsPage() {
 
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
-      <ProposalsClient orgId={orgId} canEdit={canEdit} initialProposals={proposals ?? []} clients={clients ?? []} />
+      <ProposalsClient
+        orgId={orgId}
+        canEdit={canEdit}
+        initialProposals={proposals ?? []}
+        clients={clients ?? []}
+        currency={org?.settings?.currency ?? 'usd'}
+      />
     </AppShell>
   )
 }

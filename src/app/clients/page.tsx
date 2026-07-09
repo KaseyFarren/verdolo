@@ -63,6 +63,7 @@ export default async function ClientsPage() {
         unbilledTimeEntries={unbilledTimeEntries ?? []}
         healthSnapshots={healthSnapshots ?? []}
         stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
+        currency={org?.settings?.currency ?? 'usd'}
       />
     </AppShell>
   )

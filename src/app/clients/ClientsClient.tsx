@@ -17,6 +17,7 @@ import {
   TONES,
   cadenceLabel,
   centsToDollars,
+  currencySymbol,
   dollarsToCents,
   formatDate,
   formatNoteTime,
@@ -27,6 +28,7 @@ import {
   stageColor,
   stageLabel,
   todayKey,
+  type Currency,
 } from '@/lib/agency'
 
 type Client = {
@@ -108,6 +110,7 @@ export default function ClientsClient({
   unbilledTimeEntries,
   healthSnapshots,
   stripeConnectStatus,
+  currency,
 }: {
   orgId: string
   userId: string
@@ -124,7 +127,9 @@ export default function ClientsClient({
   unbilledTimeEntries: UnbilledTimeEntry[]
   healthSnapshots: HealthSnapshot[]
   stripeConnectStatus: 'not_connected' | 'pending' | 'active'
+  currency?: Currency
 }) {
+  const currencySign = currencySymbol(currency)
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
   const [clients, setClients] = useState<Client[]>(initialClients)
@@ -198,7 +203,7 @@ export default function ClientsClient({
         billing_mode: (form.billing_mode as string) || 'retainer',
         retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
         hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
-        billing_day: Math.min(28, Math.max(1, Number(form.billing_day) || 1)),
+        billing_day: Math.min(31, Math.max(1, Number(form.billing_day) || 1)),
         contract_ends: (form.contract_ends as string) || null,
         contact_email: (form.contact_email as string) || null,
         contact_domain: (form.contact_domain as string) || null,
@@ -266,7 +271,7 @@ export default function ClientsClient({
       const hours = unbilled.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
       if (hours > 0) {
         items.push({
-          description: `Hourly work (${hours.toFixed(1)}h @ $${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
+          description: `Hourly work (${hours.toFixed(1)}h @ ${currencySign}${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
           amount_cents: Math.round(hours * (client.hourly_rate_cents || 0)),
           quantity: 1,
           timeEntryIds: unbilled.map((e) => e.id),
@@ -351,7 +356,7 @@ export default function ClientsClient({
                 billing_mode: editForm.billing_mode || 'retainer',
                 retainer_cents: isHourly ? 0 : dollarsToCents((editForm.retainer as string) || '0'),
                 hourly_rate_cents: isHourly ? dollarsToCents((editForm.hourly_rate as string) || '0') : 0,
-                billing_day: Math.min(28, Math.max(1, Number(editForm.billing_day) || 1)),
+                billing_day: Math.min(31, Math.max(1, Number(editForm.billing_day) || 1)),
                 contract_ends: editForm.contract_ends || null,
                 contact_email: editForm.contact_email || null,
                 contact_domain: editForm.contact_domain || null,
@@ -359,6 +364,7 @@ export default function ClientsClient({
               })
             }}
             members={members}
+            currencySign={currencySign}
           />
         ) : (
           <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
@@ -399,12 +405,12 @@ export default function ClientsClient({
                   </div>
                 )}
                 <div className="flex gap-3 mt-1 flex-wrap">
-                  {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">${centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
+                  {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">{currencySign}{centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
                   {selected.billing_mode !== 'hourly' && !!selected.retainer_cents && (
                     <span className="text-xs text-sage">renews on day {selected.billing_day || 1}</span>
                   )}
                   {selected.billing_mode === 'hourly' && !!selected.hourly_rate_cents && (
-                    <span className="text-xs text-green font-semibold">${centsToDollars(selected.hourly_rate_cents).toLocaleString()}/hr</span>
+                    <span className="text-xs text-green font-semibold">{currencySign}{centsToDollars(selected.hourly_rate_cents).toLocaleString()}/hr</span>
                   )}
                   {selected.contract_ends && <span className="text-xs text-sage">Contract ends: {formatDate(selected.contract_ends)}</span>}
                   {clientHoursSeconds(selected.id) > 0 && (
@@ -480,6 +486,7 @@ export default function ClientsClient({
                 onSend={() => sendInvoice(selected.id)}
                 sending={sendingInvoice}
                 error={invoiceError}
+                currencySign={currencySign}
               />
             )}
 
@@ -491,7 +498,7 @@ export default function ClientsClient({
               .map((inv) => (
                 <div key={inv.id} className="flex items-center justify-between py-2 border-b border-ink/5 text-sm">
                   <div>
-                    <span className="font-medium">${centsToDollars(inv.amount_cents).toLocaleString()}</span>
+                    <span className="font-medium">{currencySign}{centsToDollars(inv.amount_cents).toLocaleString()}</span>
                     {inv.sent_at && <span className="text-xs text-sage ml-2">Sent {formatDate(inv.sent_at.slice(0, 10))}</span>}
                   </div>
                   <div className="flex items-center gap-2">
@@ -620,7 +627,9 @@ export default function ClientsClient({
         )}
       </div>
 
-      {canEdit && showAdd && <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} />}
+      {canEdit && showAdd && (
+        <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} currencySign={currencySign} />
+      )}
 
       {clients.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -719,6 +728,7 @@ function InvoiceForm({
   onSend,
   sending,
   error,
+  currencySign,
 }: {
   lineItems: LineItemDraft[]
   setLineItems: (fn: (prev: LineItemDraft[]) => LineItemDraft[]) => void
@@ -726,6 +736,7 @@ function InvoiceForm({
   onSend: () => void
   sending: boolean
   error: string | null
+  currencySign: string
 }) {
   const total = lineItems.reduce((sum, item) => sum + item.amount_cents * (item.quantity || 1), 0)
 
@@ -749,7 +760,7 @@ function InvoiceForm({
           <input
             type="number"
             className="w-24 rounded border border-ink/10 px-2 py-1.5 text-sm"
-            placeholder="$"
+            placeholder={currencySign}
             value={item.amount_cents ? centsToDollars(item.amount_cents) : ''}
             onChange={(e) => updateItem(idx, { amount_cents: dollarsToCents(e.target.value || '0') })}
           />
@@ -765,7 +776,7 @@ function InvoiceForm({
         + Add line item
       </button>
       <div className="flex items-center justify-between border-t border-ink/10 pt-2">
-        <div className="text-sm font-semibold">Total: ${centsToDollars(total).toLocaleString()}</div>
+        <div className="text-sm font-semibold">Total: {currencySign}{centsToDollars(total).toLocaleString()}</div>
         <div className="flex gap-2">
           <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
             Cancel
@@ -791,6 +802,7 @@ function ClientForm({
   onCancel,
   onSave,
   members,
+  currencySign,
 }: {
   title: string
   form: Record<string, unknown>
@@ -798,6 +810,7 @@ function ClientForm({
   onCancel: () => void
   onSave: () => void
   members: Member[]
+  currencySign: string
 }) {
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
@@ -932,7 +945,7 @@ function ClientForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         {form.billing_mode === 'hourly' ? (
           <div>
-            <label className="block text-xs text-sage mb-1">Hourly rate ($/hr)</label>
+            <label className="block text-xs text-sage mb-1">Hourly rate ({currencySign}/hr)</label>
             <input
               type="number"
               className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
@@ -942,7 +955,7 @@ function ClientForm({
           </div>
         ) : (
           <div>
-            <label className="block text-xs text-sage mb-1">Monthly retainer ($)</label>
+            <label className="block text-xs text-sage mb-1">Monthly retainer ({currencySign})</label>
             <input
               type="number"
               className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
@@ -967,13 +980,14 @@ function ClientForm({
           <input
             type="number"
             min={1}
-            max={28}
+            max={31}
             className="w-24 rounded border border-ink/10 bg-white px-2 py-2 text-sm"
             value={(form.billing_day as number) || 1}
-            onChange={(e) => setForm((f) => ({ ...f, billing_day: Math.min(28, Math.max(1, Number(e.target.value) || 1)) }))}
+            onChange={(e) => setForm((f) => ({ ...f, billing_day: Math.min(31, Math.max(1, Number(e.target.value) || 1)) }))}
           />
           <div className="text-xs text-sage/70 mt-1">
-            Day the retainer renews - drives how &quot;this month&quot; is prorated in Reports and Revenue.
+            Day the retainer renews - drives how &quot;this month&quot; is prorated in Reports and Revenue. For a day that
+            doesn&apos;t exist in a given month (e.g. 31 in April), the last day of that month is used instead.
           </div>
         </div>
       )}

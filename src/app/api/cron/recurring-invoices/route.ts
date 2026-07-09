@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAndSendInvoice, type LineItem } from '@/lib/invoicing'
 import { isAuthorizedCronRequest } from '@/lib/cronAuth'
-import { getStage, centsToDollars } from '@/lib/agency'
+import { getStage, centsToDollars, currencySymbol } from '@/lib/agency'
 
 // Runs on the 1st of the month (see vercel.json). For every org with Stripe Connect active,
 // invoices every non-churned client with a non-zero retainer, or on billing_mode 'hourly' -
@@ -18,13 +18,15 @@ export async function GET(request: Request) {
   monthStart.setUTCDate(1)
   monthStart.setUTCHours(0, 0, 0, 0)
 
-  const { data: orgs } = await admin.from('orgs').select('id, stripe_connect_account_id').eq('stripe_connect_status', 'active')
+  const { data: orgs } = await admin.from('orgs').select('id, stripe_connect_account_id, settings').eq('stripe_connect_status', 'active')
 
   const results: { clientId: string; status: 'invoiced' | 'skipped' | 'error'; detail?: string }[] = []
 
   for (const org of orgs || []) {
     const accountId = org.stripe_connect_account_id as string | null
     if (!accountId) continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currencySign = currencySymbol((org.settings as any)?.currency)
 
     const [{ data: clients }, { data: alreadyBilled }, { data: unbilledCharges }, { data: unbilledTimeEntries }] = await Promise.all([
       admin
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
         const hours = entries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         if (hours > 0) {
           lineItems.push({
-            description: `Hourly work (${hours.toFixed(1)}h @ $${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
+            description: `Hourly work (${hours.toFixed(1)}h @ ${currencySign}${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
             amount_cents: Math.round(hours * (client.hourly_rate_cents || 0)),
             quantity: 1,
             timeEntryIds: entries.map((e) => e.id),

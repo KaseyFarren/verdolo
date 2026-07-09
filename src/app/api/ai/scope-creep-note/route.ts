@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
-import { effectiveRate } from '@/lib/agency'
+import { currencySymbol, effectiveRate } from '@/lib/agency'
 
 export async function POST(request: Request) {
   const { orgId, clientId, periodStart } = await request.json()
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   if (!membership) return NextResponse.json({ error: 'Not a member of this org' }, { status: 403 })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const targetRateCents = ((membership.orgs as any)?.settings?.hourly_cost_cents as number | undefined) || 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currencySign = currencySymbol((membership.orgs as any)?.settings?.currency)
 
   const { data: client } = await supabase.from('clients').select('id, name, retainer_cents, billing_mode').eq('id', clientId).eq('org_id', orgId).single()
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
@@ -78,6 +80,7 @@ export async function POST(request: Request) {
       targetRateCents,
       isEstimatedRevenue: !paidCents,
       periodLabel,
+      currencySign,
     })
     const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ note: extractText(result) })

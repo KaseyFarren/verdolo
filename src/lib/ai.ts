@@ -96,11 +96,13 @@ export function buildScopeCreepPrompt(params: {
   targetRateCents: number
   isEstimatedRevenue: boolean
   periodLabel: string
+  currencySign?: string
 }) {
+  const sign = params.currencySign ?? '$'
   const revenue = (params.revenueCents / 100).toFixed(0)
   const effectiveRate = (params.effectiveRateCents / 100).toFixed(0)
   const targetRate = (params.targetRateCents / 100).toFixed(0)
   return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate - the account is consuming more time than its revenue supports at that target.
-Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: $${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Effective rate realized: $${effectiveRate}/hr, vs a target of $${targetRate}/hr.
+Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.
 In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers. Do not use em dashes.`
 }
