@@ -16,6 +16,7 @@ const NAV = [
   { href: '/clients', icon: '👥', label: 'Clients', tour: 'nav-clients' },
   { href: '/proposals', icon: '📄', label: 'Proposals', tour: 'nav-proposals' },
   { href: '/time', icon: '⏱️', label: 'Time', tour: 'nav-time' },
+  { href: '/messages', icon: '💬', label: 'Messages' },
   { href: '/reports', icon: '📊', label: 'Reports', adminOnly: true },
   { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
   { href: '/revenue', icon: '💰', label: 'Revenue', ownerOnly: true },
