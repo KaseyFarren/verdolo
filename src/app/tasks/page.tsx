@@ -1,6 +1,6 @@
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { stripRetainer } from '@/lib/agency'
+import { stripBillingInfo } from '@/lib/agency'
 import TasksClient from './TasksClient'
 
 export default async function TasksPage() {
@@ -14,7 +14,7 @@ export default async function TasksPage() {
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
   ])
 
-  const visibleClients = isAdminRole(role) ? clients ?? [] : stripRetainer(clients ?? [])
+  const visibleClients = isAdminRole(role) ? clients ?? [] : stripBillingInfo(clients ?? [])
 
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>

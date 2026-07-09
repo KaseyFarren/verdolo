@@ -13,7 +13,7 @@ import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
 
-type Client = { id: string; name: string }
+type Client = { id: string; name: string; billing_mode?: string | null }
 type Task = { id: string; title: string; client_id: string | null }
 type Entry = {
   id: string
@@ -297,22 +297,38 @@ export default function TimeClient({
     if (!clearCutoff) return
     setClearing(true)
     try {
-      const { data: toClear } = await supabase
+      const { data: toClearRaw } = await supabase
         .from('time_entries')
-        .select('id, client_id, user_id, duration_seconds, billable')
+        .select('id, client_id, user_id, duration_seconds, billable, invoice_id')
         .eq('org_id', orgId)
         .lt('started_at', `${clearCutoff}T00:00:00`)
         .not('duration_seconds', 'is', null)
 
-      if (!toClear || toClear.length === 0) {
+      if (!toClearRaw || toClearRaw.length === 0) {
         toast('No entries before that date')
         return
       }
 
+      // Not-yet-invoiced billable hours on an hourly client can't be swept here - the archive
+      // only keeps lifetime totals with no billing-status field, so an unbilled hour lost to
+      // this sweep would never get invoiced, with no trace it ever existed.
+      const toClear = toClearRaw.filter((e) => {
+        const client = clients.find((c) => c.id === e.client_id)
+        const isUnbilledHourly = client?.billing_mode === 'hourly' && e.billable && !e.invoice_id
+        return !isUnbilledHourly
+      })
+      const protectedCount = toClearRaw.length - toClear.length
+
+      if (toClear.length === 0) {
+        toast(`All ${toClearRaw.length} entr${toClearRaw.length === 1 ? 'y is' : 'ies are'} unbilled hourly work - nothing to clear yet`)
+        return
+      }
+
       const totalSeconds = toClear.reduce((s, e) => s + (e.duration_seconds || 0), 0)
+      const protectedNote = protectedCount > 0 ? ` ${protectedCount} unbilled hourly entr${protectedCount === 1 ? 'y is' : 'ies are'} kept until invoiced.` : ''
       const ok = await confirm({
         title: 'Clear old time entries?',
-        message: `This permanently deletes ${toClear.length} entr${toClear.length === 1 ? 'y' : 'ies'} totaling ${formatHours(totalSeconds)}h logged before ${formatDate(clearCutoff)}. Client and teammate totals will still include this time - only the individual entry detail is removed.`,
+        message: `This permanently deletes ${toClear.length} entr${toClear.length === 1 ? 'y' : 'ies'} totaling ${formatHours(totalSeconds)}h logged before ${formatDate(clearCutoff)}. Client and teammate totals will still include this time - only the individual entry detail is removed.${protectedNote}`,
         confirmLabel: 'Delete entries',
         danger: true,
       })

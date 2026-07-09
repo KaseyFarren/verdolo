@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
-import { formatDate, todayKey, memberName, effectiveRate } from '@/lib/agency'
+import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful } from '@/lib/agency'
 import DatePicker from '@/components/ui/DatePicker'
 import CustomSelect from '@/components/ui/CustomSelect'
 import TrendLineChart from '@/components/charts/TrendLineChart'
@@ -11,12 +11,12 @@ import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
-type Client = { id: string; name: string; retainer_cents: number | null }
+type Client = { id: string; name: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
 type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: number | null }
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
-type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null; started_at: string }
+type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
 type PaidInvoice = { client_id: string; amount_cents: number; paid_at: string }
 type Member = {
   user_id: string
@@ -232,12 +232,17 @@ export default function ReportsClient({
     const monthInvoices = monthPaidInvoices.filter((i) => i.paid_at.slice(0, 7) === monthKey)
     return clients
       .map((c) => {
-        const hours = monthEntries.filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
+        const clientEntries = monthEntries.filter((e) => e.client_id === c.id)
+        const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
-        const revenueCents = paidCents || c.retainer_cents || 0
+        const isHourly = c.billing_mode === 'hourly'
+        const estimatedCents = isHourly
+          ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
+          : c.retainer_cents || 0
+        const revenueCents = paidCents || estimatedCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
-        const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        return { client: c, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents }
+        const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
+        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
       .sort((a, b) => {
@@ -627,8 +632,12 @@ export default function ReportsClient({
                         {isBelowTarget && <span className="text-[10px] rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
                       </div>
                       <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
-                        {r.effectiveRateCents !== null ? formatRate(r.effectiveRateCents) : 'No hours logged'}
-                        {targetRateCents > 0 && r.rateDeltaCents !== null && (
+                        {r.isHourly
+                          ? `Hourly @ $${centsToDollars(r.client.hourly_rate_cents || 0)}/hr`
+                          : r.effectiveRateCents !== null
+                            ? formatRate(r.effectiveRateCents)
+                            : 'No hours logged'}
+                        {!r.isHourly && targetRateCents > 0 && r.rateDeltaCents !== null && (
                           <span className="text-xs font-normal text-sage ml-1">({formatRateDelta(r.rateDeltaCents)} vs target)</span>
                         )}
                       </div>
@@ -636,7 +645,7 @@ export default function ReportsClient({
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sage">
                       <span>
                         Revenue ${centsToDollars(r.revenueCents)}
-                        {r.isEstimatedRevenue && ' (retainer, est.)'}
+                        {r.isEstimatedRevenue && (r.isHourly ? ' (hourly, est.)' : ' (retainer, est.)')}
                       </span>
                       <span>{r.hours.toFixed(1)}h logged</span>
                     </div>

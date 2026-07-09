@@ -83,7 +83,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { data: monthTimeEntries },
     { data: monthPaidInvoices },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, retainer_cents').eq('org_id', orgId).order('name'),
+    supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents').eq('org_id', orgId).order('name'),
     supabase
       .from('tasks')
       .select('id, client_id, assigned_to, title, completed_at')
@@ -114,7 +114,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .lt('started_at', weekEnd),
     supabase
       .from('time_entries')
-      .select('client_id, duration_seconds, started_at')
+      .select('client_id, duration_seconds, started_at, billable')
       .eq('org_id', orgId)
       .not('duration_seconds', 'is', null)
       .gte('started_at', trendStart)

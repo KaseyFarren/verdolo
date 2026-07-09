@@ -7,12 +7,20 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
 import PeriodSelector from '@/components/ui/PeriodSelector'
-import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { AVATAR_COLORS, centsToDollars, dollarsToCents, effectiveRate, getInitials, getStage, isRateComparisonMeaningful, memberName, mrrCentsTotal, todayKey } from '@/lib/agency'
 import { isFullCalendarMonth, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
-type Client = { id: string; name: string; retainer_cents: number | null; stage: string | null; status: string | null }
+type Client = {
+  id: string
+  name: string
+  retainer_cents: number | null
+  billing_mode: string | null
+  hourly_rate_cents: number | null
+  stage: string | null
+  status: string | null
+}
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type Entry = { user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
 type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string; title?: string | null }
@@ -110,6 +118,17 @@ export default function RevenueClient({
     return map
   }, [entries])
 
+  // Only billable hours are ever actually invoiced for an hourly client - matches the cron's
+  // and the manual invoice flow's "unbilled hours" query exactly.
+  const billableHoursByClient = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const e of entries) {
+      if (!e.client_id || !e.duration_seconds || !e.billable) continue
+      map.set(e.client_id, (map.get(e.client_id) || 0) + e.duration_seconds)
+    }
+    return map
+  }, [entries])
+
   const chargesByClient = useMemo(() => {
     const map = new Map<string, Charge[]>()
     for (const c of charges) {
@@ -124,18 +143,24 @@ export default function RevenueClient({
     return clients
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
-        // retainers are a monthly figure - only a full calendar month period can honestly
-        // include one; a week or custom range only counts what was actually billed/logged in it
-        const totalRevenue = (isFullMonth ? c.retainer_cents || 0 : 0) + chargesTotal
+        const isHourly = c.billing_mode === 'hourly'
+        // hourly revenue scales with any period length, unlike a retainer - which is a monthly
+        // figure, so only a full calendar month period can honestly include one; a week or
+        // custom range only counts what was actually billed/logged in it
+        const hourlyRevenue = isHourly ? Math.round(((billableHoursByClient.get(c.id) || 0) / 3600) * (c.hourly_rate_cents || 0)) : 0
+        const retainerRevenue = !isHourly && isFullMonth ? c.retainer_cents || 0 : 0
+        const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
+        // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
+        // consistent with the rest of this page - not swapped to billable-only for hourly rows
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
         const rate = effectiveRate(totalRevenue, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
-        return { client: c, chargesTotal, totalRevenue, seconds, hours, rate, rateDeltaCents }
+        return { client: c, isHourly, chargesTotal, totalRevenue, seconds, hours, rate, rateDeltaCents }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient, isFullMonth, targetRateCents])
+  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents])
 
   const memberRows = useMemo(() => {
     return members
@@ -314,13 +339,21 @@ export default function RevenueClient({
                 >
                   <span className="flex-1 min-w-[140px]">
                     <span className="font-medium">{r.client.name}</span>
-                    {r.client.retainer_cents ? <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span> : null}
+                    {r.isHourly ? (
+                      <span className="text-sage ml-2 text-xs">${centsToDollars(r.client.hourly_rate_cents || 0)}/hr hourly</span>
+                    ) : r.client.retainer_cents ? (
+                      <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span>
+                    ) : null}
                   </span>
                   <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
-                    <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
-                      {r.rate ? `$${centsToDollars(r.rate)}/hr` : '-'}
-                    </span>
+                    {isRateComparisonMeaningful(r.client) ? (
+                      <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
+                        {r.rate ? `$${centsToDollars(r.rate)}/hr` : '-'}
+                      </span>
+                    ) : (
+                      <span className="text-sage w-16 text-right">${centsToDollars(r.client.hourly_rate_cents || 0)}/hr</span>
+                    )}
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                   </span>
                 </button>

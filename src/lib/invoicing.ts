@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getStripe, connectAccount } from '@/lib/stripe'
 
-export type LineItem = { description: string; amount_cents: number; quantity: number; chargeId?: string }
+export type LineItem = { description: string; amount_cents: number; quantity: number; chargeId?: string; timeEntryIds?: string[] }
 
 /** Shared by the manual "Create Invoice" route and the recurring-retainer cron -
  * creates the Stripe customer/invoice on the agency's connected account, sends it,
@@ -72,6 +72,11 @@ export async function createAndSendInvoice({
   const chargeIds = lineItems.map((item) => item.chargeId).filter((id): id is string => !!id)
   if (chargeIds.length) {
     await admin.from('client_charges').update({ invoice_id: invoiceRow?.id }).in('id', chargeIds)
+  }
+
+  const timeEntryIds = lineItems.flatMap((item) => item.timeEntryIds || [])
+  if (timeEntryIds.length) {
+    await admin.from('time_entries').update({ invoice_id: invoiceRow?.id }).in('id', timeEntryIds)
   }
 
   return invoiceRow

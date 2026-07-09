@@ -23,6 +23,15 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const targetRateCents = ((membership.orgs as any)?.settings?.hourly_cost_cents as number | undefined) || 0
 
+  const { data: client } = await supabase.from('clients').select('id, name, retainer_cents, billing_mode').eq('id', clientId).eq('org_id', orgId).single()
+  if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+  // "using more hours than revenue justifies at target rate" doesn't apply to hourly clients -
+  // more hours means proportionally more revenue by definition, no scope-creep risk in the
+  // same sense. Check before spending an AI credit on a request that can't say anything useful.
+  if (client.billing_mode === 'hourly') {
+    return NextResponse.json({ error: 'Scope-creep detection only applies to retainer clients' }, { status: 400 })
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'AI generation is not configured yet' }, { status: 500 })
 
@@ -33,9 +42,6 @@ export async function POST(request: Request) {
       { status: 402 }
     )
   }
-
-  const { data: client } = await supabase.from('clients').select('id, name, retainer_cents').eq('id', clientId).eq('org_id', orgId).single()
-  if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
 
   // periodStart (YYYY-MM) is the month the caller is actually looking at in Profitability -
   // without it this always explained "this month", silently wrong once month navigation exists.

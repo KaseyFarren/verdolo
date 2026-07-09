@@ -34,7 +34,7 @@ export default async function TimePage({
   // time" - anything narrower and the archive can't be sliced to fit, so we simply don't fetch
   // it (TimeClient's summary math already treats an empty archivedTotals array as zero).
   const [{ data: clients }, { data: openTasks }, { data: allTasks }, { data: entries }, { data: members }, { data: archivedTotals }] = await Promise.all([
-    supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),
+    supabase.from('clients').select('id, name, billing_mode').eq('org_id', orgId).order('name'),
     supabase.from('tasks').select('id, title, client_id').eq('org_id', orgId).eq('done', false),
     supabase.from('tasks').select('id, title, client_id').eq('org_id', orgId),
     entriesQuery,

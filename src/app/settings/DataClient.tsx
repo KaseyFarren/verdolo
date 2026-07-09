@@ -38,8 +38,20 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
   async function exportCSV() {
     const { data: clients } = await supabase.from('clients').select('*').eq('org_id', orgId)
     const rows = [
-      ['Name', 'Business', 'Stage', 'Retainer', 'Platform', 'Service', 'Tone', 'Last Contacted', 'Contract Ends'],
-      ...(clients || []).map((c) => [c.name, c.business || '', c.stage || '', c.retainer_cents ? c.retainer_cents / 100 : '', c.platform || '', c.service || '', c.tone || '', c.last_contacted || '', c.contract_ends || '']),
+      ['Name', 'Business', 'Stage', 'Billing Mode', 'Retainer', 'Hourly Rate', 'Platform', 'Service', 'Tone', 'Last Contacted', 'Contract Ends'],
+      ...(clients || []).map((c) => [
+        c.name,
+        c.business || '',
+        c.stage || '',
+        c.billing_mode || 'retainer',
+        c.retainer_cents ? c.retainer_cents / 100 : '',
+        c.hourly_rate_cents ? c.hourly_rate_cents / 100 : '',
+        c.platform || '',
+        c.service || '',
+        c.tone || '',
+        c.last_contacted || '',
+        c.contract_ends || '',
+      ]),
     ]
     const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     triggerDownload(csv, `verdolo-clients-${todayKey()}.csv`, 'text/csv')

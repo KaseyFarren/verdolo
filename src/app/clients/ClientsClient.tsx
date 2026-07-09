@@ -42,6 +42,8 @@ type Client = {
   stage: string | null
   status: string | null
   retainer_cents: number | null
+  billing_mode: string | null
+  hourly_rate_cents: number | null
   contract_ends: string | null
   last_contacted: string | null
   quick_note: string | null
@@ -65,7 +67,8 @@ type Invoice = {
   stripe_hosted_invoice_url: string | null
 }
 type ClientCharge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
-type LineItemDraft = { description: string; amount_cents: number; quantity: number; chargeId?: string }
+type UnbilledTimeEntry = { id: string; client_id: string; duration_seconds: number | null }
+type LineItemDraft = { description: string; amount_cents: number; quantity: number; chargeId?: string; timeEntryIds?: string[] }
 type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
 
 const emptyForm = {
@@ -78,7 +81,9 @@ const emptyForm = {
   talking_points: '',
   cadence_days: 7,
   stage: 'Active',
+  billing_mode: 'retainer',
   retainer: '',
+  hourly_rate: '',
   contract_ends: '',
   contact_email: '',
   contact_domain: '',
@@ -98,6 +103,7 @@ export default function ClientsClient({
   members,
   invoices: initialInvoices,
   unbilledCharges,
+  unbilledTimeEntries,
   healthSnapshots,
   stripeConnectStatus,
 }: {
@@ -113,6 +119,7 @@ export default function ClientsClient({
   members: Member[]
   invoices: Invoice[]
   unbilledCharges: ClientCharge[]
+  unbilledTimeEntries: UnbilledTimeEntry[]
   healthSnapshots: HealthSnapshot[]
   stripeConnectStatus: 'not_connected' | 'pending' | 'active'
 }) {
@@ -172,6 +179,7 @@ export default function ClientsClient({
   async function addClient() {
     const name = (form.name as string) || ''
     if (!name.trim()) return
+    const isHourly = form.billing_mode === 'hourly'
     const { data } = await supabase
       .from('clients')
       .insert({
@@ -185,7 +193,9 @@ export default function ClientsClient({
         talking_points: form.talking_points as string,
         cadence_days: form.cadence_days as number,
         stage: form.stage as string,
-        retainer_cents: dollarsToCents((form.retainer as string) || '0'),
+        billing_mode: (form.billing_mode as string) || 'retainer',
+        retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
+        hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
         contract_ends: (form.contract_ends as string) || null,
         contact_email: (form.contact_email as string) || null,
         contact_domain: (form.contact_domain as string) || null,
@@ -248,7 +258,20 @@ export default function ClientsClient({
 
   function openInvoiceForm(client: Client) {
     const items: LineItemDraft[] = []
-    if (client.retainer_cents) items.push({ description: 'Monthly retainer', amount_cents: client.retainer_cents, quantity: 1 })
+    if (client.billing_mode === 'hourly') {
+      const unbilled = unbilledTimeEntries.filter((e) => e.client_id === client.id)
+      const hours = unbilled.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
+      if (hours > 0) {
+        items.push({
+          description: `Hourly work (${hours.toFixed(1)}h @ $${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
+          amount_cents: Math.round(hours * (client.hourly_rate_cents || 0)),
+          quantity: 1,
+          timeEntryIds: unbilled.map((e) => e.id),
+        })
+      }
+    } else if (client.retainer_cents) {
+      items.push({ description: 'Monthly retainer', amount_cents: client.retainer_cents, quantity: 1 })
+    }
     for (const charge of unbilledCharges.filter((c) => c.client_id === client.id)) {
       items.push({ description: charge.description, amount_cents: charge.amount_cents, quantity: 1, chargeId: charge.id })
     }
@@ -310,7 +333,8 @@ export default function ClientsClient({
             form={editForm}
             setForm={setEditForm}
             onCancel={() => setEditing(false)}
-            onSave={() =>
+            onSave={() => {
+              const isHourly = editForm.billing_mode === 'hourly'
               updateClient(selected.id, {
                 name: editForm.name,
                 business: editForm.business,
@@ -321,13 +345,15 @@ export default function ClientsClient({
                 talking_points: editForm.talking_points,
                 cadence_days: editForm.cadence_days,
                 stage: editForm.stage,
-                retainer_cents: dollarsToCents((editForm.retainer as string) || '0'),
+                billing_mode: editForm.billing_mode || 'retainer',
+                retainer_cents: isHourly ? 0 : dollarsToCents((editForm.retainer as string) || '0'),
+                hourly_rate_cents: isHourly ? dollarsToCents((editForm.hourly_rate as string) || '0') : 0,
                 contract_ends: editForm.contract_ends || null,
                 contact_email: editForm.contact_email || null,
                 contact_domain: editForm.contact_domain || null,
                 primary_contact_id: editForm.owner || null,
               })
-            }
+            }}
             members={members}
           />
         ) : (
@@ -370,6 +396,9 @@ export default function ClientsClient({
                 )}
                 <div className="flex gap-3 mt-1 flex-wrap">
                   {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">${centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
+                  {selected.billing_mode === 'hourly' && !!selected.hourly_rate_cents && (
+                    <span className="text-xs text-green font-semibold">${centsToDollars(selected.hourly_rate_cents).toLocaleString()}/hr</span>
+                  )}
                   {selected.contract_ends && <span className="text-xs text-sage">Contract ends: {formatDate(selected.contract_ends)}</span>}
                   {clientHoursSeconds(selected.id) > 0 && (
                     <Link href="/time" className="text-xs text-sage underline">
@@ -401,7 +430,9 @@ export default function ClientsClient({
                         talking_points: selected.talking_points || '',
                         cadence_days: selected.cadence_days || 7,
                         stage,
+                        billing_mode: selected.billing_mode || 'retainer',
                         retainer: selected.retainer_cents ? centsToDollars(selected.retainer_cents) : '',
+                        hourly_rate: selected.hourly_rate_cents ? centsToDollars(selected.hourly_rate_cents) : '',
                         contract_ends: selected.contract_ends || '',
                         contact_email: selected.contact_email || '',
                         contact_domain: selected.contact_domain || '',
@@ -868,16 +899,50 @@ function ClientForm({
           </button>
         ))}
       </div>
+      <label className="block text-xs text-sage mb-1">Billing</label>
+      <div className="flex gap-1.5 mb-3">
+        {(['retainer', 'hourly'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() =>
+              setForm((f) => ({
+                ...f,
+                billing_mode: mode,
+                // mutually exclusive - switching modes clears the other field's draft value so
+                // a stale number can't get saved if the user flips back without touching it
+                ...(mode === 'hourly' ? { retainer: '' } : { hourly_rate: '' }),
+              }))
+            }
+            className={`px-3 py-1 rounded text-xs border ${
+              (form.billing_mode || 'retainer') === mode ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'
+            }`}
+          >
+            {mode === 'retainer' ? 'Retainer' : 'Hourly'}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-        <div>
-          <label className="block text-xs text-sage mb-1">Monthly retainer ($)</label>
-          <input
-            type="number"
-            className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-            value={(form.retainer as string) || ''}
-            onChange={(e) => setForm((f) => ({ ...f, retainer: e.target.value }))}
-          />
-        </div>
+        {form.billing_mode === 'hourly' ? (
+          <div>
+            <label className="block text-xs text-sage mb-1">Hourly rate ($/hr)</label>
+            <input
+              type="number"
+              className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              value={(form.hourly_rate as string) || ''}
+              onChange={(e) => setForm((f) => ({ ...f, hourly_rate: e.target.value }))}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs text-sage mb-1">Monthly retainer ($)</label>
+            <input
+              type="number"
+              className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+              value={(form.retainer as string) || ''}
+              onChange={(e) => setForm((f) => ({ ...f, retainer: e.target.value }))}
+            />
+          </div>
+        )}
         <div>
           <label className="block text-xs text-sage mb-1">Contract ends</label>
           <input

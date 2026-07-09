@@ -1,6 +1,6 @@
 import AppShell from '@/components/AppShell'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { stripRetainer } from '@/lib/agency'
+import { stripBillingInfo } from '@/lib/agency'
 import ClientsClient from './ClientsClient'
 
 export default async function ClientsPage() {
@@ -17,6 +17,7 @@ export default async function ClientsPage() {
     { data: members },
     { data: invoices },
     { data: unbilledCharges },
+    { data: unbilledTimeEntries },
     { data: healthSnapshots },
   ] = await Promise.all([
     supabase.from('clients').select('*').eq('org_id', orgId).order('name'),
@@ -30,6 +31,9 @@ export default async function ClientsPage() {
     canEdit
       ? supabase.from('client_charges').select('*').eq('org_id', orgId).is('invoice_id', null).order('charged_on', { ascending: false })
       : Promise.resolve({ data: [] }),
+    canEdit
+      ? supabase.from('time_entries').select('id, client_id, duration_seconds').eq('org_id', orgId).eq('billable', true).is('invoice_id', null)
+      : Promise.resolve({ data: [] }),
     supabase
       .from('client_health_snapshots')
       .select('client_id, snapshot_date, health')
@@ -38,8 +42,8 @@ export default async function ClientsPage() {
       .order('snapshot_date', { ascending: true }),
   ])
 
-  // retainer amounts are revenue - members (view-only on clients) don't get them, admins/owners do
-  const visibleClients = canEdit ? clients ?? [] : stripRetainer(clients ?? [])
+  // billing amounts are revenue - members (view-only on clients) don't get them, admins/owners do
+  const visibleClients = canEdit ? clients ?? [] : stripBillingInfo(clients ?? [])
 
   return (
     <AppShell orgId={orgId} userId={user.id} orgName={org?.name ?? ''} userEmail={user.email ?? ''} role={role} accentColor={org?.accent_color}>
@@ -56,6 +60,7 @@ export default async function ClientsPage() {
         members={members ?? []}
         invoices={invoices ?? []}
         unbilledCharges={unbilledCharges ?? []}
+        unbilledTimeEntries={unbilledTimeEntries ?? []}
         healthSnapshots={healthSnapshots ?? []}
         stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
       />

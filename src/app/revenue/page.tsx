@@ -12,7 +12,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
 
   // revenue is owner-only - redirect server-side before any revenue data is fetched, rather
   // than relying on a client-side check (Server Component props still serialize to the client
-  // regardless of what's rendered, same reasoning as stripRetainer() in lib/agency.ts)
+  // regardless of what's rendered, same reasoning as stripBillingInfo() in lib/agency.ts)
   if (role !== 'owner') redirect('/dashboard')
 
   const sp = await searchParams
@@ -23,7 +23,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   const rangeEnd = bounds.end as string
 
   const [{ data: clients }, { data: charges }, { data: entries }, { data: members }, { data: tasks }] = await Promise.all([
-    supabase.from('clients').select('id, name, retainer_cents, stage, status').eq('org_id', orgId).order('name'),
+    supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, stage, status').eq('org_id', orgId).order('name'),
     supabase
       .from('client_charges')
       .select('*')
