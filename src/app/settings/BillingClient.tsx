@@ -67,19 +67,23 @@ export default function BillingClient({
   async function updateSeats() {
     setLoading('seats')
     setError(null)
-    const res = await fetch('/api/billing/seats', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orgId, seats: seatsInput }),
-    })
-    const body = await res.json()
-    if (!res.ok) {
-      setError(body.error ?? 'Could not update seats')
+    try {
+      const res = await fetch('/api/billing/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, seats: seatsInput }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(body.error ?? 'Could not update seats')
+        setLoading(null)
+        return
+      }
+      window.location.reload()
+    } catch {
+      setError('Could not update seats - please try again')
       setLoading(null)
-      return
     }
-    setLoading(null)
-    window.location.reload()
   }
 
   if (role !== 'owner') {

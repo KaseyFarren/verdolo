@@ -642,7 +642,7 @@ export default function ClientsClient({
           Clients <span className="text-sm font-normal text-sage">({clients.length})</span>
         </h1>
         {canEdit && !showAdd && (
-          <Button variant="primary" onClick={() => setShowAdd(true)}>
+          <Button variant="primary" data-tour="add-client-button" onClick={() => setShowAdd(true)}>
             + New client
           </Button>
         )}

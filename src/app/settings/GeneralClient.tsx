@@ -90,6 +90,7 @@ export default function GeneralClient({
       <Row title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, Clients, and invoices">
         <select
           className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
+          data-tour="billing-currency"
           value={currency}
           disabled={!isAdmin}
           onChange={(e) => { const v = e.target.value as Currency; setCurrency(v); saveSettings({ currency: v }) }}

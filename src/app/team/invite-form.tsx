@@ -35,7 +35,7 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
   }
 
   return (
-    <section>
+    <section data-tour="invite-teammate">
       <h2 className="mb-2 font-medium text-ink">Invite a teammate</h2>
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input

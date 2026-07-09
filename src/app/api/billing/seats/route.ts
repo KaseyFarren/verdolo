@@ -41,33 +41,41 @@ export async function POST(request: Request) {
 
   const stripe = getStripe()
 
-  if (org.plan_type === 'lifetime') {
-    // The lifetime one-time payment already covers the first 2 seats - only seats beyond that
-    // are ever billed, on a separate flat (non-tiered) subscription created on demand.
-    const extraSeats = Math.max(seats - 2, 0)
-    if (org.stripe_subscription_id) {
+  // Stripe errors (stale subscription id, missing customer, etc.) must not escape as an
+  // unhandled throw - Next.js would then return a non-JSON 500 page, which the client's
+  // res.json() call chokes on, leaving the "Updating…" button stuck forever with no error shown.
+  try {
+    if (org.plan_type === 'lifetime') {
+      // The lifetime one-time payment already covers the first 2 seats - only seats beyond that
+      // are ever billed, on a separate flat (non-tiered) subscription created on demand.
+      const extraSeats = Math.max(seats - 2, 0)
+      if (org.stripe_subscription_id) {
+        const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id)
+        const itemId = subscription.items.data[0]?.id
+        if (extraSeats === 0) {
+          await stripe.subscriptions.cancel(org.stripe_subscription_id)
+          await admin.from('orgs').update({ stripe_subscription_id: null }).eq('id', orgId)
+        } else if (itemId) {
+          await stripe.subscriptionItems.update(itemId, { quantity: extraSeats, proration_behavior: 'create_prorations' })
+        }
+      } else if (extraSeats > 0) {
+        const subscription = await stripe.subscriptions.create({
+          customer: org.stripe_customer_id as string,
+          items: [{ price: LIFETIME_EXTRA_SEAT_PRICE_ID, quantity: extraSeats }],
+          metadata: { org_id: orgId },
+        })
+        await admin.from('orgs').update({ stripe_subscription_id: subscription.id }).eq('id', orgId)
+      }
+    } else if (org.stripe_subscription_id) {
       const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id)
       const itemId = subscription.items.data[0]?.id
-      if (extraSeats === 0) {
-        await stripe.subscriptions.cancel(org.stripe_subscription_id)
-        await admin.from('orgs').update({ stripe_subscription_id: null }).eq('id', orgId)
-      } else if (itemId) {
-        await stripe.subscriptionItems.update(itemId, { quantity: extraSeats, proration_behavior: 'create_prorations' })
+      if (itemId) {
+        await stripe.subscriptionItems.update(itemId, { quantity: seats, proration_behavior: 'create_prorations' })
       }
-    } else if (extraSeats > 0) {
-      const subscription = await stripe.subscriptions.create({
-        customer: org.stripe_customer_id as string,
-        items: [{ price: LIFETIME_EXTRA_SEAT_PRICE_ID, quantity: extraSeats }],
-        metadata: { org_id: orgId },
-      })
-      await admin.from('orgs').update({ stripe_subscription_id: subscription.id }).eq('id', orgId)
     }
-  } else if (org.stripe_subscription_id) {
-    const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id)
-    const itemId = subscription.items.data[0]?.id
-    if (itemId) {
-      await stripe.subscriptionItems.update(itemId, { quantity: seats, proration_behavior: 'create_prorations' })
-    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Stripe update failed'
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 
   await admin.from('orgs').update({ seats_purchased: seats }).eq('id', orgId)

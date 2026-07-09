@@ -85,3 +85,95 @@ button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* Onboarding tour (driver.js) - restyled to match the app's cards instead of the library's
+   plain-white/system-font defaults. driver.css is injected at runtime via a dynamic import
+   (see TourProvider), which lands after this stylesheet in the cascade - !important on every
+   property here is load-bearing, not decoration, since same-specificity + later source order
+   would otherwise let the library's own defaults win. */
+.driver-popover {
+  background-color: var(--cream) !important;
+  color: var(--ink) !important;
+  border: 1px solid rgba(26, 26, 23, 0.1) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 20px !important;
+  max-width: 320px !important;
+}
+
+.driver-popover * {
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif !important;
+}
+
+.driver-popover-title {
+  font-family: var(--font-heading), sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+  color: var(--ink) !important;
+}
+
+.driver-popover-description {
+  color: var(--sage) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  margin-top: 6px !important;
+}
+
+.driver-popover-footer {
+  margin-top: 16px !important;
+}
+
+.driver-popover-progress-text {
+  color: var(--sage) !important;
+  font-size: 12px !important;
+}
+
+.driver-popover-footer-btn {
+  border-radius: 9999px !important;
+  border: 1px solid rgba(26, 26, 23, 0.12) !important;
+  background-color: #fff !important;
+  color: var(--ink) !important;
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.driver-popover-footer-btn:hover,
+.driver-popover-footer-btn:focus {
+  background-color: var(--sand) !important;
+}
+
+.driver-popover-next-btn,
+.driver-popover-done-btn {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+.driver-popover-next-btn:hover,
+.driver-popover-done-btn:hover {
+  background-color: var(--orange-soft) !important;
+}
+
+.driver-popover-close-btn {
+  color: var(--sage) !important;
+  font-size: 16px !important;
+}
+
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  color: var(--ink) !important;
+}
+
+.driver-popover-arrow-side-left {
+  border-right-color: var(--cream) !important;
+}
+.driver-popover-arrow-side-right {
+  border-left-color: var(--cream) !important;
+}
+.driver-popover-arrow-side-top {
+  border-bottom-color: var(--cream) !important;
+}
+.driver-popover-arrow-side-bottom {
+  border-top-color: var(--cream) !important;
+}

@@ -592,7 +592,7 @@ export default function TimeClient({
     <div>
       <h1 className="text-xl font-semibold mb-5">Time</h1>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
+      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6" data-tour="start-timer">
         {running ? (
           <div>
             <div className="text-2xl font-mono font-semibold mb-1">

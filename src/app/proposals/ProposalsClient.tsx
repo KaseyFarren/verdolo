@@ -162,7 +162,7 @@ export default function ProposalsClient({
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Proposals</h1>
         {canEdit && (
-          <Button variant="primary" size="lg" className="rounded-full" onClick={() => setShowAdd((v) => !v)}>
+          <Button variant="primary" size="lg" className="rounded-full" data-tour="new-proposal-button" onClick={() => setShowAdd((v) => !v)}>
             {showAdd ? 'Cancel' : '+ New proposal'}
           </Button>
         )}
