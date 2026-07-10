@@ -186,3 +186,12 @@ export function AlertTriangleIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
+
+export function MoonIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z" />
+      <path d="M15.5 3.5h4l-4 3.5h4" strokeWidth="1.4" />
+    </svg>
+  )
+}

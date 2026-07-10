@@ -7,20 +7,20 @@ import MultiSelect from '@/components/ui/MultiSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import Avatar from '@/components/ui/Avatar'
 import IconButton from '@/components/ui/IconButton'
-import { AlertTriangleIcon, ClockArrowIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
+import { AlertTriangleIcon, MoonIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, priorityColor, todayKey } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 
-// No trailing `auto` track for actions - that reserved its full intrinsic width even while
-// invisible (opacity doesn't collapse grid tracks), which forced the row wider than its
-// container on anything but a very wide window. Actions are an absolutely-positioned overlay
-// instead (see the row below), so they cost zero width until actually shown on hover.
+// Actions live in a real reserved trailing column (fixed width) rather than an absolute overlay -
+// the overlay approach floated over and hid the Priority/Notes columns on hover. The column stays
+// empty (just whitespace) until the row is hovered, so nothing is ever covered. Its fixed width is
+// accounted for in ROW_MIN_WIDTH so the row scrolls rather than clipping when the window is narrow.
 export const ROW_GRID_COLS =
-  'grid-cols-[20px_24px_minmax(0,3fr)_90px_100px_minmax(0,1fr)] md:grid-cols-[20px_24px_minmax(0,3fr)_80px_110px_90px_100px_70px_minmax(0,1fr)]'
+  'grid-cols-[20px_24px_minmax(0,3fr)_90px_100px_minmax(0,1fr)_150px] md:grid-cols-[20px_24px_minmax(0,3fr)_80px_110px_90px_100px_70px_minmax(0,1fr)_150px]'
 // Below this, the row's fixed-width columns no longer fit even with type/client/priority hidden -
 // the row list wraps in overflow-x-auto at this width so it scrolls instead of silently clipping.
-export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[780px]'
+export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[920px]'
 
 const PLAIN_FIELD = 'bg-transparent border border-transparent rounded px-1 -mx-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white'
 
@@ -36,6 +36,7 @@ export function TaskListHeader() {
       <div>Due</div>
       <div className="hidden md:block">Priority</div>
       <div>Notes</div>
+      <div />
     </div>
   )
 }
@@ -232,12 +233,12 @@ export default function TaskRow({
         />
 
         <div
-          className={`absolute right-0 top-0 h-full flex gap-1.5 shrink-0 items-center pl-8 bg-gradient-to-l from-cream from-60% to-transparent transition-opacity ${
+          className={`flex gap-1.5 shrink-0 items-center justify-end transition-opacity ${
             isTimerRunning ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
           }`}
         >
           {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-          {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
+          {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<MoonIcon />} onClick={snooze} />}
           {!t.done && skip && <IconButton label="Skip this occurrence" tone="accent" icon={<SkipForwardIcon />} onClick={skip} />}
           <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
         </div>
