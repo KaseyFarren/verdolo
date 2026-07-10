@@ -2,28 +2,40 @@
 
 import { useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import TaskEditFormMulti from '@/components/tasks/TaskEditFormMulti'
+import CustomSelect from '@/components/ui/CustomSelect'
+import MultiSelect from '@/components/ui/MultiSelect'
+import Avatar from '@/components/ui/Avatar'
 import IconButton from '@/components/ui/IconButton'
-import { ClockArrowIcon, PauseIcon, PencilIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
+import { ClockArrowIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
-import { formatDate } from '@/lib/agency'
+import { PRIORITY } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 
-const ROW_GRID_COLS =
-  'grid-cols-[20px_minmax(0,3fr)_100px_70px_minmax(0,1fr)_auto] md:grid-cols-[20px_minmax(0,3fr)_100px_100px_70px_60px_minmax(0,1fr)_auto]'
+export const ROW_GRID_COLS =
+  'grid-cols-[20px_minmax(0,3fr)_90px_100px_minmax(0,1fr)_auto] md:grid-cols-[20px_minmax(0,3fr)_110px_90px_100px_80px_minmax(0,1fr)_auto]'
+
+const PLAIN_FIELD = 'bg-transparent border border-transparent rounded px-1 -mx-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white'
+
+export function TaskListHeader() {
+  return (
+    <div className={`grid ${ROW_GRID_COLS} gap-3 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold uppercase tracking-wide text-sage/70`}>
+      <div />
+      <div>Title</div>
+      <div className="hidden md:block">Client</div>
+      <div>Assigned</div>
+      <div>Due</div>
+      <div className="hidden md:block">Priority</div>
+      <div>Notes</div>
+      <div />
+    </div>
+  )
+}
 
 export default function TaskRow({
   t,
-  clientName,
-  memberEmail,
-  isEditing,
-  editForm,
-  setEditForm,
   clients,
   members,
-  startEdit,
-  cancelEdit,
-  save,
+  updateField,
   complete,
   uncomplete,
   del,
@@ -42,16 +54,9 @@ export default function TaskRow({
   addSubtaskForm,
 }: {
   t: Task
-  clientName: (id: string | null) => string
-  memberEmail: (id: string | null) => string
-  isEditing: boolean
-  editForm: Record<string, unknown>
-  setEditForm: (f: (prev: Record<string, unknown>) => Record<string, unknown>) => void
   clients: Client[]
   members: Member[]
-  startEdit: () => void
-  cancelEdit: () => void
-  save: () => void
+  updateField: (field: string, value: unknown) => void
   complete: () => void
   uncomplete: () => void
   del: () => void
@@ -70,103 +75,161 @@ export default function TaskRow({
   addSubtaskForm?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(true)
+  const [titleDraft, setTitleDraft] = useState(t.title)
+  const [notesDraft, setNotesDraft] = useState(t.notes || '')
+  // Resync local drafts when the underlying task changes from outside this row (save, realtime,
+  // switching tasks) - adjusting state during render instead of an effect avoids an extra render.
+  const [syncedFor, setSyncedFor] = useState(`${t.id}:${t.title}:${t.notes || ''}`)
+  const syncKey = `${t.id}:${t.title}:${t.notes || ''}`
+  if (syncKey !== syncedFor) {
+    setSyncedFor(syncKey)
+    setTitleDraft(t.title)
+    setNotesDraft(t.notes || '')
+  }
 
   const openSubtasks = subtasks.filter((st) => !st.done)
   const hasOpenSubtasks = !isSubtask && openSubtasks.length > 0
 
   const assigneeIds = t.assignee_ids?.length ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : []
-  const assigneeLabel = assigneeIds.length ? assigneeIds.map(memberEmail).join(', ') : '—'
-
   const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-amber-700' : 'text-green'
-
-  const row = isEditing ? (
-    <TaskEditFormMulti editForm={editForm} setEditForm={setEditForm} clients={clients} members={members} showDueDate={!t.is_auto} onCancel={cancelEdit} onSave={save} />
-  ) : (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
-      exit={{ opacity: 0, x: -8 }}
-      transition={{ duration: 0.15 }}
-      className={`grid ${ROW_GRID_COLS} gap-3 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
-    >
-      <button
-        onClick={() => {
-          if (!t.done && hasOpenSubtasks) return
-          if (t.done) uncomplete()
-          else complete()
-        }}
-        title={hasOpenSubtasks && !t.done ? `Complete ${openSubtasks.length} subtask${openSubtasks.length === 1 ? '' : 's'} first` : isTimerRunning ? 'Mark done - stops the running timer' : undefined}
-        className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-          t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
-        } ${hasOpenSubtasks && !t.done ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        {t.done && <span className="text-[10px] text-white">✓</span>}
-      </button>
-
-      <div className="text-sm min-w-0 truncate">
-        {!isSubtask && subtasks.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="mr-1 text-xs text-sage hover:text-ink align-middle"
-            title={expanded ? 'Collapse subtasks' : 'Expand subtasks'}
-          >
-            {expanded ? '▾' : '▸'} {subtasks.filter((s) => s.done).length}/{subtasks.length}
-          </button>
-        )}
-        <span className={t.done ? 'line-through text-sage' : ''}>{t.title}</span>
-        {t.is_auto && <span className="ml-1 text-xs text-sage">auto</span>}
-        {t.recurring_id && <span className="ml-1 text-xs text-sage">↻</span>}
-        {isTimerRunning && (
-          <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
-          </span>
-        )}
-        {t.done && t.completed_at && (
-          <span className="ml-2 text-xs text-green">
-            Done{' '}
-            {new Date(t.completed_at).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </span>
-        )}
-      </div>
-
-      <div className="hidden md:block text-xs text-sage truncate">{t.client_id ? clientName(t.client_id) : ''}</div>
-
-      <div className="text-xs text-sage truncate" title={assigneeLabel}>
-        {assigneeLabel}
-      </div>
-
-      <div className="text-xs text-sage whitespace-nowrap">{formatDate(t.due_date)}</div>
-
-      <div className={`hidden md:block text-xs font-medium ${priorityColor}`}>{!t.quick ? t.priority : ''}</div>
-
-      <div className="text-xs text-sage truncate" title={t.notes || undefined}>
-        {t.notes}
-      </div>
-
-      <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
-        {!t.done &&
-          (isTimerRunning ? (
-            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
-          ) : (
-            <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
-          ))}
-        {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-        {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
-        {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
-        <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
-        <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
-      </div>
-    </motion.div>
-  )
 
   return (
     <div>
-      {row}
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
+        exit={{ opacity: 0, x: -8 }}
+        transition={{ duration: 0.15 }}
+        className={`grid ${ROW_GRID_COLS} gap-3 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
+      >
+        <button
+          onClick={() => {
+            if (!t.done && hasOpenSubtasks) return
+            if (t.done) uncomplete()
+            else complete()
+          }}
+          title={hasOpenSubtasks && !t.done ? `Complete ${openSubtasks.length} subtask${openSubtasks.length === 1 ? '' : 's'} first` : isTimerRunning ? 'Mark done - stops the running timer' : undefined}
+          className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+            t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
+          } ${hasOpenSubtasks && !t.done ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {t.done && <span className="text-[10px] text-white">✓</span>}
+        </button>
+
+        <div className="flex items-center gap-1 min-w-0">
+          {!isSubtask && subtasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-xs text-sage hover:text-ink shrink-0"
+              title={expanded ? 'Collapse subtasks' : 'Expand subtasks'}
+            >
+              {expanded ? '▾' : '▸'} {subtasks.filter((s) => s.done).length}/{subtasks.length}
+            </button>
+          )}
+          <input
+            className={`flex-1 min-w-0 text-sm ${PLAIN_FIELD} ${t.done ? 'line-through text-sage' : ''}`}
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={() => {
+              if (titleDraft.trim() && titleDraft !== t.title) updateField('title', titleDraft)
+              else setTitleDraft(t.title)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              if (e.key === 'Escape') {
+                setTitleDraft(t.title)
+                ;(e.target as HTMLInputElement).blur()
+              }
+            }}
+          />
+          {t.is_auto && <span className="text-xs text-sage shrink-0">auto</span>}
+          {t.recurring_id && <span className="text-xs text-sage shrink-0">↻</span>}
+          {isTimerRunning && (
+            <span className="text-xs font-mono text-green inline-flex items-center gap-1 shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
+            </span>
+          )}
+        </div>
+
+        <div className="hidden md:block text-xs">
+          <CustomSelect
+            variant="plain"
+            value={t.client_id || ''}
+            onChange={(v) => updateField('client_id', v)}
+            options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+            className="text-sage"
+          />
+        </div>
+
+        <div className="text-xs">
+          <MultiSelect
+            variant="plain"
+            value={assigneeIds}
+            onChange={(ids) => updateField('assignee_ids', ids)}
+            options={members.map((m) => ({ value: m.user_id, label: m.display_name || m.invited_email || '-' }))}
+            renderTrigger={(selected) =>
+              selected.length === 0 ? (
+                <span className="text-sage">—</span>
+              ) : (
+                <span className="flex items-center -space-x-1.5">
+                  {selected.slice(0, 3).map((o) => (
+                    <Avatar key={o.value} member={members.find((m) => m.user_id === o.value)} size={20} className="ring-2 ring-cream" />
+                  ))}
+                  {selected.length > 3 && <span className="text-[10px] text-sage ml-1.5">+{selected.length - 3}</span>}
+                </span>
+              )
+            }
+          />
+        </div>
+
+        <input
+          type="date"
+          className={`text-xs text-sage ${PLAIN_FIELD}`}
+          value={t.due_date}
+          onChange={(e) => updateField('due_date', e.target.value)}
+        />
+
+        <div className="hidden md:block text-xs">
+          {!t.quick && (
+            <CustomSelect
+              variant="plain"
+              value={t.priority}
+              onChange={(v) => updateField('priority', v)}
+              options={PRIORITY.map((p) => ({ value: p, label: p }))}
+              className={`font-medium ${priorityColor}`}
+            />
+          )}
+        </div>
+
+        <input
+          className={`w-full text-xs text-sage ${PLAIN_FIELD}`}
+          value={notesDraft}
+          placeholder="—"
+          onChange={(e) => setNotesDraft(e.target.value)}
+          onBlur={() => {
+            if (notesDraft !== (t.notes || '')) updateField('notes', notesDraft)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+        />
+
+        <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+          {!t.done &&
+            (isTimerRunning ? (
+              <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
+            ) : (
+              <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
+            ))}
+          {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
+          {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
+          {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
+          <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
+        </div>
+      </motion.div>
+
       {!isSubtask && expanded && (subtasks.length > 0 || isAddingSubtask) && (
         <div>
           {subtaskRows}

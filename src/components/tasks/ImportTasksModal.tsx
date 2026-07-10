@@ -250,27 +250,27 @@ export default function ImportTasksModal({
           {drafts && (
             <>
               <div className="text-sm text-sage mb-3">Found {drafts.length} task{drafts.length === 1 ? '' : 's'} - review before adding.</div>
-              <div className="space-y-2 mb-3 max-h-[50vh] overflow-y-auto pr-1">
+              <div className="space-y-3 mb-3 max-h-[50vh] overflow-y-auto pr-1">
                 {drafts.map((d, i) => (
-                  <div key={i} className="rounded border border-ink/10 p-2">
-                    <div className="flex items-start gap-2">
+                  <div key={i} className="rounded-lg border border-ink/10 p-3">
+                    <div className="flex items-start gap-3">
                       <button
                         type="button"
                         onClick={() => updateDraft(i, { include: !d.include })}
-                        className={`mt-1.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${d.include ? 'bg-green border-green' : 'border-ink/25'}`}
+                        className={`mt-1.5 h-4 w-4 rounded-md border flex items-center justify-center shrink-0 ${d.include ? 'bg-green border-green' : 'border-ink/25'}`}
                       >
                         {d.include && <span className="text-[10px] text-white">✓</span>}
                       </button>
                       <div className="flex-1 min-w-0">
                         <input
-                          className="w-full rounded border border-ink/10 bg-white px-2 py-1 text-sm mb-1"
+                          className="w-full rounded-md border border-ink/10 bg-white px-2 py-1.5 text-sm mb-2"
                           value={d.title}
                           onChange={(e) => updateDraft(i, { title: e.target.value })}
                         />
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-2 gap-2">
                           <input
                             type="date"
-                            className="rounded border border-ink/10 bg-white px-2 py-1 text-xs"
+                            className="rounded-md border border-ink/10 bg-white px-2 py-1.5 text-xs"
                             value={d.due_date || ''}
                             onChange={(e) => updateDraft(i, { due_date: e.target.value || null })}
                           />
@@ -280,7 +280,7 @@ export default function ImportTasksModal({
                             options={PRIORITY.map((p) => ({ value: p, label: p }))}
                           />
                         </div>
-                        {d.notes && <div className="text-xs text-sage mt-1">{d.notes}</div>}
+                        {d.notes && <div className="text-xs text-sage mt-2">{d.notes}</div>}
                       </div>
                       <button onClick={() => removeDraft(i)} className="text-sage hover:text-ink shrink-0">
                         <TrashIcon size={14} />

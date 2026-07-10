@@ -14,7 +14,7 @@ import ImportTasksModal from '@/components/tasks/ImportTasksModal'
 import Button from '@/components/ui/Button'
 import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
-import TaskRow from '@/components/tasks/TaskRow'
+import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
 
 export type Client = { id: string; name: string }
 export type Member = {
@@ -120,8 +120,6 @@ export default function TasksClient({
   const [showImportTasks, setShowImportTasks] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Record<string, unknown>>({})
   const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null)
   const [subtaskForm, setSubtaskForm] = useState(emptyTaskForm)
   const [showAddRecurring, setShowAddRecurring] = useState(false)
@@ -255,7 +253,6 @@ export default function TasksClient({
   async function updateTask(id: string, fields: Record<string, unknown>) {
     const { data } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
     if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
-    setEditingTaskId(null)
   }
 
   async function completeTask(t: Task) {
@@ -536,30 +533,18 @@ export default function TasksClient({
       <TaskRow
         key={t.id}
         t={t}
-        clientName={clientName}
-        memberEmail={memberEmail}
-        isEditing={editingTaskId === t.id}
-        editForm={editForm}
-        setEditForm={setEditForm}
         clients={clients}
         members={members}
-        startEdit={() => {
-          setEditingTaskId(t.id)
-          setEditForm({
-            title: t.title,
-            client_id: t.client_id || '',
-            assignee_ids: effectiveAssignees(t),
-            priority: t.priority,
-            due_date: t.due_date,
-            notes: t.notes || '',
-          })
-        }}
-        cancelEdit={() => setEditingTaskId(null)}
-        save={() => {
-          const assigneeIds = (editForm.assignee_ids as string[]) || []
-          // client_id is a uuid column - Postgres rejects '' (CustomSelect's "No client" value),
-          // so it must be normalized to null the same way addTask() already does on insert
-          updateTask(t.id, { ...editForm, client_id: (editForm.client_id as string) || null, assigned_to: deriveAssignedTo(assigneeIds) })
+        updateField={(field, value) => {
+          if (field === 'assignee_ids') {
+            const assigneeIds = value as string[]
+            updateTask(t.id, { assignee_ids: assigneeIds, assigned_to: deriveAssignedTo(assigneeIds) })
+          } else if (field === 'client_id') {
+            // client_id is a uuid column - Postgres rejects '' (CustomSelect's "No client" value)
+            updateTask(t.id, { client_id: (value as string) || null })
+          } else {
+            updateTask(t.id, { [field]: value })
+          }
         }}
         complete={() => completeTask(t)}
         uncomplete={() => uncompleteTask(t)}
@@ -812,7 +797,10 @@ export default function TasksClient({
                   {tasksForDate(selectedDate).length === 0 ? (
                     <div className="text-sm text-sage py-4">No tasks scheduled.</div>
                   ) : (
-                    <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                    <>
+                      <TaskListHeader />
+                      <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                    </>
                   )}
                 </>
               )}
@@ -822,6 +810,7 @@ export default function TasksClient({
           {view === 'list' && (
             <>
               {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
+              {buckets.length > 0 && <TaskListHeader />}
               {buckets.map((b) => {
                 const { mine, unassigned } = splitBucket(b.items)
                 const pendingCount = b.items.filter((t) => !t.done).length

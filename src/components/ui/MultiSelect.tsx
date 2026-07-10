@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SelectOption } from './CustomSelect'
 
 export default function MultiSelect({
@@ -10,6 +10,8 @@ export default function MultiSelect({
   placeholder = 'Unassigned',
   className = '',
   disabled = false,
+  variant = 'pill',
+  renderTrigger,
 }: {
   value: string[]
   onChange: (ids: string[]) => void
@@ -17,6 +19,11 @@ export default function MultiSelect({
   placeholder?: string
   className?: string
   disabled?: boolean
+  /** 'pill' (default) is the filled pill button used in forms. 'plain' is a borderless,
+   * text-like trigger for inline-editable table cells (Tasks list row cells). */
+  variant?: 'pill' | 'plain'
+  /** Overrides the default text-label trigger content (e.g. to show avatars instead). */
+  renderTrigger?: (selected: SelectOption[]) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -55,12 +62,16 @@ export default function MultiSelect({
         type="button"
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        className={`w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left ${
-          disabled ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
+        className={
+          variant === 'plain'
+            ? `flex items-center gap-1 rounded px-1 -mx-1 text-left hover:bg-sand/60 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`
+            : `w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left ${
+                disabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`
+        }
       >
-        <span className="truncate">{label}</span>
-        <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        {renderTrigger ? renderTrigger(selected) : <span className="truncate">{label}</span>}
+        {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && !disabled && (
         <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg border border-ink/10 py-1">
