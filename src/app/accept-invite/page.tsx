@@ -27,15 +27,39 @@ export default function AcceptInvitePage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    // Supabase's invite email links deliver the session as a URL hash fragment (never sent to
-    // the server), which the browser client picks up automatically on load - this only works
-    // client-side, which is why this route has to bypass the server-side auth check entirely
-    // (see PUBLIC_PATHS in lib/supabase/middleware.ts) rather than being a normal page.
+    // Supabase's invite link can deliver the session in more than one shape depending on flow
+    // type/template config - a PKCE `?code=`, a `?token_hash=&type=` pair (the newer confirm-link
+    // style), or plain hash-fragment tokens the browser client auto-detects on load. Handling
+    // only one of these silently showed "invalid or expired" even when Supabase's own Auth logs
+    // confirmed the /verify call and Login had already succeeded server-side - the session was
+    // real, this page just wasn't picking it up. This all has to run client-side (hash fragments
+    // never reach the server), which is why the route bypasses the server-side auth check
+    // entirely (see PUBLIC_PATHS in lib/supabase/middleware.ts) rather than being a normal page.
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
+
+    async function resolveSession() {
+      const url = new URL(window.location.href)
+      const code = url.searchParams.get('code')
+      const tokenHash = url.searchParams.get('token_hash')
+      const otpType = url.searchParams.get('type')
+      const knownOtpTypes = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code)
+      } else if (tokenHash && otpType && (knownOtpTypes as readonly string[]).includes(otpType)) {
+        await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType as (typeof knownOtpTypes)[number] })
+      }
+
+      if (code || tokenHash) window.history.replaceState(null, '', url.pathname)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       setEmail(session?.user?.email ?? null)
       setChecking(false)
-    })
+    }
+
+    resolveSession()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
