@@ -134,9 +134,13 @@ export default function DashboardClient({
   }, [initialTasks])
 
   useEffect(() => {
-    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, initialDefaults, excludeWeekends).then(async () => {
-      const { data } = await supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false)
-      if (data) setTasks(data as Task[])
+    ensureAutoAndRecurringTasks(supabase, orgId, initialClients, initialRecurring, initialDefaults, excludeWeekends).then((newRows) => {
+      if (!newRows.length) return
+      setTasks((prev) => {
+        const existingIds = new Set(prev.map((t) => t.id))
+        const toAdd = (newRows as Task[]).filter((t) => !existingIds.has(t.id))
+        return toAdd.length ? [...prev, ...toAdd] : prev
+      })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

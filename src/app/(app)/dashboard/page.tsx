@@ -21,14 +21,18 @@ export default async function DashboardPage() {
     { data: sentTodayRows },
     { data: weekCompletedTasks },
   ] = await Promise.all([
+    // .limit(2000) is a defensive ceiling against pathological growth, not user-facing pagination.
+    // The active-tasks query below is intentionally left unbounded - the Today/Overdue/Upcoming
+    // bucketing needs the true full active set, and is now covered by idx_tasks_active.
     supabase
       .from('clients')
       .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id')
       .eq('org_id', orgId)
-      .order('name'),
+      .order('name')
+      .limit(2000),
     supabase.from('tasks').select('*').eq('org_id', orgId).eq('archived', false),
-    supabase.from('recurring_templates').select('*').eq('org_id', orgId),
-    supabase.from('default_task_templates').select('*').eq('org_id', orgId),
+    supabase.from('recurring_templates').select('*').eq('org_id', orgId).limit(2000),
+    supabase.from('default_task_templates').select('*').eq('org_id', orgId).limit(2000),
     // RLS scopes this for free: admins/owners get every member's rows, members only get their own.
     supabase
       .from('time_entries')

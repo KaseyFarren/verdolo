@@ -25,7 +25,11 @@ type DefaultTemplate = {
 /** Idempotent and safe to call concurrently (e.g. from Dashboard and Tasks mounting at once):
  * duplicate default-task / recurring instances are prevented by DB-level unique constraints
  * (tasks_default_template_instance_unique, tasks_recurring_instance_unique), so upserting with
- * ignoreDuplicates can't race regardless of how many callers run at the same time. */
+ * ignoreDuplicates can't race regardless of how many callers run at the same time.
+ *
+ * Returns the rows actually inserted (PostgREST only returns rows that weren't skipped by
+ * ON CONFLICT DO NOTHING), so callers can merge just the new tasks into state instead of
+ * re-fetching the entire active-tasks table on every mount. */
 export async function ensureAutoAndRecurringTasks(
   supabase: SupabaseClient,
   orgId: string,
@@ -33,11 +37,11 @@ export async function ensureAutoAndRecurringTasks(
   recurring: RecurringTemplate[],
   defaultTemplates: DefaultTemplate[],
   excludeWeekends: boolean
-) {
+): Promise<Record<string, unknown>[]> {
   const today = todayKey()
   const tomorrow = getOffsetDate(1)
   const dates = [today, tomorrow].filter((d) => !excludeWeekends || !isWeekend(d))
-  if (!dates.length) return
+  if (!dates.length) return []
 
   const defaultRows: Record<string, unknown>[] = []
   const recurringRows: Record<string, unknown>[] = []
@@ -79,10 +83,20 @@ export async function ensureAutoAndRecurringTasks(
     }
   }
 
+  const newRows: Record<string, unknown>[] = []
   if (defaultRows.length) {
-    await supabase.from('tasks').upsert(defaultRows, { onConflict: 'org_id,client_id,due_date,default_template_id', ignoreDuplicates: true })
+    const { data } = await supabase
+      .from('tasks')
+      .upsert(defaultRows, { onConflict: 'org_id,client_id,due_date,default_template_id', ignoreDuplicates: true })
+      .select()
+    if (data) newRows.push(...data)
   }
   if (recurringRows.length) {
-    await supabase.from('tasks').upsert(recurringRows, { onConflict: 'org_id,recurring_id,due_date', ignoreDuplicates: true })
+    const { data } = await supabase
+      .from('tasks')
+      .upsert(recurringRows, { onConflict: 'org_id,recurring_id,due_date', ignoreDuplicates: true })
+      .select()
+    if (data) newRows.push(...data)
   }
+  return newRows
 }

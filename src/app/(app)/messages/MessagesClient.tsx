@@ -8,6 +8,7 @@ import { FileIcon, ImageFileIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIc
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+const PAGE_SIZE = 50
 
 type Member = {
   user_id: string
@@ -121,6 +122,8 @@ export default function MessagesClient({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(teamThreadId)
   const [activeContactId, setActiveContactId] = useState<string | null>(null)
   const [messagesByThread, setMessagesByThread] = useState<Record<string, Message[]>>({})
+  const [hasMoreOlderByThread, setHasMoreOlderByThread] = useState<Record<string, boolean>>({})
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [lastMessageAtByThread, setLastMessageAtByThread] = useState(initialLastMessageAt)
   const [lastReadAtByThread, setLastReadAtByThread] = useState(initialLastReadAt)
   const [lastMentionAtByThread, setLastMentionAtByThread] = useState(initialLastMentionAt)
@@ -132,6 +135,12 @@ export default function MessagesClient({
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeThreadIdRef = useRef(activeThreadId)
   const loadedThreads = useRef(new Set<string>())
+  const messagesByThreadRef = useRef(messagesByThread)
+  const isLoadingOlderRef = useRef(false)
+
+  useEffect(() => {
+    messagesByThreadRef.current = messagesByThread
+  }, [messagesByThread])
 
   useEffect(() => {
     activeThreadIdRef.current = activeThreadId
@@ -167,32 +176,80 @@ export default function MessagesClient({
     [supabase]
   )
 
-  const loadThread = useCallback(
-    async (threadId: string) => {
-      setLoading(true)
-      const [{ data: msgs }, { data: reactions }] = await Promise.all([
-        supabase
-          .from('messages')
-          .select(
-            'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
-          )
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: true }),
-        supabase.from('message_reactions').select('id, message_id, emoji, user_id').eq('thread_id', threadId),
-      ])
+  const fetchReactionsFor = useCallback(
+    async (messageIds: string[]) => {
+      if (!messageIds.length) return new Map<string, Reaction[]>()
+      const { data: reactions } = await supabase.from('message_reactions').select('id, message_id, emoji, user_id').in('message_id', messageIds)
       const reactionsByMessage = new Map<string, Reaction[]>()
       for (const r of reactions ?? []) {
         const list = reactionsByMessage.get(r.message_id) ?? []
         list.push({ id: r.id, emoji: r.emoji, user_id: r.user_id })
         reactionsByMessage.set(r.message_id, list)
       }
-      const full: Message[] = (msgs ?? []).map((m) => ({ ...m, reactions: reactionsByMessage.get(m.id) ?? [] }))
+      return reactionsByMessage
+    },
+    [supabase]
+  )
+
+  // Loads only the latest PAGE_SIZE messages - a long-lived thread's full history used to be
+  // fetched on every open, which only gets slower as a thread grows. "Load older" (below) pages
+  // further back on demand instead.
+  const loadThread = useCallback(
+    async (threadId: string) => {
+      setLoading(true)
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select(
+          'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
+        )
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+      const ordered = (msgs ?? []).slice().reverse()
+      const reactionsByMessage = await fetchReactionsFor(ordered.map((m) => m.id))
+      const full: Message[] = ordered.map((m) => ({ ...m, reactions: reactionsByMessage.get(m.id) ?? [] }))
       loadedThreads.current.add(threadId)
       setMessagesByThread((prev) => ({ ...prev, [threadId]: full }))
+      setHasMoreOlderByThread((prev) => ({ ...prev, [threadId]: (msgs ?? []).length >= PAGE_SIZE }))
       setLoading(false)
       resolveImageAttachments(threadId, full)
     },
-    [supabase, resolveImageAttachments]
+    [supabase, fetchReactionsFor, resolveImageAttachments]
+  )
+
+  const loadOlderMessages = useCallback(
+    async (threadId: string) => {
+      const oldest = messagesByThreadRef.current[threadId]?.[0]
+      if (!oldest || loadingOlder) return
+      setLoadingOlder(true)
+      isLoadingOlderRef.current = true
+      const container = scrollRef.current
+      const prevScrollHeight = container?.scrollHeight ?? 0
+
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select(
+          'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
+        )
+        .eq('thread_id', threadId)
+        .lt('created_at', oldest.created_at)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+      const ordered = (msgs ?? []).slice().reverse()
+      const reactionsByMessage = await fetchReactionsFor(ordered.map((m) => m.id))
+      const older: Message[] = ordered.map((m) => ({ ...m, reactions: reactionsByMessage.get(m.id) ?? [] }))
+
+      setMessagesByThread((prev) => ({ ...prev, [threadId]: [...older, ...(prev[threadId] ?? [])] }))
+      setHasMoreOlderByThread((prev) => ({ ...prev, [threadId]: older.length >= PAGE_SIZE }))
+      resolveImageAttachments(threadId, older)
+
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop += container.scrollHeight - prevScrollHeight
+        isLoadingOlderRef.current = false
+        setLoadingOlder(false)
+      })
+    },
+    [supabase, fetchReactionsFor, resolveImageAttachments, loadingOlder]
   )
 
   useEffect(() => {
@@ -259,6 +316,7 @@ export default function MessagesClient({
   }, [orgId, supabase])
 
   useEffect(() => {
+    if (isLoadingOlderRef.current) return
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messagesByThread, activeThreadId])
 
@@ -516,6 +574,15 @@ export default function MessagesClient({
             {loading && <div className="text-sm text-sage">Loading…</div>}
             {!loading && messages.length === 0 && (
               <div className="text-sm text-sage">No messages yet. Say hi 👋</div>
+            )}
+            {!loading && activeThreadId && hasMoreOlderByThread[activeThreadId] && (
+              <button
+                onClick={() => loadOlderMessages(activeThreadId)}
+                disabled={loadingOlder}
+                className="w-full text-center text-xs text-sage hover:text-ink py-2 disabled:opacity-50"
+              >
+                {loadingOlder ? 'Loading…' : 'Load older messages'}
+              </button>
             )}
             {messages.map((m, i) => {
               const own = m.sender_id === userId

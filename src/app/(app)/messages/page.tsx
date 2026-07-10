@@ -35,32 +35,31 @@ export default async function MessagesPage() {
 
   const allThreadIds = [teamThread?.id, ...dmThreadIds].filter((id): id is string => Boolean(id))
 
-  const [{ data: recentMessages }, { data: reads }, { data: mentionMessages }] =
+  // last-message and last-mention per thread are denormalized (message_threads.last_message_at,
+  // message_mentions) so this stays bounded by thread/mention count instead of scanning every
+  // message ever sent - see supabase/migrations/0046_message_thread_activity.sql
+  const [{ data: threadActivity }, { data: reads }, { data: mentionRows }] =
     allThreadIds.length > 0
       ? await Promise.all([
-          supabase
-            .from('messages')
-            .select('thread_id, created_at')
-            .in('thread_id', allThreadIds)
-            .order('created_at', { ascending: false }),
+          supabase.from('message_threads').select('id, last_message_at').in('id', allThreadIds),
           supabase.from('message_reads').select('thread_id, last_read_at').eq('user_id', user.id).in('thread_id', allThreadIds),
           supabase
-            .from('messages')
+            .from('message_mentions')
             .select('thread_id, created_at')
+            .eq('user_id', user.id)
             .in('thread_id', allThreadIds)
-            .contains('mentioned_user_ids', [user.id])
             .order('created_at', { ascending: false }),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }]
 
   const lastMessageAtByThread: Record<string, string> = {}
-  for (const row of recentMessages ?? []) {
-    if (!lastMessageAtByThread[row.thread_id]) lastMessageAtByThread[row.thread_id] = row.created_at
+  for (const row of threadActivity ?? []) {
+    if (row.last_message_at) lastMessageAtByThread[row.id] = row.last_message_at
   }
   const lastReadAtByThread = Object.fromEntries((reads ?? []).map((r) => [r.thread_id, r.last_read_at]))
 
   const lastMentionAtByThread: Record<string, string> = {}
-  for (const row of mentionMessages ?? []) {
+  for (const row of mentionRows ?? []) {
     if (!lastMentionAtByThread[row.thread_id]) lastMentionAtByThread[row.thread_id] = row.created_at
   }
 
