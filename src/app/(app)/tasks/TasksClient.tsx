@@ -9,26 +9,26 @@ import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
-import AddTaskForm from '@/components/tasks/AddTaskForm'
-import TaskEditForm from '@/components/tasks/TaskEditForm'
+import AddTaskFormMulti from '@/components/tasks/AddTaskFormMulti'
 import ImportTasksModal from '@/components/tasks/ImportTasksModal'
 import Button from '@/components/ui/Button'
-import IconButton from '@/components/ui/IconButton'
-import { ClockArrowIcon, PauseIcon, PencilIcon, PlayIcon, SkipForwardIcon, TrashIcon, UploadCloudIcon } from '@/components/ui/icons'
-import QuickAddTime from '@/components/QuickAddTime'
+import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
+import TaskRow from '@/components/tasks/TaskRow'
 
-type Client = { id: string; name: string }
-type Member = {
+export type Client = { id: string; name: string }
+export type Member = {
   user_id: string
   invited_email: string | null
   display_name?: string | null
   avatar_url?: string | null
 }
-type Task = {
+export type Task = {
   id: string
   client_id: string | null
   assigned_to: string | null
+  assignee_ids: string[]
+  parent_task_id: string | null
   title: string
   due_date: string
   priority: string
@@ -65,7 +65,7 @@ type Default = {
 const emptyTaskForm = {
   title: '',
   clientId: '',
-  assignedTo: '',
+  assigneeIds: [] as string[],
   dueDate: todayKey(),
   priority: 'Medium',
   notes: '',
@@ -122,6 +122,8 @@ export default function TasksClient({
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
+  const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null)
+  const [subtaskForm, setSubtaskForm] = useState(emptyTaskForm)
   const [showAddRecurring, setShowAddRecurring] = useState(false)
   const [recurringForm, setRecurringForm] = useState(emptyRecurringForm)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null)
@@ -184,6 +186,18 @@ export default function TasksClient({
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || ''
   const memberEmail = (id: string | null) => memberName(members.find((m) => m.user_id === id))
 
+  // Old rows only have `assigned_to`; new/edited rows carry the full `assignee_ids` array. This
+  // lets every read site treat assignment uniformly without a one-time backfill migration.
+  function effectiveAssignees(t: Task): string[] {
+    return t.assignee_ids?.length ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : []
+  }
+  // `assigned_to` (first-selected = primary) keeps getting written alongside `assignee_ids` so
+  // pages outside Tasks that only read the single column - Dashboard, Revenue, Reports, Time -
+  // keep working unchanged for at least the primary assignee.
+  function deriveAssignedTo(ids: string[]): string | null {
+    return ids[0] ?? null
+  }
+
   function selectDate(d: string) {
     setSelectedDate(d)
     if (d) setCalMonth(d.slice(0, 7))
@@ -191,13 +205,15 @@ export default function TasksClient({
 
   async function addTask() {
     if (!taskForm.title.trim()) return
+    const assigneeIds = taskForm.assigneeIds.length ? taskForm.assigneeIds : taskMode === 'quick' ? [userId] : []
     const { data } = await supabase
       .from('tasks')
       .insert({
         org_id: orgId,
         title: taskForm.title,
         client_id: taskForm.clientId || null,
-        assigned_to: taskForm.assignedTo || (taskMode === 'quick' ? userId : null),
+        assignee_ids: assigneeIds,
+        assigned_to: deriveAssignedTo(assigneeIds),
         due_date: taskForm.dueDate,
         priority: taskForm.priority,
         notes: taskForm.notes,
@@ -209,6 +225,31 @@ export default function TasksClient({
     if (data) setTasks((prev) => [...prev, data as Task])
     setTaskForm(emptyTaskForm)
     setShowAddTask(false)
+  }
+
+  async function addSubtask(parentId: string) {
+    if (!subtaskForm.title.trim()) return
+    const assigneeIds = subtaskForm.assigneeIds
+    const { data } = await supabase
+      .from('tasks')
+      .insert({
+        org_id: orgId,
+        title: subtaskForm.title,
+        client_id: subtaskForm.clientId || null,
+        assignee_ids: assigneeIds,
+        assigned_to: deriveAssignedTo(assigneeIds),
+        due_date: subtaskForm.dueDate,
+        priority: subtaskForm.priority,
+        notes: subtaskForm.notes,
+        quick: false,
+        done: false,
+        parent_task_id: parentId,
+      })
+      .select()
+      .single()
+    if (data) setTasks((prev) => [...prev, data as Task])
+    setSubtaskForm(emptyTaskForm)
+    setAddingSubtaskFor(null)
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
@@ -236,7 +277,10 @@ export default function TasksClient({
   function deleteTask(id: string) {
     const removed = tasks.find((t) => t.id === id)
     if (!removed) return
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    // deleting a parent cascades to its subtasks in the DB (on delete cascade); mirror that in
+    // the optimistic local state and Undo path so subtask rows don't linger until the next fetch
+    const removedSubtasks = tasks.filter((t) => t.parent_task_id === id)
+    setTasks((prev) => prev.filter((t) => t.id !== id && t.parent_task_id !== id))
     const timeoutId = setTimeout(async () => {
       await supabase.from('tasks').delete().eq('id', id)
     }, 5000)
@@ -245,7 +289,7 @@ export default function TasksClient({
         label: 'Undo',
         onClick: () => {
           clearTimeout(timeoutId)
-          setTasks((prev) => [...prev, removed])
+          setTasks((prev) => [...prev, removed, ...removedSubtasks])
         },
       },
     })
@@ -374,18 +418,32 @@ export default function TasksClient({
   }
 
   // skipped instances stay in the DB (so the recurring-instance upsert won't regenerate them)
-  // but are hidden everywhere in the UI - they weren't actually done, just dismissed
-  const visible = tasks.filter((t) => !t.skipped)
+  // but are hidden everywhere in the UI - they weren't actually done, just dismissed.
+  // Subtasks are excluded from the top-level list/bucket flow - they render nested under their
+  // parent row instead (see subtasksByParent below).
+  const visible = tasks.filter((t) => !t.skipped && !t.parent_task_id)
   const overdueCount = visible.filter((t) => t.due_date < today && !t.done).length
+
+  const subtasksByParent = useMemo(() => {
+    const map = new Map<string, Task[]>()
+    for (const t of tasks) {
+      if (t.parent_task_id && !t.skipped) {
+        const arr = map.get(t.parent_task_id) || []
+        arr.push(t)
+        map.set(t.parent_task_id, arr)
+      }
+    }
+    return map
+  }, [tasks])
 
   // captures the assignee/client dimension of the current filter selection only - the
   // date/done-status dimension (today/overdue/completed/all) is handled separately by
   // visibleBuckets() and tasksForDate() below, since those two dimensions compose independently
   // (e.g. a pinned date + an assignee filter) in a way the old single-bucket-per-chip model never needed to
   function matchesFilter(t: Task): boolean {
-    if (filter === 'assignee:mine') return t.assigned_to === userId
-    if (filter === 'assignee:unassigned') return !t.assigned_to
-    if (filter.startsWith('assignee:')) return t.assigned_to === filter.slice('assignee:'.length)
+    if (filter === 'assignee:mine') return effectiveAssignees(t).includes(userId)
+    if (filter === 'assignee:unassigned') return effectiveAssignees(t).length === 0
+    if (filter.startsWith('assignee:')) return effectiveAssignees(t).includes(filter.slice('assignee:'.length))
     if (filter !== 'all' && filter !== 'today' && filter !== 'overdue' && filter !== 'completed') return t.client_id === filter
     return true
   }
@@ -466,17 +524,18 @@ export default function TasksClient({
   function splitBucket(items: Task[]) {
     if (isAdmin) return { mine: items, unassigned: [] as Task[] }
     return {
-      mine: items.filter((t) => t.assigned_to !== null),
-      unassigned: items.filter((t) => t.assigned_to === null),
+      mine: items.filter((t) => effectiveAssignees(t).length > 0),
+      unassigned: items.filter((t) => effectiveAssignees(t).length === 0),
     }
   }
 
-  function renderTaskRow(t: Task) {
+  function renderTaskRow(t: Task, opts?: { isSubtask?: boolean }) {
+    const isSubtask = opts?.isSubtask ?? false
+    const childSubtasks = isSubtask ? [] : subtasksByParent.get(t.id) || []
     return (
       <TaskRow
         key={t.id}
         t={t}
-        currentUserId={userId}
         clientName={clientName}
         memberEmail={memberEmail}
         isEditing={editingTaskId === t.id}
@@ -489,14 +548,19 @@ export default function TasksClient({
           setEditForm({
             title: t.title,
             client_id: t.client_id || '',
-            assigned_to: t.assigned_to || '',
+            assignee_ids: effectiveAssignees(t),
             priority: t.priority,
             due_date: t.due_date,
             notes: t.notes || '',
           })
         }}
         cancelEdit={() => setEditingTaskId(null)}
-        save={() => updateTask(t.id, editForm)}
+        save={() => {
+          const assigneeIds = (editForm.assignee_ids as string[]) || []
+          // client_id is a uuid column - Postgres rejects '' (CustomSelect's "No client" value),
+          // so it must be normalized to null the same way addTask() already does on insert
+          updateTask(t.id, { ...editForm, client_id: (editForm.client_id as string) || null, assigned_to: deriveAssignedTo(assigneeIds) })
+        }}
         complete={() => completeTask(t)}
         uncomplete={() => uncompleteTask(t)}
         del={() => deleteTask(t.id)}
@@ -507,6 +571,34 @@ export default function TasksClient({
         startTimer={() => timer.startForTask(t)}
         stopTimer={() => timer.stopRunning()}
         addManualTime={(hours) => addManualTimeForTask(t, hours)}
+        isSubtask={isSubtask}
+        subtasks={childSubtasks}
+        subtaskRows={!isSubtask ? childSubtasks.map((st) => renderTaskRow(st, { isSubtask: true })) : undefined}
+        isAddingSubtask={!isSubtask && addingSubtaskFor === t.id}
+        onAddSubtask={
+          isSubtask
+            ? undefined
+            : () => {
+                setAddingSubtaskFor(t.id)
+                setSubtaskForm({ ...emptyTaskForm, clientId: t.client_id || '', dueDate: t.due_date })
+              }
+        }
+        addSubtaskForm={
+          !isSubtask && addingSubtaskFor === t.id ? (
+            <AddTaskFormMulti
+              mode="quick"
+              setMode={() => {}}
+              forceDetailed
+              form={subtaskForm}
+              setForm={setSubtaskForm}
+              clients={clients}
+              members={members}
+              onSubmit={() => addSubtask(t.id)}
+              onCancel={() => setAddingSubtaskFor(null)}
+              submitLabel="Add subtask"
+            />
+          ) : undefined
+        }
       />
     )
   }
@@ -639,7 +731,7 @@ export default function TasksClient({
           </div>
 
           {view === 'list' && showAddTask && (
-            <AddTaskForm mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
+            <AddTaskFormMulti mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
           )}
 
           {showImportTasks && (
@@ -705,7 +797,7 @@ export default function TasksClient({
                   <div className="text-sm font-medium mb-2">{formatDate(selectedDate)}</div>
 
                   {showAddTask && (
-                    <AddTaskForm
+                    <AddTaskFormMulti
                       mode={taskMode}
                       setMode={setTaskMode}
                       form={taskForm}
@@ -1027,121 +1119,5 @@ export default function TasksClient({
         </div>
       </div>
     </div>
-  )
-}
-
-function TaskRow({
-  t,
-  currentUserId,
-  clientName,
-  memberEmail,
-  isEditing,
-  editForm,
-  setEditForm,
-  clients,
-  members,
-  startEdit,
-  cancelEdit,
-  save,
-  complete,
-  uncomplete,
-  del,
-  snooze,
-  skip,
-  isTimerRunning,
-  elapsed,
-  startTimer,
-  stopTimer,
-  addManualTime,
-}: {
-  t: Task
-  currentUserId: string
-  clientName: (id: string | null) => string
-  memberEmail: (id: string | null) => string
-  isEditing: boolean
-  editForm: Record<string, unknown>
-  setEditForm: (f: (prev: Record<string, unknown>) => Record<string, unknown>) => void
-  clients: Client[]
-  members: Member[]
-  startEdit: () => void
-  cancelEdit: () => void
-  save: () => void
-  complete: () => void
-  uncomplete: () => void
-  del: () => void
-  snooze: () => void
-  skip?: () => void
-  isTimerRunning: boolean
-  elapsed: string | null
-  startTimer: () => void
-  stopTimer: () => void
-  addManualTime: (hours: number) => void | Promise<void>
-}) {
-  if (isEditing) {
-    return <TaskEditForm editForm={editForm} setEditForm={setEditForm} clients={clients} members={members} showDueDate={!t.is_auto} onCancel={cancelEdit} onSave={save} />
-  }
-
-  const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-amber-700' : 'text-green'
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
-      exit={{ opacity: 0, x: -8 }}
-      transition={{ duration: 0.15 }}
-      className={`flex gap-3 items-start py-2.5 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''}`}
-    >
-      <button
-        onClick={() => (t.done ? uncomplete() : complete())}
-        title={isTimerRunning ? 'Mark done - stops the running timer' : undefined}
-        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-          t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
-        }`}
-      >
-        {t.done && <span className="text-[10px] text-white">✓</span>}
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className={`text-sm ${t.done ? 'line-through text-sage' : ''}`}>
-          {t.title}
-          {!t.quick && <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>}
-          {t.is_auto && <span className="ml-1 text-xs text-sage">auto</span>}
-          {t.recurring_id && <span className="ml-1 text-xs text-sage">↻</span>}
-          {isTimerRunning && (
-            <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-sage mt-0.5 flex gap-2 flex-wrap">
-          {t.client_id && <span>{clientName(t.client_id)}</span>}
-          {t.assigned_to && t.assigned_to !== currentUserId && <span>→ {memberEmail(t.assigned_to)}</span>}
-          <span>{formatDate(t.due_date)}</span>
-          {t.done && t.completed_at && (
-            <span className="text-green">
-              Done{' '}
-              {new Date(t.completed_at).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </span>
-          )}
-        </div>
-        {t.notes && !t.done && <div className="text-xs text-sage mt-1">{t.notes}</div>}
-      </div>
-      <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
-        {!t.done &&
-          (isTimerRunning ? (
-            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
-          ) : (
-            <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
-          ))}
-        {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-        {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
-        {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
-        <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
-        <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
-      </div>
-    </motion.div>
   )
 }

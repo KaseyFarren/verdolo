@@ -14,6 +14,8 @@ type Task = {
   id: string
   client_id: string | null
   assigned_to: string | null
+  assignee_ids: string[]
+  parent_task_id: string | null
   title: string
   due_date: string
   priority: string
@@ -252,7 +254,13 @@ export default function ImportTasksModal({
                 {drafts.map((d, i) => (
                   <div key={i} className="rounded border border-ink/10 p-2">
                     <div className="flex items-start gap-2">
-                      <input type="checkbox" className="mt-1.5" checked={d.include} onChange={(e) => updateDraft(i, { include: e.target.checked })} />
+                      <button
+                        type="button"
+                        onClick={() => updateDraft(i, { include: !d.include })}
+                        className={`mt-1.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${d.include ? 'bg-green border-green' : 'border-ink/25'}`}
+                      >
+                        {d.include && <span className="text-[10px] text-white">✓</span>}
+                      </button>
                       <div className="flex-1 min-w-0">
                         <input
                           className="w-full rounded border border-ink/10 bg-white px-2 py-1 text-sm mb-1"

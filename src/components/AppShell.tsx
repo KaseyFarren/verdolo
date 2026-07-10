@@ -146,7 +146,7 @@ export default function AppShell({
           <div className="md:ml-52 flex-1 min-h-screen pt-14 md:pt-0">
             <motion.div
               key={pathname}
-              className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-8"
+              className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${pathname === '/tasks' ? 'max-w-6xl' : 'max-w-3xl'}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
