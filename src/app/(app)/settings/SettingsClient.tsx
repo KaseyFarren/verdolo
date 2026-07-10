@@ -41,6 +41,7 @@ export default function SettingsClient({
   settings,
   initialAccentColor,
   initialDisplayName,
+  initialAvatarUrl,
   aiCredits,
   subscriptionStatus,
   trialEndsAt,
@@ -56,6 +57,7 @@ export default function SettingsClient({
   settings: Settings
   initialAccentColor: string
   initialDisplayName: string
+  initialAvatarUrl: string | null
   aiCredits: { tierName: string; limit: number; used: number; remaining: number }
   subscriptionStatus: Status
   trialEndsAt: string | null
@@ -97,7 +99,7 @@ export default function SettingsClient({
         </nav>
         <div className="flex-1 min-w-0">
           {view === 'general' && <GeneralClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
-          {view === 'profile' && <ProfileClient orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} />}
+          {view === 'profile' && <ProfileClient orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} initialAvatarUrl={initialAvatarUrl} />}
           {view === 'appearance' && <AppearanceClient orgId={orgId} isAdmin={isAdmin} initialAccentColor={initialAccentColor} />}
           {view === 'voice' && <VoiceClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
           {view === 'integrations' && (

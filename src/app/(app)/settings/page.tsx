@@ -9,7 +9,7 @@ export default async function SettingsPage() {
   const isAdmin = isAdminRole(role)
 
   const [{ data: membership }, { count: activeMemberCount }, aiCredits] = await Promise.all([
-    supabase.from('org_members').select('display_name').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
+    supabase.from('org_members').select('display_name, avatar_url').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
     supabase.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
     getAiCreditStatus(orgId),
   ])
@@ -23,6 +23,7 @@ export default async function SettingsPage() {
       settings={org?.settings ?? {}}
       initialAccentColor={org?.accent_color ?? '#dd6b2c'}
       initialDisplayName={membership?.display_name ?? ''}
+      initialAvatarUrl={membership?.avatar_url ?? null}
       aiCredits={aiCredits}
       subscriptionStatus={org?.subscription_status ?? null}
       trialEndsAt={org?.trial_ends_at ?? null}
