@@ -88,6 +88,19 @@ ${periodLabel}: ${params.periodStart}–${params.periodEnd}
 ${params.clientSummaries.join('\n')}`
 }
 
+export function buildTasksFromDocPrompt(params: { clientName?: string; today: string; text?: string }) {
+  const clientLine = params.clientName ? ` for the client "${params.clientName}"` : ''
+  const sourceLine = params.text
+    ? `Source document:\n"""\n${params.text}\n"""`
+    : 'A source document is attached to this message - read it directly.'
+  return `You are an agency operations assistant. Read the attached meeting transcript or document${clientLine} and extract concrete, actionable follow-up tasks - things someone on the team needs to do, not general discussion points or things already done.
+Today's date is ${params.today}. Only set a due_date if the source clearly implies one (e.g. "by Friday", "next week") - resolve relative dates against today's date. Otherwise leave it null. Set priority to High only for things described as urgent or blocking; default to Medium.
+${sourceLine}
+Return ONLY valid JSON, no markdown:
+{"tasks":[{"title":"short imperative title","due_date":"YYYY-MM-DD or null","priority":"High|Medium|Low","notes":"one sentence of context from the source, or empty string"}]}
+If no actionable tasks are found, return {"tasks":[]}.`
+}
+
 export function buildScopeCreepPrompt(params: {
   clientName: string
   hours: number

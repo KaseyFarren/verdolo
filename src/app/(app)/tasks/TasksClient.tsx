@@ -11,9 +11,10 @@ import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/
 import DatePicker from '@/components/ui/DatePicker'
 import AddTaskForm from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
+import ImportTasksModal from '@/components/tasks/ImportTasksModal'
 import Button from '@/components/ui/Button'
 import IconButton from '@/components/ui/IconButton'
-import { ClockArrowIcon, PauseIcon, PencilIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
+import { ClockArrowIcon, PauseIcon, PencilIcon, PlayIcon, SkipForwardIcon, TrashIcon, UploadCloudIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 
@@ -116,6 +117,7 @@ export default function TasksClient({
   const [selectedDate, setSelectedDate] = useState('')
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
   const [showAddTask, setShowAddTask] = useState(false)
+  const [showImportTasks, setShowImportTasks] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -621,7 +623,15 @@ export default function TasksClient({
               {(view === 'list' || view === 'calendar') && filterSelect}
             </div>
             {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
-            <div className={headerAction.open ? 'invisible pointer-events-none' : ''}>
+            <div className={`flex items-center gap-2 ${headerAction.open ? 'invisible pointer-events-none' : ''}`}>
+              {view === 'list' && (
+                <Button variant="secondary" size="lg" className="rounded-full" onClick={() => setShowImportTasks(true)}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <UploadCloudIcon size={14} />
+                    Import from doc
+                  </span>
+                </Button>
+              )}
               <Button variant="primary" size="lg" className="rounded-full" onClick={headerAction.onClick}>
                 + New task
               </Button>
@@ -630,6 +640,16 @@ export default function TasksClient({
 
           {view === 'list' && showAddTask && (
             <AddTaskForm mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
+          )}
+
+          {showImportTasks && (
+            <ImportTasksModal
+              supabase={supabase}
+              orgId={orgId}
+              clients={clients}
+              onImported={(newTasks) => setTasks((prev) => [...prev, ...newTasks])}
+              onClose={() => setShowImportTasks(false)}
+            />
           )}
 
           {view === 'calendar' && (
