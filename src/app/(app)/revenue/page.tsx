@@ -21,7 +21,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   const rangeStart = bounds.start as string
   const rangeEnd = bounds.end as string
 
-  const [{ data: clients }, { data: charges }, { data: entries }, { data: members }, { data: tasks }] = await Promise.all([
+  const [{ data: clients }, { data: charges }, { data: entries }, { data: members }, { data: tasks }, { data: archivedTaskTotals }] = await Promise.all([
     supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId).order('name'),
     supabase
       .from('client_charges')
@@ -46,6 +46,15 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .not('assigned_to', 'is', null)
       .gte('original_due_date', rangeStart)
       .lt('original_due_date', rangeEnd),
+    // Rolled-up counts for tasks the archive-cleanup cron already hard-deleted (60+ days
+    // after archiving) - see migration 0048. Folds back into the same completed/completed-late
+    // counters below so old custom date ranges don't drop to zero once the rows are gone.
+    supabase
+      .from('task_archived_totals')
+      .select('assigned_to, completed, completed_late')
+      .eq('org_id', orgId)
+      .gte('original_due_date', rangeStart)
+      .lt('original_due_date', rangeEnd),
   ])
 
   return (
@@ -58,6 +67,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       entries={entries ?? []}
       members={members ?? []}
       tasks={tasks ?? []}
+      archivedTaskTotals={archivedTaskTotals ?? []}
       targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
       currency={org?.settings?.currency ?? 'usd'}
     />

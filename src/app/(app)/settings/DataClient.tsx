@@ -16,6 +16,14 @@ type ArchivedTask = {
   archived_at: string | null
 }
 
+const ARCHIVE_RETENTION_DAYS = 60
+
+// Mirrors the RETENTION_DAYS cutoff in api/cron/archive-cleanup/route.ts.
+function purgeLabel(archivedAt: string) {
+  const daysLeft = ARCHIVE_RETENTION_DAYS - Math.floor((Date.now() - new Date(archivedAt).getTime()) / 86400000)
+  return daysLeft > 0 ? `purges in ${daysLeft}d` : 'purging soon'
+}
+
 export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin: boolean }) {
   const supabase = useMemo(() => createClient(), [])
   const confirm = useConfirm()
@@ -132,7 +140,7 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
           Clear
         </button>
       </Row>
-      <Row title="Archived tasks" subtitle="View or restore tasks you've archived">
+      <Row title="Archived tasks" subtitle="View or restore tasks you've archived - auto-deleted 60 days after archiving (completion counts are preserved for reporting)">
         <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={toggleArchive}>
           {archiveOpen ? 'Hide' : 'View'}
         </button>
@@ -147,7 +155,12 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
                 <div className="min-w-0">
                   <div className="truncate">{t.title}</div>
                   <div className="text-xs text-sage truncate">
-                    {[t.client_id ? clientNames[t.client_id] : null, t.assigned_to ? memberLabels[t.assigned_to] : null, t.completed_at ? `completed ${formatDate(t.completed_at.slice(0, 10))}` : null]
+                    {[
+                      t.client_id ? clientNames[t.client_id] : null,
+                      t.assigned_to ? memberLabels[t.assigned_to] : null,
+                      t.completed_at ? `completed ${formatDate(t.completed_at.slice(0, 10))}` : null,
+                      t.archived_at ? purgeLabel(t.archived_at) : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>

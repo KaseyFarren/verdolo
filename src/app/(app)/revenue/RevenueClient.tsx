@@ -57,6 +57,7 @@ function formatHours(seconds: number) {
 }
 
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
+type ArchivedTaskTotal = { assigned_to: string; completed: number; completed_late: number }
 
 export default function RevenueClient({
   orgId,
@@ -67,6 +68,7 @@ export default function RevenueClient({
   entries,
   members,
   tasks,
+  archivedTaskTotals,
   targetRateCents,
   currency,
 }: {
@@ -78,6 +80,7 @@ export default function RevenueClient({
   entries: Entry[]
   members: Member[]
   tasks: TaskRow[]
+  archivedTaskTotals: ArchivedTaskTotal[]
   targetRateCents: number
   currency?: Currency
 }) {
@@ -219,8 +222,18 @@ export default function RevenueClient({
       }
       map.set(t.assigned_to, stats)
     }
+    // Tasks purged by the 60-day archive-cleanup cron (api/cron/archive-cleanup) no longer
+    // exist as rows, but their contribution to these counters was rolled up into
+    // task_archived_totals before deletion - fold it back in so old custom date ranges on
+    // this page still show accurate completed/completed-late counts.
+    for (const a of archivedTaskTotals) {
+      const stats = map.get(a.assigned_to) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
+      stats.completed += a.completed
+      stats.completedLate += a.completed_late
+      map.set(a.assigned_to, stats)
+    }
     return map
-  }, [tasks, today])
+  }, [tasks, archivedTaskTotals, today])
 
   const totals = useMemo(() => {
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
