@@ -212,26 +212,40 @@ export default function TasksClient({
     // otherwise NotificationSound could ping you for a task you created yourself.
     const id = crypto.randomUUID()
     if (assigneeIds.includes(userId)) markSelfAssigned(id)
-    const { data } = await supabase
-      .from('tasks')
-      .insert({
-        id,
-        org_id: orgId,
-        title: taskForm.title,
-        client_id: taskForm.clientId || null,
-        assignee_ids: assigneeIds,
-        assigned_to: deriveAssignedTo(assigneeIds),
-        due_date: taskForm.dueDate,
-        priority: taskForm.priority,
-        notes: taskForm.notes,
-        quick: taskMode === 'quick',
-        done: false,
-      })
-      .select()
-      .single()
-    if (data) setTasks((prev) => [...prev, data as Task])
+    const insertRow = {
+      id,
+      org_id: orgId,
+      title: taskForm.title,
+      client_id: taskForm.clientId || null,
+      assignee_ids: assigneeIds,
+      assigned_to: deriveAssignedTo(assigneeIds),
+      due_date: taskForm.dueDate,
+      priority: taskForm.priority,
+      notes: taskForm.notes,
+      quick: taskMode === 'quick',
+      done: false,
+    }
+    // Optimistic: id is client-generated, so we can show the row and clear the form immediately.
+    const optimisticRow: Task = {
+      ...insertRow,
+      parent_task_id: null,
+      completed_at: null,
+      is_auto: false,
+      auto_type: null,
+      recurring_id: null,
+      default_template_id: null,
+      skipped: false,
+    }
+    setTasks((prev) => [...prev, optimisticRow])
     setTaskForm(emptyTaskForm)
     setShowAddTask(false)
+    const { data, error } = await supabase.from('tasks').insert(insertRow).select().single()
+    if (error) {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      toast.error('Could not add that task')
+      return
+    }
+    if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
 
   async function addSubtask(parentId: string) {
@@ -239,27 +253,39 @@ export default function TasksClient({
     const assigneeIds = subtaskForm.assigneeIds
     const id = crypto.randomUUID()
     if (assigneeIds.includes(userId)) markSelfAssigned(id)
-    const { data } = await supabase
-      .from('tasks')
-      .insert({
-        id,
-        org_id: orgId,
-        title: subtaskForm.title,
-        client_id: subtaskForm.clientId || null,
-        assignee_ids: assigneeIds,
-        assigned_to: deriveAssignedTo(assigneeIds),
-        due_date: subtaskForm.dueDate,
-        priority: subtaskForm.priority,
-        notes: subtaskForm.notes,
-        quick: false,
-        done: false,
-        parent_task_id: parentId,
-      })
-      .select()
-      .single()
-    if (data) setTasks((prev) => [...prev, data as Task])
+    const insertRow = {
+      id,
+      org_id: orgId,
+      title: subtaskForm.title,
+      client_id: subtaskForm.clientId || null,
+      assignee_ids: assigneeIds,
+      assigned_to: deriveAssignedTo(assigneeIds),
+      due_date: subtaskForm.dueDate,
+      priority: subtaskForm.priority,
+      notes: subtaskForm.notes,
+      quick: false,
+      done: false,
+      parent_task_id: parentId,
+    }
+    const optimisticRow: Task = {
+      ...insertRow,
+      completed_at: null,
+      is_auto: false,
+      auto_type: null,
+      recurring_id: null,
+      default_template_id: null,
+      skipped: false,
+    }
+    setTasks((prev) => [...prev, optimisticRow])
     setSubtaskForm(emptyTaskForm)
     setAddingSubtaskFor(null)
+    const { data, error } = await supabase.from('tasks').insert(insertRow).select().single()
+    if (error) {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      toast.error('Could not add that subtask')
+      return
+    }
+    if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
@@ -267,7 +293,25 @@ export default function TasksClient({
     if ((Array.isArray(fields.assignee_ids) && (fields.assignee_ids as string[]).includes(userId)) || fields.assigned_to === userId) {
       markSelfAssigned(id)
     }
-    const { data } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
+    // Optimistic: apply the change locally before the round-trip so the UI reacts instantly.
+    // Capture the pre-edit row inside the updater (not from the `tasks` closure) so rapid
+    // successive edits each roll back to their own true prior state, not a stale snapshot.
+    let prevTask: Task | undefined
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t
+        prevTask = t
+        return { ...t, ...fields } as Task
+      }),
+    )
+    const { data, error } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
+    if (error) {
+      // Roll back to the captured pre-edit row and surface the failure.
+      if (prevTask) setTasks((prev) => prev.map((t) => (t.id === id ? (prevTask as Task) : t)))
+      toast.error('Could not save that change')
+      return
+    }
+    // Reconcile with the server row (picks up any DB-computed fields).
     if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
 

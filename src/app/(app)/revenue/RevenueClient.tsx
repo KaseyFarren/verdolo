@@ -278,8 +278,17 @@ export default function RevenueClient({
   async function deleteCharge(charge: Charge) {
     const ok = await confirm({ title: `Delete "${charge.description}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true })
     if (!ok) return
-    await supabase.from('client_charges').delete().eq('id', charge.id)
-    setCharges((prev) => prev.filter((c) => c.id !== charge.id))
+    // Optimistic: drop the row immediately; restore the full prior list if the delete fails.
+    let snapshot: Charge[] = []
+    setCharges((prev) => {
+      snapshot = prev
+      return prev.filter((c) => c.id !== charge.id)
+    })
+    const { error } = await supabase.from('client_charges').delete().eq('id', charge.id)
+    if (error) {
+      setCharges(snapshot)
+      toast.error('Failed to delete charge')
+    }
   }
 
   return (

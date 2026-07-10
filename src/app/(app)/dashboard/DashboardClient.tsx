@@ -254,20 +254,41 @@ export default function DashboardClient({
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
-    const { data } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
-    if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
+    // Optimistic: apply the edit and close the editor before the round-trip; roll back on failure.
+    let prevTask: Task | undefined
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t
+        prevTask = t
+        return { ...t, ...fields } as Task
+      }),
+    )
     setEditingTaskId(null)
+    const { data, error } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
+    if (error) {
+      if (prevTask) setTasks((prev) => prev.map((t) => (t.id === id ? (prevTask as Task) : t)))
+      toast.error('Could not save that change')
+      return
+    }
+    if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
 
   async function toggleTask(t: Task) {
     const nowDone = !t.done
     if (nowDone) await timer.stopIfRunningFor(t.id)
-    const { data } = await supabase
+    // Optimistic: flip the checkbox immediately, roll back if the update fails.
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? ({ ...x, done: nowDone, completed_at: nowDone ? new Date().toISOString() : null } as Task) : x)))
+    const { data, error } = await supabase
       .from('tasks')
       .update({ done: nowDone, completed_at: nowDone ? new Date().toISOString() : null })
       .eq('id', t.id)
       .select()
       .single()
+    if (error) {
+      setTasks((prev) => prev.map((x) => (x.id === t.id ? t : x)))
+      toast.error('Could not update that task')
+      return
+    }
     if (data) setTasks((prev) => prev.map((x) => (x.id === t.id ? (data as Task) : x)))
     if (nowDone && t.is_auto && t.auto_type === 'checkin' && t.client_id) {
       await supabase.from('clients').update({ last_contacted: today }).eq('id', t.client_id)
@@ -352,22 +373,27 @@ export default function DashboardClient({
     }
   }
 
-  async function markAwaitingReply(client: Client) {
-    const { error } = await supabase.from('clients').update({ awaiting_reply: true }).eq('id', client.id)
+  async function setAwaitingReply(client: Client, value: boolean) {
+    // Optimistic: flip the badge immediately, roll back to the captured prior value if the write fails.
+    let prev: boolean | undefined
+    setClients((cs) =>
+      cs.map((c) => {
+        if (c.id !== client.id) return c
+        prev = c.awaiting_reply
+        return { ...c, awaiting_reply: value }
+      }),
+    )
+    const { error } = await supabase.from('clients').update({ awaiting_reply: value }).eq('id', client.id)
     if (error) {
+      setClients((cs) => cs.map((c) => (c.id === client.id ? { ...c, awaiting_reply: prev ?? c.awaiting_reply } : c)))
       toast.error('Could not update reply status')
-      return
     }
-    setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, awaiting_reply: true } : c)))
   }
-
+  async function markAwaitingReply(client: Client) {
+    await setAwaitingReply(client, true)
+  }
   async function clearAwaitingReply(client: Client) {
-    const { error } = await supabase.from('clients').update({ awaiting_reply: false }).eq('id', client.id)
-    if (error) {
-      toast.error('Could not update reply status')
-      return
-    }
-    setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, awaiting_reply: false } : c)))
+    await setAwaitingReply(client, false)
   }
 
   const msgTasksDone = activeClients.filter((c) => isSentToday(c.id)).length
