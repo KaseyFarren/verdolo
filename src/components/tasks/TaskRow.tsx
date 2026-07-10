@@ -108,7 +108,7 @@ export default function TaskRow({
         animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
         exit={{ opacity: 0, x: -8 }}
         transition={{ duration: 0.15 }}
-        className={`grid ${ROW_GRID_COLS} gap-2 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
+        className={`grid ${ROW_GRID_COLS} gap-2 items-center py-2 group ${t.notes ? '' : 'border-b border-ink/10'} ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
       >
         <button
           onClick={() => {
@@ -227,21 +227,25 @@ export default function TaskRow({
         </div>
       </motion.div>
 
-      {/* full-width notes bar under the row - only shown when the task has notes; add notes to a
-          note-less task via the detail modal (click the title). Aligned to start under the title. */}
+      {/* Notes belong WITH their task, so the row above has no bottom border when notes exist -
+          the group's divider is this bar's bottom border instead, and the note reads as attached
+          text under the title (borderless until hover/focus) rather than a separate boxed item.
+          Add notes to a note-less task via the detail modal (click the title). */}
       {t.notes && (
-        <div className={`${isSubtask ? 'ml-[84px]' : 'ml-[60px]'} mr-2 mb-1.5`}>
-          <input
-            className="w-full text-xs text-sage bg-transparent rounded-md border border-ink/10 px-2 py-1 outline-none focus:border-ink/20 focus:bg-white focus:text-ink"
-            value={notesDraft}
-            onChange={(e) => setNotesDraft(e.target.value)}
-            onBlur={() => {
-              if (notesDraft !== (t.notes || '')) updateField('notes', notesDraft)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            }}
-          />
+        <div className="border-b border-ink/10 pb-2">
+          <div className={isSubtask ? 'pl-[84px] pr-2' : 'pl-[60px] pr-2'}>
+            <input
+              className="w-full text-xs text-sage bg-transparent rounded-md border border-transparent px-2 py-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white focus:text-ink"
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              onBlur={() => {
+                if (notesDraft !== (t.notes || '')) updateField('notes', notesDraft)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              }}
+            />
+          </div>
         </div>
       )}
 
