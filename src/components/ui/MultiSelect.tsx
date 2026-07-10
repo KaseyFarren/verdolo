@@ -74,7 +74,7 @@ export default function MultiSelect({
         {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && !disabled && (
-        <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg border border-ink/10 py-1">
+        <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto overflow-x-hidden rounded-xl bg-white shadow-lg border border-ink/10 py-1">
           {options.map((o) => {
             const checked = value.includes(o.value)
             return (
@@ -82,7 +82,7 @@ export default function MultiSelect({
                 key={o.value}
                 type="button"
                 onClick={() => toggle(o.value)}
-                className={`w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm whitespace-nowrap ${
+                className={`w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm min-w-0 ${
                   checked ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-sand'
                 }`}
               >
@@ -93,7 +93,7 @@ export default function MultiSelect({
                 >
                   {checked && <span className="text-[9px] text-white">✓</span>}
                 </span>
-                {o.label}
+                <span className="truncate">{o.label}</span>
               </button>
             )
           })}

@@ -73,13 +73,13 @@ export default function CustomSelect({
         {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && !disabled && (
-        <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg border border-ink/10 py-1">
+        <div className="absolute z-20 mt-1 w-full min-w-[10rem] max-h-64 overflow-y-auto overflow-x-hidden rounded-xl bg-white shadow-lg border border-ink/10 py-1">
           {options.map((o) => (
             <button
               key={o.value}
               type="button"
               onClick={() => select(o.value)}
-              className={`w-full text-left px-3 py-1.5 text-sm whitespace-nowrap ${
+              className={`block w-full text-left px-3 py-1.5 text-sm truncate ${
                 o.value === value ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-sand'
               }`}
             >
@@ -94,7 +94,7 @@ export default function CustomSelect({
                   key={o.value}
                   type="button"
                   onClick={() => select(o.value)}
-                  className={`w-full text-left px-3 py-1.5 text-sm whitespace-nowrap ${
+                  className={`block w-full text-left px-3 py-1.5 text-sm truncate ${
                     o.value === value ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-sand'
                   }`}
                 >
