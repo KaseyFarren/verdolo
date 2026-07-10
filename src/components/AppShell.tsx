@@ -143,7 +143,7 @@ export default function AppShell({
               </div>
             </div>
           </div>
-          <div className="md:ml-52 flex-1 min-h-screen pt-14 md:pt-0">
+          <div className="md:ml-52 flex-1 min-w-0 min-h-screen pt-14 md:pt-0">
             <motion.div
               key={pathname}
               className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${pathname === '/tasks' ? 'max-w-6xl' : 'max-w-3xl'}`}

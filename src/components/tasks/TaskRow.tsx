@@ -11,8 +11,14 @@ import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 
-export const ROW_GRID_COLS =
-  'grid-cols-[20px_minmax(0,3fr)_90px_100px_minmax(0,1fr)_auto] md:grid-cols-[20px_minmax(0,3fr)_110px_90px_100px_80px_minmax(0,1fr)_auto]'
+// No trailing `auto` track for actions - that reserved its full intrinsic width even while
+// invisible (opacity doesn't collapse grid tracks), which forced the row wider than its
+// container on anything but a very wide window. Actions are an absolutely-positioned overlay
+// instead (see the row below), so they cost zero width until actually shown on hover.
+export const ROW_GRID_COLS = 'grid-cols-[20px_minmax(0,3fr)_90px_100px_minmax(0,1fr)] md:grid-cols-[20px_minmax(0,3fr)_110px_90px_100px_80px_minmax(0,1fr)]'
+// Below this, the row's fixed-width columns no longer fit even with client/priority hidden -
+// the row list wraps in overflow-x-auto at this width so it scrolls instead of silently clipping.
+export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[720px]'
 
 const PLAIN_FIELD = 'bg-transparent border border-transparent rounded px-1 -mx-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white'
 
@@ -26,7 +32,6 @@ export function TaskListHeader() {
       <div>Due</div>
       <div className="hidden md:block">Priority</div>
       <div>Notes</div>
-      <div />
     </div>
   )
 }
@@ -101,7 +106,7 @@ export default function TaskRow({
         animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
         exit={{ opacity: 0, x: -8 }}
         transition={{ duration: 0.15 }}
-        className={`grid ${ROW_GRID_COLS} gap-3 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
+        className={`relative grid ${ROW_GRID_COLS} gap-3 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
       >
         <button
           onClick={() => {
@@ -216,7 +221,11 @@ export default function TaskRow({
           }}
         />
 
-        <div className={`flex gap-0.5 shrink-0 items-center ${isTimerRunning ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+        <div
+          className={`absolute right-0 top-0 h-full flex gap-0.5 shrink-0 items-center pl-6 bg-gradient-to-l from-cream from-70% to-transparent transition-opacity ${
+            isTimerRunning ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+          }`}
+        >
           {!t.done &&
             (isTimerRunning ? (
               <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />

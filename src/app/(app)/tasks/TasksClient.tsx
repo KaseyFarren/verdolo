@@ -14,7 +14,7 @@ import ImportTasksModal from '@/components/tasks/ImportTasksModal'
 import Button from '@/components/ui/Button'
 import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
-import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
+import TaskRow, { TaskListHeader, ROW_MIN_WIDTH } from '@/components/tasks/TaskRow'
 
 export type Client = { id: string; name: string }
 export type Member = {
@@ -797,10 +797,12 @@ export default function TasksClient({
                   {tasksForDate(selectedDate).length === 0 ? (
                     <div className="text-sm text-sage py-4">No tasks scheduled.</div>
                   ) : (
-                    <>
-                      <TaskListHeader />
-                      <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
-                    </>
+                    <div className="overflow-x-auto">
+                      <div className={ROW_MIN_WIDTH}>
+                        <TaskListHeader />
+                        <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -810,30 +812,36 @@ export default function TasksClient({
           {view === 'list' && (
             <>
               {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
-              {buckets.length > 0 && <TaskListHeader />}
-              {buckets.map((b) => {
-                const { mine, unassigned } = splitBucket(b.items)
-                const pendingCount = b.items.filter((t) => !t.done).length
-                return (
-                  <div key={b.label} className="mb-5">
-                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
-                      {pendingCount > 1 && (
-                        <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
-                          Complete all ({pendingCount})
-                        </button>
-                      )}
-                    </div>
-                    <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
-                    {unassigned.length > 0 && (
-                      <>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
-                        <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
-                      </>
-                    )}
+              {buckets.length > 0 && (
+                <div className="overflow-x-auto">
+                  <div className={ROW_MIN_WIDTH}>
+                    <TaskListHeader />
+                    {buckets.map((b) => {
+                      const { mine, unassigned } = splitBucket(b.items)
+                      const pendingCount = b.items.filter((t) => !t.done).length
+                      return (
+                        <div key={b.label} className="mb-5">
+                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
+                            {pendingCount > 1 && (
+                              <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
+                                Complete all ({pendingCount})
+                              </button>
+                            )}
+                          </div>
+                          <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
+                          {unassigned.length > 0 && (
+                            <>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                              <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
+                </div>
+              )}
             </>
           )}
 
