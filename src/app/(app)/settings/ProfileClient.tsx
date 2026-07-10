@@ -62,27 +62,26 @@ export default function ProfileClient({
       return
     }
     setUploading(true)
-    // Folder must be the user's id - storage RLS (migration 0022) only lets you write under
-    // avatars/<your-uid>/. upsert overwrites the previous file so old pictures don't pile up.
-    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-    const path = `${userId}/avatar.${ext}`
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
-    if (upErr) {
-      toast.error('Upload failed - try again')
+    // Upload goes through /api/avatar (service-role, server-side) rather than straight to storage:
+    // the avatars-bucket RLS insert policy has never reliably landed in prod, so a direct browser
+    // upload fails with "new row violates row-level security policy". See the route for detail.
+    const body = new FormData()
+    body.append('file', file)
+    let res: Response
+    try {
+      res = await fetch('/api/avatar', { method: 'POST', body })
+    } catch {
+      toast.error('Upload failed - check your connection and try again')
       setUploading(false)
       return
     }
-    // Bucket is public; add a cache-busting query so the new picture shows immediately even
-    // though the storage path (and thus base URL) is stable across re-uploads.
-    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
-    const url = `${pub.publicUrl}?t=${Date.now()}`
-    const { error: updErr } = await supabase.from('org_members').update({ avatar_url: url }).eq('org_id', orgId).eq('user_id', userId)
-    if (updErr) {
-      toast.error('Could not save your picture')
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(json.error || 'Upload failed - try again')
       setUploading(false)
       return
     }
-    setAvatarUrl(url)
+    setAvatarUrl(json.url)
     setUploading(false)
     toast.success('Profile picture updated')
     router.refresh()
@@ -90,9 +89,17 @@ export default function ProfileClient({
 
   async function removeAvatar() {
     setUploading(true)
-    const { error } = await supabase.from('org_members').update({ avatar_url: null }).eq('org_id', orgId).eq('user_id', userId)
-    if (error) {
-      toast.error('Could not remove your picture')
+    let res: Response
+    try {
+      res = await fetch('/api/avatar', { method: 'DELETE' })
+    } catch {
+      toast.error('Could not remove your picture - try again')
+      setUploading(false)
+      return
+    }
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      toast.error(json.error || 'Could not remove your picture')
       setUploading(false)
       return
     }
