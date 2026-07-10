@@ -12,30 +12,25 @@ import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, priorityColor, todayKey } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 
-// Actions live in a real reserved trailing column (fixed width) rather than an absolute overlay -
-// the overlay approach floated over and hid the Priority/Notes columns on hover. The column stays
-// empty (just whitespace) until the row is hovered, so nothing is ever covered. Its fixed width is
-// accounted for in ROW_MIN_WIDTH so the row scrolls rather than clipping when the window is narrow.
+// Every column is minmax(0, ...) so the whole grid ALWAYS fits its container and never triggers
+// horizontal scrolling - when space is tight the flexible (title/client) columns give first, then
+// the capped ones shrink and their content truncates. No fixed px tracks, no overflow-x wrapper,
+// no min-width. Actions get their own reserved (capped) column so they never overlap data columns.
+// Notes are NOT a column (too cramped) - they render in a full-width bar under the row instead.
 export const ROW_GRID_COLS =
-  'grid-cols-[20px_24px_minmax(0,3fr)_90px_100px_minmax(0,1fr)_150px] md:grid-cols-[20px_24px_minmax(0,3fr)_80px_110px_90px_100px_70px_minmax(0,1fr)_150px]'
-// Below this, the row's fixed-width columns no longer fit even with type/client/priority hidden -
-// the row list wraps in overflow-x-auto at this width so it scrolls instead of silently clipping.
-export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[920px]'
-
-const PLAIN_FIELD = 'bg-transparent border border-transparent rounded px-1 -mx-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white'
+  'grid-cols-[20px_24px_minmax(0,1fr)_minmax(0,60px)_minmax(0,84px)_minmax(0,132px)] lg:grid-cols-[20px_24px_minmax(0,2fr)_minmax(0,64px)_minmax(0,1fr)_minmax(0,60px)_minmax(0,88px)_minmax(0,64px)_minmax(0,132px)]'
 
 export function TaskListHeader() {
   return (
-    <div className={`grid ${ROW_GRID_COLS} gap-3 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold uppercase tracking-wide text-sage/70`}>
+    <div className={`grid ${ROW_GRID_COLS} gap-2 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold uppercase tracking-wide text-sage/70`}>
       <div />
       <div />
       <div>Title</div>
-      <div className="hidden md:block">Type</div>
-      <div className="hidden md:block">Client</div>
+      <div className="hidden lg:block">Type</div>
+      <div className="hidden lg:block">Client</div>
       <div>Assigned</div>
       <div>Due</div>
-      <div className="hidden md:block">Priority</div>
-      <div>Notes</div>
+      <div className="hidden lg:block">Priority</div>
       <div />
     </div>
   )
@@ -46,6 +41,7 @@ export default function TaskRow({
   clients,
   members,
   updateField,
+  onOpenDetail,
   complete,
   uncomplete,
   del,
@@ -67,6 +63,7 @@ export default function TaskRow({
   clients: Client[]
   members: Member[]
   updateField: (field: string, value: unknown) => void
+  onOpenDetail: () => void
   complete: () => void
   uncomplete: () => void
   del: () => void
@@ -85,15 +82,14 @@ export default function TaskRow({
   addSubtaskForm?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(true)
-  const [titleDraft, setTitleDraft] = useState(t.title)
+  const [addingTime, setAddingTime] = useState(false)
   const [notesDraft, setNotesDraft] = useState(t.notes || '')
-  // Resync local drafts when the underlying task changes from outside this row (save, realtime,
+  // Resync the local notes draft when the task changes from outside this row (modal save, realtime,
   // switching tasks) - adjusting state during render instead of an effect avoids an extra render.
-  const [syncedFor, setSyncedFor] = useState(`${t.id}:${t.title}:${t.notes || ''}`)
-  const syncKey = `${t.id}:${t.title}:${t.notes || ''}`
+  const [syncedFor, setSyncedFor] = useState(`${t.id}:${t.notes || ''}`)
+  const syncKey = `${t.id}:${t.notes || ''}`
   if (syncKey !== syncedFor) {
     setSyncedFor(syncKey)
-    setTitleDraft(t.title)
     setNotesDraft(t.notes || '')
   }
 
@@ -112,7 +108,7 @@ export default function TaskRow({
         animate={{ opacity: t.done ? 0.45 : 1, y: 0 }}
         exit={{ opacity: 0, x: -8 }}
         transition={{ duration: 0.15 }}
-        className={`relative grid ${ROW_GRID_COLS} gap-3 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
+        className={`grid ${ROW_GRID_COLS} gap-2 items-center py-2 border-b border-ink/10 group ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
       >
         <button
           onClick={() => {
@@ -134,6 +130,7 @@ export default function TaskRow({
           ) : (
             <IconButton label="Start timer" tone="accent" icon={<PlayIcon />} onClick={startTimer} className="!p-1" />
           ))}
+        {t.done && <span />}
 
         <div className="flex items-center gap-1 min-w-0">
           {!isSubtask && subtasks.length > 0 && (
@@ -146,22 +143,14 @@ export default function TaskRow({
               {expanded ? '▾' : '▸'} {subtasks.filter((s) => s.done).length}/{subtasks.length}
             </button>
           )}
-          <input
-            className={`flex-1 min-w-0 text-sm ${PLAIN_FIELD} ${t.done ? 'line-through text-sage' : ''}`}
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={() => {
-              if (titleDraft.trim() && titleDraft !== t.title) updateField('title', titleDraft)
-              else setTitleDraft(t.title)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-              if (e.key === 'Escape') {
-                setTitleDraft(t.title)
-                ;(e.target as HTMLInputElement).blur()
-              }
-            }}
-          />
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            title="Open task details"
+            className={`flex-1 min-w-0 truncate text-left text-sm hover:underline ${t.done ? 'line-through text-sage' : ''}`}
+          >
+            {t.title}
+          </button>
           {isTimerRunning && (
             <span className="text-xs font-mono text-green inline-flex items-center gap-1 shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
@@ -169,9 +158,9 @@ export default function TaskRow({
           )}
         </div>
 
-        <div className="hidden md:block text-xs text-sage truncate">{taskType}</div>
+        <div className="hidden lg:block text-xs text-sage truncate">{taskType}</div>
 
-        <div className="hidden md:block text-xs">
+        <div className="hidden lg:block text-xs">
           <CustomSelect
             variant="plain"
             value={t.client_id || ''}
@@ -207,7 +196,7 @@ export default function TaskRow({
           <DatePicker variant="plain" allowClear={false} value={t.due_date} onChange={(v) => updateField('due_date', v)} className={isOverdue ? 'text-red-600 font-medium' : 'text-sage'} />
         </div>
 
-        <div className="hidden md:block text-xs">
+        <div className="hidden lg:block text-xs">
           {!t.quick && (
             <CustomSelect
               variant="plain"
@@ -219,30 +208,42 @@ export default function TaskRow({
           )}
         </div>
 
-        <input
-          className={`w-full text-xs text-sage ${PLAIN_FIELD}`}
-          value={notesDraft}
-          placeholder="—"
-          onChange={(e) => setNotesDraft(e.target.value)}
-          onBlur={() => {
-            if (notesDraft !== (t.notes || '')) updateField('notes', notesDraft)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          }}
-        />
-
+        {/* Actions reveal on hover (or always while a timer runs / time is being entered). While
+            entering time only QuickAddTime shows, so its expanded input never overflows the cell
+            into the priority column. */}
         <div
-          className={`flex gap-1.5 shrink-0 items-center justify-end transition-opacity ${
-            isTimerRunning ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+          className={`flex gap-1 shrink-0 items-center justify-end transition-opacity ${
+            isTimerRunning || addingTime ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
           }`}
         >
-          {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
-          {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<MoonIcon />} onClick={snooze} />}
-          {!t.done && skip && <IconButton label="Skip this occurrence" tone="accent" icon={<SkipForwardIcon />} onClick={skip} />}
-          <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
+          {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} onOpenChange={setAddingTime} />}
+          {!addingTime && (
+            <>
+              {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<MoonIcon />} onClick={snooze} />}
+              {!t.done && skip && <IconButton label="Skip this occurrence" tone="accent" icon={<SkipForwardIcon />} onClick={skip} />}
+              <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
+            </>
+          )}
         </div>
       </motion.div>
+
+      {/* full-width notes bar under the row - only shown when the task has notes; add notes to a
+          note-less task via the detail modal (click the title). Aligned to start under the title. */}
+      {t.notes && (
+        <div className={`${isSubtask ? 'ml-[84px]' : 'ml-[60px]'} mr-2 mb-1.5`}>
+          <input
+            className="w-full text-xs text-sage bg-transparent rounded-md border border-ink/10 px-2 py-1 outline-none focus:border-ink/20 focus:bg-white focus:text-ink"
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={() => {
+              if (notesDraft !== (t.notes || '')) updateField('notes', notesDraft)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+          />
+        </div>
+      )}
 
       {!isSubtask && expanded && (subtasks.length > 0 || isAddingSubtask) && (
         <div>

@@ -11,10 +11,11 @@ import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/
 import DatePicker from '@/components/ui/DatePicker'
 import AddTaskFormMulti from '@/components/tasks/AddTaskFormMulti'
 import ImportTasksModal from '@/components/tasks/ImportTasksModal'
+import TaskDetailModal from '@/components/tasks/TaskDetailModal'
 import Button from '@/components/ui/Button'
 import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
-import TaskRow, { TaskListHeader, ROW_MIN_WIDTH } from '@/components/tasks/TaskRow'
+import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
 
 export type Client = { id: string; name: string }
 export type Member = {
@@ -123,6 +124,7 @@ export default function TasksClient({
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
   const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null)
   const [subtaskForm, setSubtaskForm] = useState(emptyTaskForm)
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [showAddRecurring, setShowAddRecurring] = useState(false)
   const [recurringForm, setRecurringForm] = useState(emptyRecurringForm)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null)
@@ -478,6 +480,7 @@ export default function TasksClient({
   }
 
   const filteredList = filteredTasks()
+  const detailTask = detailTaskId ? tasks.find((t) => t.id === detailTaskId) ?? null : null
   // members only ever fetch their own + unassigned tasks (RLS-scoped); split those apart with
   // a header so "shared/unclaimed" work reads distinctly from "assigned to me". Admins/owners
   // see everyone's tasks flat (each row already shows its assignee) and use the chips instead.
@@ -509,6 +512,7 @@ export default function TasksClient({
             updateTask(t.id, { [field]: value })
           }
         }}
+        onOpenDetail={() => setDetailTaskId(t.id)}
         complete={() => completeTask(t)}
         uncomplete={() => uncompleteTask(t)}
         del={() => deleteTask(t.id)}
@@ -700,6 +704,21 @@ export default function TasksClient({
             />
           )}
 
+          {detailTask && (
+            <TaskDetailModal
+              task={detailTask}
+              clients={clients}
+              members={members}
+              effectiveAssignees={effectiveAssignees}
+              onSave={(fields) => updateTask(detailTask.id, { ...fields, assigned_to: deriveAssignedTo(fields.assignee_ids) })}
+              onDelete={() => {
+                deleteTask(detailTask.id)
+                setDetailTaskId(null)
+              }}
+              onClose={() => setDetailTaskId(null)}
+            />
+          )}
+
           {view === 'calendar' && (
             <>
               <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
@@ -768,11 +787,9 @@ export default function TasksClient({
                   {tasksForDate(selectedDate).length === 0 ? (
                     <div className="text-sm text-sage py-4">No tasks scheduled.</div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <div className={ROW_MIN_WIDTH}>
-                        <TaskListHeader />
-                        <AnimatePresence initial={false}>{applySort(tasksForDate(selectedDate)).map((t) => renderTaskRow(t))}</AnimatePresence>
-                      </div>
+                    <div>
+                      <TaskListHeader />
+                      <AnimatePresence initial={false}>{applySort(tasksForDate(selectedDate)).map((t) => renderTaskRow(t))}</AnimatePresence>
                     </div>
                   )}
                 </>
@@ -788,24 +805,22 @@ export default function TasksClient({
                   const { mine, unassigned } = splitBucket(filteredList)
                   const pendingCount = filteredList.filter((t) => !t.done).length
                   return (
-                    <div className="overflow-x-auto">
-                      <div className={ROW_MIN_WIDTH}>
-                        <div className="flex items-center justify-end mb-1">
-                          {pendingCount > 1 && (
-                            <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(filteredList)}>
-                              Complete all ({pendingCount})
-                            </button>
-                          )}
-                        </div>
-                        <TaskListHeader />
-                        <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
-                        {unassigned.length > 0 && (
-                          <>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
-                            <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
-                          </>
+                    <div>
+                      <div className="flex items-center justify-end mb-1">
+                        {pendingCount > 1 && (
+                          <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(filteredList)}>
+                            Complete all ({pendingCount})
+                          </button>
                         )}
                       </div>
+                      <TaskListHeader />
+                      <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
+                      {unassigned.length > 0 && (
+                        <>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                          <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
+                        </>
+                      )}
                     </div>
                   )
                 })()}
