@@ -59,19 +59,6 @@ type Note = { id: string; client_id: string; text: string; created_at: string; a
 type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string; assigned_to: string | null }
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string; generated_by: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
-type Invoice = {
-  id: string
-  client_id: string
-  amount_cents: number
-  status: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible'
-  sent_at: string | null
-  paid_at: string | null
-  due_date: string | null
-  stripe_hosted_invoice_url: string | null
-}
-type ClientCharge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
-type UnbilledTimeEntry = { id: string; client_id: string; duration_seconds: number | null }
-type LineItemDraft = { description: string; amount_cents: number; quantity: number; chargeId?: string; timeEntryIds?: string[] }
 type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
 
 const emptyForm = {
@@ -105,11 +92,7 @@ export default function ClientsClient({
   timeEntries,
   archivedTimeTotals,
   members,
-  invoices: initialInvoices,
-  unbilledCharges,
-  unbilledTimeEntries,
   healthSnapshots,
-  stripeConnectStatus,
   currency,
 }: {
   orgId: string
@@ -122,11 +105,7 @@ export default function ClientsClient({
   timeEntries: { client_id: string | null; duration_seconds: number | null }[]
   archivedTimeTotals: { client_id: string | null; seconds: number }[]
   members: Member[]
-  invoices: Invoice[]
-  unbilledCharges: ClientCharge[]
-  unbilledTimeEntries: UnbilledTimeEntry[]
   healthSnapshots: HealthSnapshot[]
-  stripeConnectStatus: 'not_connected' | 'pending' | 'active'
   currency?: Currency
 }) {
   const currencySign = currencySymbol(currency)
@@ -154,15 +133,6 @@ export default function ClientsClient({
   const [stageFilter, setStageFilter] = useState('')
   const [timelineType, setTimelineType] = useState<'all' | 'note' | 'task' | 'message'>('all')
   const [timelinePeriod, setTimelinePeriod] = useState<PeriodValue>({ period: 'all_time' })
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices)
-  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
-  const [invoiceLineItems, setInvoiceLineItems] = useState<LineItemDraft[]>([])
-  const [sendingInvoice, setSendingInvoice] = useState(false)
-
-  useEffect(() => {
-    setInvoices(initialInvoices)
-  }, [initialInvoices])
-
   const today = todayKey()
   const selected = clients.find((c) => c.id === selectedId) || null
   const memberById = (id: string | null) => members.find((m) => m.user_id === id) || null
@@ -261,47 +231,6 @@ export default function ClientsClient({
     if (!ok) return
     await supabase.from('client_notes').delete().eq('id', id)
     setNotes((prev) => prev.filter((n) => n.id !== id))
-  }
-
-  function openInvoiceForm(client: Client) {
-    const items: LineItemDraft[] = []
-    if (client.billing_mode === 'hourly') {
-      const unbilled = unbilledTimeEntries.filter((e) => e.client_id === client.id)
-      const hours = unbilled.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
-      if (hours > 0) {
-        items.push({
-          description: `Hourly work (${hours.toFixed(1)}h @ ${currencySign}${centsToDollars(client.hourly_rate_cents || 0)}/hr)`,
-          amount_cents: Math.round(hours * (client.hourly_rate_cents || 0)),
-          quantity: 1,
-          timeEntryIds: unbilled.map((e) => e.id),
-        })
-      }
-    } else if (client.retainer_cents) {
-      items.push({ description: 'Monthly retainer', amount_cents: client.retainer_cents, quantity: 1 })
-    }
-    for (const charge of unbilledCharges.filter((c) => c.client_id === client.id)) {
-      items.push({ description: charge.description, amount_cents: charge.amount_cents, quantity: 1, chargeId: charge.id })
-    }
-    setInvoiceLineItems(items)
-    setShowInvoiceForm(true)
-  }
-
-  async function sendInvoice(clientId: string) {
-    setSendingInvoice(true)
-    const res = await fetch('/api/billing/invoices/create-and-send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orgId, clientId, lineItems: invoiceLineItems }),
-    })
-    const body = await res.json()
-    if (!res.ok) {
-      toast.error(body.error ?? 'Failed to send invoice')
-    } else {
-      setInvoices((prev) => [body.invoice as Invoice, ...prev])
-      setShowInvoiceForm(false)
-      toast.success('Invoice sent')
-    }
-    setSendingInvoice(false)
   }
 
   if (selected) {
@@ -464,54 +393,6 @@ export default function ClientsClient({
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {canEdit && (
-          <div className="rounded-lg border border-ink/10 bg-white p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Billing</div>
-              {!showInvoiceForm && stripeConnectStatus === 'active' && (
-                <button className="text-xs rounded border border-ink/10 px-2 py-1" onClick={() => openInvoiceForm(selected)}>
-                  + Create invoice
-                </button>
-              )}
-            </div>
-
-            {stripeConnectStatus !== 'active' && <div className="text-sm text-sage py-2">Client invoicing is coming soon.</div>}
-
-            {showInvoiceForm && (
-              <InvoiceForm
-                lineItems={invoiceLineItems}
-                setLineItems={setInvoiceLineItems}
-                onCancel={() => setShowInvoiceForm(false)}
-                onSend={() => sendInvoice(selected.id)}
-                sending={sendingInvoice}
-                currencySign={currencySign}
-              />
-            )}
-
-            {invoices.filter((inv) => inv.client_id === selected.id).length === 0 && !showInvoiceForm && stripeConnectStatus === 'active' && (
-              <div className="text-sm text-sage py-2">No invoices sent yet.</div>
-            )}
-            {invoices
-              .filter((inv) => inv.client_id === selected.id)
-              .map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between py-2 border-b border-ink/5 last:border-b-0 text-sm">
-                  <div>
-                    <span className="font-medium">{currencySign}{centsToDollars(inv.amount_cents).toLocaleString()}</span>
-                    {inv.sent_at && <span className="text-xs text-sage ml-2">Sent {formatDate(inv.sent_at.slice(0, 10))}</span>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <InvoiceStatusBadge status={inv.status} />
-                    {inv.stripe_hosted_invoice_url && (
-                      <a href={inv.stripe_hosted_invoice_url} target="_blank" rel="noreferrer" className="text-xs underline text-sage">
-                        View
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
           </div>
         )}
 
@@ -724,87 +605,6 @@ function Avatar({ name, index, size = 36 }: { name: string; index: number; size?
       }}
     >
       {getInitials(name)}
-    </div>
-  )
-}
-
-function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
-  const color = status === 'paid' ? '#2db87a' : status === 'void' || status === 'uncollectible' ? '#a3a3a3' : '#cc9a3c'
-  const label = status === 'paid' ? 'Paid' : status === 'void' ? 'Void' : status === 'uncollectible' ? 'Uncollectible' : 'Open'
-  return (
-    <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color, background: `${color}22` }}>
-      {label}
-    </span>
-  )
-}
-
-function InvoiceForm({
-  lineItems,
-  setLineItems,
-  onCancel,
-  onSend,
-  sending,
-  currencySign,
-}: {
-  lineItems: LineItemDraft[]
-  setLineItems: (fn: (prev: LineItemDraft[]) => LineItemDraft[]) => void
-  onCancel: () => void
-  onSend: () => void
-  sending: boolean
-  currencySign: string
-}) {
-  const total = lineItems.reduce((sum, item) => sum + item.amount_cents * (item.quantity || 1), 0)
-
-  function updateItem(idx: number, fields: Partial<LineItemDraft>) {
-    setLineItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...fields } : item)))
-  }
-  function removeItem(idx: number) {
-    setLineItems((prev) => prev.filter((_, i) => i !== idx))
-  }
-
-  return (
-    <div className="rounded-lg border border-ink/10 bg-white p-3 mb-3">
-      {lineItems.map((item, idx) => (
-        <div key={idx} className="flex gap-2 items-center mb-2">
-          <input
-            className="flex-1 rounded border border-ink/10 px-2 py-1.5 text-sm min-w-0"
-            placeholder="Description"
-            value={item.description}
-            onChange={(e) => updateItem(idx, { description: e.target.value })}
-          />
-          <input
-            type="number"
-            className="w-24 rounded border border-ink/10 px-2 py-1.5 text-sm"
-            placeholder={currencySign}
-            value={item.amount_cents ? centsToDollars(item.amount_cents) : ''}
-            onChange={(e) => updateItem(idx, { amount_cents: dollarsToCents(e.target.value || '0') })}
-          />
-          <button className="text-red-600 text-sm shrink-0" onClick={() => removeItem(idx)}>
-            ✕
-          </button>
-        </div>
-      ))}
-      <button
-        className="text-xs text-sage mb-3"
-        onClick={() => setLineItems((prev) => [...prev, { description: '', amount_cents: 0, quantity: 1 }])}
-      >
-        + Add line item
-      </button>
-      <div className="flex items-center justify-between border-t border-ink/10 pt-2">
-        <div className="text-sm font-semibold">Total: {currencySign}{centsToDollars(total).toLocaleString()}</div>
-        <div className="flex gap-2">
-          <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-            onClick={onSend}
-            disabled={sending || !lineItems.length || total <= 0}
-          >
-            {sending ? 'Sending…' : 'Send invoice'}
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

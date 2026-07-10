@@ -14,14 +14,11 @@ export default async function ClientsPage() {
     { data: timeEntries },
     { data: archivedTimeTotals },
     { data: members },
-    { data: invoices },
-    { data: unbilledCharges },
-    { data: unbilledTimeEntries },
     { data: healthSnapshots },
   ] = await Promise.all([
     // .limit(2000) below is a defensive ceiling against pathological growth (e.g. a runaway
     // automation bug), not user-facing pagination - see supabase/migrations plan notes. Realistic
-    // per-org volume (clients, notes, invoices) for this product stays well under that.
+    // per-org volume (clients, notes) for this product stays well under that.
     supabase.from('clients').select('*').eq('org_id', orgId).order('name').limit(2000),
     supabase.from('client_notes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(2000),
     supabase.from('tasks').select('*').eq('org_id', orgId).eq('done', true).not('completed_at', 'is', null).limit(2000),
@@ -29,27 +26,6 @@ export default async function ClientsPage() {
     supabase.from('time_entries').select('client_id, duration_seconds').eq('org_id', orgId).not('duration_seconds', 'is', null).limit(2000),
     supabase.from('time_archived_totals').select('client_id, seconds').eq('org_id', orgId),
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
-    canEdit
-      ? supabase.from('invoices').select('*').eq('org_id', orgId).order('sent_at', { ascending: false }).limit(2000)
-      : Promise.resolve({ data: [] }),
-    canEdit
-      ? supabase
-          .from('client_charges')
-          .select('*')
-          .eq('org_id', orgId)
-          .is('invoice_id', null)
-          .order('charged_on', { ascending: false })
-          .limit(2000)
-      : Promise.resolve({ data: [] }),
-    canEdit
-      ? supabase
-          .from('time_entries')
-          .select('id, client_id, duration_seconds')
-          .eq('org_id', orgId)
-          .eq('billable', true)
-          .is('invoice_id', null)
-          .limit(2000)
-      : Promise.resolve({ data: [] }),
     supabase
       .from('client_health_snapshots')
       .select('client_id, snapshot_date, health')
@@ -73,11 +49,7 @@ export default async function ClientsPage() {
       timeEntries={timeEntries ?? []}
       archivedTimeTotals={archivedTimeTotals ?? []}
       members={members ?? []}
-      invoices={invoices ?? []}
-      unbilledCharges={unbilledCharges ?? []}
-      unbilledTimeEntries={unbilledTimeEntries ?? []}
       healthSnapshots={healthSnapshots ?? []}
-      stripeConnectStatus={org?.stripe_connect_status ?? 'not_connected'}
       currency={org?.settings?.currency ?? 'usd'}
     />
   )

@@ -4,7 +4,6 @@ import { Section } from '@/components/settings/SettingsUI'
 import IntegrationIcon from '@/components/settings/IntegrationIcon'
 
 const COMING_SOON = [
-  { key: 'stripe', name: 'Stripe (client invoicing)' },
   { key: 'slack', name: 'Slack' },
   { key: 'zoom', name: 'Zoom' },
   { key: 'teams', name: 'Microsoft Teams' },
