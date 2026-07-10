@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -27,6 +27,24 @@ export default function ProfileClient({
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default')
+
+  useEffect(() => {
+    setNotifPermission(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
+  }, [])
+
+  async function enableDesktopNotifications() {
+    if (typeof Notification === 'undefined') return
+    // requestPermission must run from a user gesture (this click) - it can't be requested
+    // passively when a notification-worthy event arrives.
+    const result = await Notification.requestPermission()
+    setNotifPermission(result)
+    if (result === 'granted') {
+      new Notification('Desktop notifications on', { body: "You'll be notified about mentions and new tasks.", icon: '/icon.png' })
+    } else if (result === 'denied') {
+      toast.error('Blocked - allow notifications for this site in your browser settings')
+    }
+  }
 
   async function saveDisplayName() {
     await supabase.from('org_members').update({ display_name: displayName.trim() || null }).eq('org_id', orgId).eq('user_id', userId)
@@ -127,6 +145,19 @@ export default function ProfileClient({
             )}
           </div>
         </div>
+      </Row>
+      <Row title="Desktop notifications" subtitle="Get a browser popup for @mentions and tasks assigned to you, even in another tab">
+        {notifPermission === 'unsupported' ? (
+          <span className="text-xs text-sage">Not supported in this browser</span>
+        ) : notifPermission === 'granted' ? (
+          <span className="text-xs text-green">Enabled</span>
+        ) : notifPermission === 'denied' ? (
+          <span className="text-xs text-sage">Blocked - enable in your browser&apos;s site settings</span>
+        ) : (
+          <button className="rounded border border-ink/10 bg-white px-3 py-1.5 text-sm hover:bg-sand/60" onClick={enableDesktopNotifications}>
+            Enable
+          </button>
+        )}
       </Row>
       <Row title="Nickname" subtitle="Shown instead of your email across the app">
         <div className="flex items-center gap-2">
