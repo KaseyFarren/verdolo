@@ -19,11 +19,13 @@ type Member = {
 }
 
 export default function MembersList({
+  orgId,
   members,
   currentUserId,
   canManage,
   canManageOwners,
 }: {
+  orgId: string
   members: Member[]
   currentUserId: string
   canManage: boolean
@@ -33,6 +35,7 @@ export default function MembersList({
   const confirm = useConfirm()
   const [rows, setRows] = useState(members)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   // router.refresh() after inviting gives a new `members` array, but useState's initializer
@@ -69,6 +72,22 @@ export default function MembersList({
       setRows((prev) => prev.map((r) => (r.id === m.id ? (data as Member) : r)))
       toast.success('Target hours updated')
     }
+  }
+
+  async function resendInvite(m: Member) {
+    setResendingId(m.id)
+    const res = await fetch('/api/invite/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId, memberId: m.id }),
+    })
+    const body = await res.json().catch(() => ({}))
+    setResendingId(null)
+    if (!res.ok) {
+      toast.error(body.error ?? 'Could not resend invite')
+      return
+    }
+    toast.success(`Invite resent to ${m.invited_email}`)
   }
 
   async function removeMember(m: Member) {
@@ -162,6 +181,15 @@ export default function MembersList({
                 <span className="text-sage">{m.role}</span>
               )}
               {m.status === 'invited' && <span className="text-sage text-xs">invited</span>}
+              {m.status === 'invited' && canTouch && (
+                <button
+                  className="text-xs text-accent disabled:opacity-40"
+                  onClick={() => resendInvite(m)}
+                  disabled={resendingId === m.id}
+                >
+                  {resendingId === m.id ? 'Resending…' : 'Resend'}
+                </button>
+              )}
               {canTouch && (
                 <button
                   className="text-xs text-red-600 disabled:opacity-40"

@@ -52,13 +52,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Supabase's invite email delivers the session as a URL hash fragment, not a PKCE `code`
-  // query param (there's no code_verifier in the invitee's browser to redeem one, since they
-  // never initiated the request) - /auth/callback only handles the PKCE flow, so it always
-  // fell through to its /login fallback for invites specifically. /accept-invite is a
-  // dedicated client-side page that lets the browser client pick up the hash fragment itself,
-  // and doubles as the "set your password" step invited users otherwise never get (without it
-  // they'd have no way to log back in once their initial invite session expires).
+  // /accept-invite (not /auth/callback) is where the invite link lands - see that page for why.
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${origin}/accept-invite`,
   })
@@ -67,13 +61,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: inviteError?.message ?? 'Invite failed' }, { status: 500 })
   }
 
+  // Starts 'invited', not 'active' - flips to 'active' (via the accept_own_invite RPC) only once
+  // they actually finish setup on /accept-invite, so a pending invite doesn't consume a seat or
+  // show up in member pickers until someone is really using it. joined_at is set at that point too.
   const { error: memberError } = await admin.from('org_members').insert({
     org_id: orgId,
     user_id: invited.user.id,
     role: invitedRole,
-    status: 'active',
+    status: 'invited',
     invited_email: email,
-    joined_at: new Date().toISOString(),
   })
 
   if (memberError) {

@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Logo from '@/components/Logo'
+
+const KNOWN_OTP_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -18,49 +20,53 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
+type Status = 'idle' | 'verifying' | 'ready' | 'invalid'
+
 export default function AcceptInvitePage() {
   const router = useRouter()
-  const [checking, setChecking] = useState(true)
+  const [status, setStatus] = useState<Status>('idle')
   const [email, setEmail] = useState<string | null>(null)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    // Supabase's invite link can deliver the session in more than one shape depending on flow
-    // type/template config - a PKCE `?code=`, a `?token_hash=&type=` pair (the newer confirm-link
-    // style), or plain hash-fragment tokens the browser client auto-detects on load. Handling
-    // only one of these silently showed "invalid or expired" even when Supabase's own Auth logs
-    // confirmed the /verify call and Login had already succeeded server-side - the session was
-    // real, this page just wasn't picking it up. This all has to run client-side (hash fragments
-    // never reach the server), which is why the route bypasses the server-side auth check
-    // entirely (see PUBLIC_PATHS in lib/supabase/middleware.ts) rather than being a normal page.
+  // Verification only ever runs from this explicit click, never on page load. Email security
+  // scanners (Gmail, Outlook Safe Links, Apple Mail Privacy Protection, etc.) automatically
+  // GET-fetch links in emails to scan them - if this page auto-verified on mount, that scan
+  // alone would burn the single-use invite token before the person ever saw the page, so every
+  // real click landed on an already-consumed link. Confirmed via Supabase's own Auth logs: two
+  // /verify calls at the identical second, one "request completed" and one "invalid or has
+  // expired" - a scanner and the real click racing for the same token. Gating verification
+  // behind a manual button press means the scanner's GET is harmless (nothing to verify yet).
+  async function acceptInvite() {
+    setStatus('verifying')
     const supabase = createClient()
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code')
+    const tokenHash = url.searchParams.get('token_hash')
+    const otpType = url.searchParams.get('type')
 
-    async function resolveSession() {
-      const url = new URL(window.location.href)
-      const code = url.searchParams.get('code')
-      const tokenHash = url.searchParams.get('token_hash')
-      const otpType = url.searchParams.get('type')
-      const knownOtpTypes = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const
+    let sessionEmail: string | null = null
 
-      if (code) {
-        await supabase.auth.exchangeCodeForSession(code)
-      } else if (tokenHash && otpType && (knownOtpTypes as readonly string[]).includes(otpType)) {
-        await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType as (typeof knownOtpTypes)[number] })
-      }
-
-      if (code || tokenHash) window.history.replaceState(null, '', url.pathname)
-
+    if (code) {
+      const { data } = await supabase.auth.exchangeCodeForSession(code)
+      sessionEmail = data.session?.user?.email ?? null
+    } else if (tokenHash && otpType && (KNOWN_OTP_TYPES as readonly string[]).includes(otpType)) {
+      const { data } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType as (typeof KNOWN_OTP_TYPES)[number] })
+      sessionEmail = data.session?.user?.email ?? null
+    } else {
+      // Fallback for the old-style link format (hash-fragment tokens the browser client
+      // auto-detects), in case an email sent before this change is still being used.
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      setEmail(session?.user?.email ?? null)
-      setChecking(false)
+      sessionEmail = session?.user?.email ?? null
     }
 
-    resolveSession()
-  }, [])
+    window.history.replaceState(null, '', url.pathname)
+    setEmail(sessionEmail)
+    setStatus(sessionEmail ? 'ready' : 'invalid')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -75,24 +81,41 @@ export default function AcceptInvitePage() {
     setSaving(true)
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
-    setSaving(false)
     if (error) {
+      setSaving(false)
       toast.error(error.message)
       return
     }
+    // Flips this user's org_members row from 'invited' to 'active' now that setup is actually
+    // complete - before this, they didn't count against the org's seat limit or show up in
+    // member pickers.
+    await supabase.rpc('accept_own_invite')
+    setSaving(false)
     router.push('/dashboard')
     router.refresh()
   }
 
-  if (checking) {
+  if (status === 'idle') {
     return (
       <Shell>
-        <p className="text-sm text-sage text-center">Loading…</p>
+        <h1 className="text-xl font-semibold text-center">You&apos;ve been invited to Verdolo</h1>
+        <p className="text-sm text-sage text-center">Click below to accept your invite and set up your account.</p>
+        <Button variant="primary" onClick={acceptInvite} className="w-full">
+          Accept invite
+        </Button>
       </Shell>
     )
   }
 
-  if (!email) {
+  if (status === 'verifying') {
+    return (
+      <Shell>
+        <p className="text-sm text-sage text-center">Verifying…</p>
+      </Shell>
+    )
+  }
+
+  if (status === 'invalid' || !email) {
     return (
       <Shell>
         <h1 className="text-xl font-semibold text-center">This invite link is invalid or has expired</h1>

@@ -23,7 +23,7 @@ export default async function TeamPage() {
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-medium text-sage">Members</h2>
-        <MembersList members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
+        <MembersList orgId={orgId} members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
       </section>
 
       <InviteForm orgId={orgId} canInviteOwner={role === 'owner'} />
