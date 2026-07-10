@@ -36,25 +36,23 @@ export async function getAiCreditStatus(orgId: string) {
   return { tierName: tier.name, limit: tier.limit, used, remaining: Math.max(0, tier.limit - used) }
 }
 
-/** Call before every AI generation. Consumes one credit and returns whether the org is under its monthly limit. */
+/**
+ * Call before every AI generation. Consumes one credit and returns whether the org is under its
+ * monthly limit. The check-and-increment runs in a single row-locked Postgres function
+ * (consume_ai_credit, migration 0050) so concurrent requests can't race past the cap - the tier
+ * limit is still computed here because it depends on the live seat count.
+ */
 export async function checkAndConsumeAiCredit(orgId: string): Promise<{ allowed: boolean; tierName: string; limit: number; used: number }> {
   const admin = createAdminClient()
-  const [{ data: org }, seatCount] = await Promise.all([
-    admin.from('orgs').select('ai_credits_used, ai_credits_reset_at').eq('id', orgId).single(),
-    activeSeatCount(orgId),
-  ])
+  const seatCount = await activeSeatCount(orgId)
   const tier = tierForSeatCount(seatCount)
-  const resetting = !org || periodHasElapsed(org.ai_credits_reset_at)
-  const used = resetting ? 0 : org.ai_credits_used
 
-  if (used >= tier.limit) {
-    return { allowed: false, tierName: tier.name, limit: tier.limit, used }
+  const { data, error } = await admin.rpc('consume_ai_credit', { p_org_id: orgId, p_limit: tier.limit })
+  const row = Array.isArray(data) ? data[0] : data
+  if (error || !row) {
+    // Fail closed: if the atomic consume can't run, don't hand out a free (uncounted) generation.
+    return { allowed: false, tierName: tier.name, limit: tier.limit, used: tier.limit }
   }
 
-  await admin
-    .from('orgs')
-    .update({ ai_credits_used: used + 1, ai_credits_reset_at: resetting ? new Date().toISOString() : org!.ai_credits_reset_at })
-    .eq('id', orgId)
-
-  return { allowed: true, tierName: tier.name, limit: tier.limit, used: used + 1 }
+  return { allowed: row.allowed === true, tierName: tier.name, limit: tier.limit, used: row.used }
 }

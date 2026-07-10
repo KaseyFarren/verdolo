@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripe, LIFETIME_EXTRA_SEAT_PRICE_ID } from '@/lib/stripe'
+import { apiError } from '@/lib/apiError'
 
 export async function POST(request: Request) {
   const { orgId, seats } = await request.json()
@@ -74,8 +75,7 @@ export async function POST(request: Request) {
       }
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe update failed'
-    return NextResponse.json({ error: message }, { status: 502 })
+    return apiError('Could not update your seats with the payment provider', 502, err)
   }
 
   await admin.from('orgs').update({ seats_purchased: seats }).eq('id', orgId)

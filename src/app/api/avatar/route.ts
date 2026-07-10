@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { apiError } from '@/lib/apiError'
+
+// Identify the real image type from the file's magic bytes, so a client can't smuggle other
+// content in by spoofing the multipart Content-Type. Returns null if it's not one we allow.
+function sniffImageType(buf: Buffer): 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | null {
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
+  if (buf.length >= 6 && (buf.subarray(0, 6).toString('ascii') === 'GIF87a' || buf.subarray(0, 6).toString('ascii') === 'GIF89a')) return 'image/gif'
+  if (buf.length >= 12 && buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp'
+  return null
+}
 
 // Profile-picture upload runs server-side with the service-role key, which bypasses storage
 // RLS. The avatars-bucket RLS insert policy has repeatedly failed to land in prod (see
@@ -26,12 +37,17 @@ export async function POST(request: Request) {
   if (!ALLOWED.has(file.type)) return NextResponse.json({ error: 'Please choose a PNG, JPG, WebP or GIF image' }, { status: 400 })
   if (file.size > MAX_AVATAR_BYTES) return NextResponse.json({ error: 'Image must be under 3MB' }, { status: 400 })
 
+  const buffer = Buffer.from(await file.arrayBuffer())
+  // Trust the file's own bytes, not the client-supplied Content-Type, for what actually gets
+  // stored and served from the public avatars bucket.
+  const sniffed = sniffImageType(buffer)
+  if (!sniffed) return NextResponse.json({ error: 'That file is not a valid PNG, JPG, WebP or GIF image' }, { status: 400 })
+
   const admin = createAdminClient()
   // Folder is the authenticated user's id - not anything the client sent.
-  const path = `${user.id}/avatar.${EXT[file.type]}`
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const { error: upErr } = await admin.storage.from('avatars').upload(path, buffer, { upsert: true, contentType: file.type })
-  if (upErr) return NextResponse.json({ error: `Upload failed: ${upErr.message}` }, { status: 500 })
+  const path = `${user.id}/avatar.${EXT[sniffed]}`
+  const { error: upErr } = await admin.storage.from('avatars').upload(path, buffer, { upsert: true, contentType: sniffed })
+  if (upErr) return apiError('Could not upload your picture', 500, upErr)
 
   const { data: pub } = admin.storage.from('avatars').getPublicUrl(path)
   // Cache-bust so the new picture shows immediately even though the storage path is stable.

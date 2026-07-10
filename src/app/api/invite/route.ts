@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { apiError } from '@/lib/apiError'
 
 export async function POST(request: Request) {
   const { origin } = new URL(request.url)
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   })
 
   if (inviteError || !invited.user) {
-    return NextResponse.json({ error: inviteError?.message ?? 'Invite failed' }, { status: 500 })
+    return apiError('Could not send the invite', 500, inviteError)
   }
 
   // Starts 'invited', not 'active' - flips to 'active' (via the accept_own_invite RPC) only once
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   })
 
   if (memberError) {
-    return NextResponse.json({ error: memberError.message }, { status: 500 })
+    return apiError('Could not add the teammate', 500, memberError)
   }
 
   return NextResponse.json({ ok: true })

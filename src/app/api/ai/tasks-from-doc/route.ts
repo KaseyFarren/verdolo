@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
+import { rateLimit } from '@/lib/rateLimit'
 import { buildTasksFromDocPrompt, callClaude, extractText } from '@/lib/ai'
 import { todayKey } from '@/lib/agency'
 
@@ -35,6 +36,11 @@ export async function POST(request: Request) {
   if (typeof text === 'string' && text.length > MAX_TEXT_CHARS) return NextResponse.json({ error: 'Document is too long' }, { status: 400 })
   // base64 is ~4/3 the size of the original file
   if (typeof pdfBase64 === 'string' && pdfBase64.length > (MAX_PDF_BYTES * 4) / 3) return NextResponse.json({ error: 'PDF is too large (20MB max)' }, { status: 400 })
+
+  // Burst guard on top of the monthly credit cap - stops a member scripting a flood of calls.
+  if (!(await rateLimit(`ai:${orgId}`, 20, 60))) {
+    return NextResponse.json({ error: 'Too many requests - please slow down and try again in a moment' }, { status: 429 })
+  }
 
   const credit = await checkAndConsumeAiCredit(orgId)
   if (!credit.allowed) {

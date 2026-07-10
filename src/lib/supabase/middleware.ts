@@ -4,6 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/create-account', '/accept-invite']
 
 export async function updateSession(request: NextRequest) {
+  // Strip any client-supplied identity headers before we (maybe) set our own from the verified
+  // session. Downstream Server Components trust x-user-id as the authenticated user, so an
+  // inbound copy must never survive - this is the trust boundary for that shortcut.
+  request.headers.delete('x-user-id')
+  request.headers.delete('x-user-email')
+
   let pendingCookies: { name: string; value: string; options?: CookieOptions }[] = []
 
   const supabase = createServerClient(

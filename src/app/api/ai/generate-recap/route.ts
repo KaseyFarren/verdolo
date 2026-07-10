@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
+import { rateLimit } from '@/lib/rateLimit'
 import { buildRecapPrompt, callClaude, extractText } from '@/lib/ai'
 import { getHealthScore, getStage, getWeekAnchor, todayKey } from '@/lib/agency'
 import { addDays } from '@/lib/period'
@@ -49,6 +50,11 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'AI generation is not configured yet' }, { status: 500 })
+
+  // Burst guard on top of the monthly credit cap - stops a member scripting a flood of calls.
+  if (!(await rateLimit(`ai:${orgId}`, 20, 60))) {
+    return NextResponse.json({ error: 'Too many requests - please slow down and try again in a moment' }, { status: 429 })
+  }
 
   const credit = await checkAndConsumeAiCredit(orgId)
   if (!credit.allowed) {
