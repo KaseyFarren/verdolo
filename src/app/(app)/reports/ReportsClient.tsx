@@ -285,7 +285,9 @@ export default function ReportsClient({
         // An effective rate needs a denominator - a month with retainer revenue but zero
         // logged hours has no *rate* to report, not a rate of $0 (retainer_cents is always
         // "current", so every month trivially has revenue even before a client was active).
-        blendedRateCents: effectiveRate(totalRevenue, totalHours) ?? 0,
+        // null (not 0) for a month with no logged hours so the trend line gaps over it instead
+        // of diving to the axis floor and reading as a real, terrible rate.
+        blendedRateCents: effectiveRate(totalRevenue, totalHours),
         hasData: effectiveRate(totalRevenue, totalHours) !== null,
       }
     })
@@ -561,19 +563,20 @@ export default function ReportsClient({
 
       {view === 'profitability' && (
         <div>
-          <div className="mb-6 flex items-center gap-1 rounded-full border border-ink/10 bg-white shadow-md w-fit px-1 py-1">
+          <div className="mb-6 flex items-center gap-1 w-fit">
             <button
               type="button"
-              className="w-7 h-7 rounded-full text-sage hover:text-ink hover:bg-sand/60 transition-colors"
+              className="w-8 h-8 rounded-full border border-ink/10 bg-white shadow-md text-sage hover:text-ink hover:bg-sand/60 transition-colors"
               onClick={() => onMonthChange(shiftMonth(pMonth, -1))}
               aria-label="Previous month"
             >
               ‹
             </button>
-            <span className="px-2 text-sm font-medium min-w-[8rem] text-center">{monthLabel(`${pMonth}-01`)}</span>
+            {/* Click the month itself to jump to any month/year, not just step one at a time. */}
+            <MonthPicker value={pMonth} onChange={onMonthChange} className="w-44" />
             <button
               type="button"
-              className="w-7 h-7 rounded-full text-sage hover:text-ink hover:bg-sand/60 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              className="w-8 h-8 rounded-full border border-ink/10 bg-white shadow-md text-sage hover:text-ink hover:bg-sand/60 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               onClick={() => onMonthChange(shiftMonth(pMonth, 1))}
               disabled={pMonth >= todayKey().slice(0, 7)}
               aria-label="Next month"
@@ -614,7 +617,7 @@ export default function ReportsClient({
                       values: monthlyTrend.map((m) => m.blendedRateCents),
                       pointColors:
                         targetRateCents > 0
-                          ? monthlyTrend.map((m) => (!m.hasData ? '#c3c2b7' : m.blendedRateCents >= targetRateCents ? '#2a78d6' : '#e05070'))
+                          ? monthlyTrend.map((m) => (!m.hasData || m.blendedRateCents === null ? '#c3c2b7' : m.blendedRateCents >= targetRateCents ? '#2a78d6' : '#e05070'))
                           : undefined,
                     },
                   ]}

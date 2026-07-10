@@ -644,8 +644,10 @@ export default function DashboardClient({
                   </div>
                 )}
               </div>
-              {sent && c.awaiting_reply && (
-                <div className="flex items-center justify-between bg-amber-100/70 border border-amber-300 rounded-lg px-2.5 py-1.5 mt-1">
+              {/* Gated on awaiting_reply alone, not `sent` - awaiting_reply persists across days, so
+                  the day after you send (when sent flips back to false) you can still mark "Got reply". */}
+              {c.awaiting_reply && (
+                <div className={`flex items-center justify-between bg-amber-100/70 border border-amber-300 rounded-lg px-2.5 py-1.5 ${sent ? 'mt-1' : 'mb-2'}`}>
                   <span className="text-xs text-amber-800">⏳ Awaiting reply</span>
                   <button className="text-xs text-green font-medium" onClick={() => clearAwaitingReply(c)}>
                     Got reply

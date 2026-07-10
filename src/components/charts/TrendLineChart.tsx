@@ -6,7 +6,9 @@ export type TrendSeries = {
   key: string
   label: string
   color: string
-  values: number[]
+  // A null value = "no data that month": the line breaks around it and no dot is drawn,
+  // instead of plunging to zero and reading as a real (bad) result.
+  values: (number | null)[]
   // Per-point marker color override (e.g. above/below a target) - the connecting line still
   // uses `color`, only the dots pick this up. Same length as `values` when provided.
   pointColors?: string[]
@@ -56,7 +58,9 @@ export default function TrendLineChart({
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
-  const allValues = [...series.flatMap((s) => s.values), ...(referenceLine ? [referenceLine.value] : [])]
+  const allValues = [...series.flatMap((s) => s.values), ...(referenceLine ? [referenceLine.value] : [])].filter(
+    (v): v is number => v !== null,
+  )
   const yMin = Math.min(0, ...allValues)
   const yMax = Math.max(1, ...allValues)
   const ticks = niceTicks(yMin, yMax, 4)
@@ -151,11 +155,26 @@ export default function TrendLineChart({
         )}
 
         {series.map((s) => {
-          const points = s.values.map((v, i) => `${xAt(i)},${yAt(v)}`).join(' ')
+          // Break the line into runs of consecutive non-null points so no-data months leave a
+          // gap instead of a segment diving to zero.
+          const segments: string[] = []
+          let run: string[] = []
+          s.values.forEach((v, i) => {
+            if (v === null) {
+              if (run.length) segments.push(run.join(' '))
+              run = []
+            } else {
+              run.push(`${xAt(i)},${yAt(v)}`)
+            }
+          })
+          if (run.length) segments.push(run.join(' '))
           return (
             <g key={s.key}>
-              <polyline points={points} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              {segments.map((points, si) => (
+                <polyline key={si} points={points} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              ))}
               {s.values.map((v, i) => {
+                if (v === null) return null
                 const dotColor = s.pointColors?.[i] ?? s.color
                 return (
                   <g key={i}>
@@ -170,17 +189,27 @@ export default function TrendLineChart({
 
         {/* End labels, nudged apart top-to-bottom so converging lines don't overlap (marks-and-anatomy.md). */}
         {(() => {
-          const lastIdx = months.length - 1
           const MIN_GAP = 13
           const labels = series
-            .map((s) => ({ key: s.key, text: formatValue(s.values[lastIdx]), y: yAt(s.values[lastIdx]) }))
+            // Anchor each end label to that series' last month that actually has data, so a
+            // trailing no-data month doesn't drop the label to the axis floor (or hide it).
+            .map((s) => {
+              let idx = -1
+              for (let i = s.values.length - 1; i >= 0; i--) {
+                if (s.values[i] !== null) { idx = i; break }
+              }
+              return idx === -1 ? null : { key: s.key, text: formatValue(s.values[idx] as number), y: yAt(s.values[idx] as number) }
+            })
+            .filter((l): l is { key: string; text: string; y: number } => l !== null)
             .sort((a, b) => a.y - b.y)
           for (let i = 1; i < labels.length; i++) {
             if (labels[i].y - labels[i - 1].y < MIN_GAP) labels[i].y = labels[i - 1].y + MIN_GAP
           }
           const byKey = new Map(labels.map((l) => [l.key, l]))
+          const lastIdx = months.length - 1
           return series.map((s) => {
-            const label = byKey.get(s.key)!
+            const label = byKey.get(s.key)
+            if (!label) return null
             return (
               <text key={s.key} x={xAt(lastIdx) + 8} y={label.y} dominantBaseline="middle" fontSize={11} fontWeight={600} fill="#1a1a17">
                 {label.text}
@@ -206,7 +235,7 @@ export default function TrendLineChart({
                 <span className="inline-block w-2.5 h-0.5 rounded-full" style={{ background: s.pointColors?.[hoverIdx] ?? s.color }} />
                 {s.label}
               </span>
-              <span className="font-semibold text-ink ml-3">{formatValue(s.values[hoverIdx])}</span>
+              <span className="font-semibold text-ink ml-3">{s.values[hoverIdx] === null ? 'No data' : formatValue(s.values[hoverIdx] as number)}</span>
             </div>
           ))}
           {referenceLine && (

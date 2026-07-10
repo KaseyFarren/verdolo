@@ -246,10 +246,8 @@ export default function RevenueClient({
   // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period -
   // a retainer is "at risk" regardless of which week you happen to be looking at.
   const mrrCents = useMemo(() => mrrCentsTotal(clients), [clients])
-  const atRiskCents = useMemo(
-    () => clients.filter((c) => getStage(c) === 'At Risk').reduce((s, c) => s + (c.retainer_cents || 0), 0),
-    [clients]
-  )
+  const atRiskClients = useMemo(() => clients.filter((c) => getStage(c) === 'At Risk'), [clients])
+  const atRiskCents = useMemo(() => atRiskClients.reduce((s, c) => s + (c.retainer_cents || 0), 0), [atRiskClients])
   const utilization = useMemo(() => {
     const totalSeconds = entries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
     const billableSeconds = entries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0)
@@ -357,8 +355,13 @@ export default function RevenueClient({
           </div>
         )}
         {atRiskCents > 0 && (
-          <div className="rounded-lg px-3 py-1.5 text-xs bg-red-100">
-            <span className="font-semibold text-red-600">{fmtMoney(atRiskCents)}</span> <span className="text-red-600">MRR at risk</span>
+          <div className="rounded-lg px-3 py-1.5 text-xs bg-red-100 inline-flex items-center">
+            <span className="font-semibold text-red-600">{fmtMoney(atRiskCents)}</span>&nbsp;<span className="text-red-600">MRR at risk</span>
+            <InfoTooltip
+              content={`Combined monthly retainer of ${atRiskClients.length} client${atRiskClients.length === 1 ? '' : 's'} in the At Risk stage${
+                atRiskClients.length ? `: ${atRiskClients.map((c) => c.name).join(', ')}` : ''
+              }. This retainer walks if they churn - reach out, then move them out of At Risk in Clients to clear it.`}
+            />
           </div>
         )}
       </div>
@@ -395,6 +398,12 @@ export default function RevenueClient({
                       <span className="text-sage w-16 text-right">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr</span>
                     )}
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
+                    <span
+                      className={`text-sage/60 text-xs shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                      title={expanded ? 'Hide billables' : 'Add billables'}
+                    >
+                      ▾
+                    </span>
                   </span>
                 </button>
                 {expanded && (

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { todayKey } from '@/lib/agency'
+import { markSelfAssigned } from '@/lib/selfNotify'
 import Button from '@/components/ui/Button'
 
 export default function QuickCapture({ orgId, userId }: { orgId: string; userId: string }) {
@@ -31,7 +32,11 @@ export default function QuickCapture({ orgId, userId }: { orgId: string; userId:
     if (!trimmed) return
     setSubmitting(true)
     const supabase = createClient()
+    // Quick-captured tasks are always assigned to you - don't ping yourself for them.
+    const id = crypto.randomUUID()
+    markSelfAssigned(id)
     const { error } = await supabase.from('tasks').insert({
+      id,
       org_id: orgId,
       title: trimmed,
       due_date: todayKey(),

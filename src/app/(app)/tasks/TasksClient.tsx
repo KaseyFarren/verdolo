@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
+import { markSelfAssigned } from '@/lib/selfNotify'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import CustomSelect, { type SelectGroup, type SelectOption } from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -207,9 +208,14 @@ export default function TasksClient({
   async function addTask() {
     if (!taskForm.title.trim()) return
     const assigneeIds = taskForm.assigneeIds.length ? taskForm.assigneeIds : taskMode === 'quick' ? [userId] : []
+    // Supply the id so we can flag a self-assignment before the realtime INSERT echoes back,
+    // otherwise NotificationSound could ping you for a task you created yourself.
+    const id = crypto.randomUUID()
+    if (assigneeIds.includes(userId)) markSelfAssigned(id)
     const { data } = await supabase
       .from('tasks')
       .insert({
+        id,
         org_id: orgId,
         title: taskForm.title,
         client_id: taskForm.clientId || null,
@@ -231,9 +237,12 @@ export default function TasksClient({
   async function addSubtask(parentId: string) {
     if (!subtaskForm.title.trim()) return
     const assigneeIds = subtaskForm.assigneeIds
+    const id = crypto.randomUUID()
+    if (assigneeIds.includes(userId)) markSelfAssigned(id)
     const { data } = await supabase
       .from('tasks')
       .insert({
+        id,
         org_id: orgId,
         title: subtaskForm.title,
         client_id: subtaskForm.clientId || null,
@@ -254,6 +263,10 @@ export default function TasksClient({
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
+    // Reassigning a task to yourself shouldn't ping you - flag it before the realtime UPDATE echoes.
+    if ((Array.isArray(fields.assignee_ids) && (fields.assignee_ids as string[]).includes(userId)) || fields.assigned_to === userId) {
+      markSelfAssigned(id)
+    }
     const { data } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
     if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
@@ -280,9 +293,15 @@ export default function TasksClient({
     // deleting a parent cascades to its subtasks in the DB (on delete cascade); mirror that in
     // the optimistic local state and Undo path so subtask rows don't linger until the next fetch
     const removedSubtasks = tasks.filter((t) => t.parent_task_id === id)
+    // A generated instance (recurring / default / auto) can't be hard-deleted - the generator
+    // recreates it on the next load, so the "deleted" task reappears. Mark it skipped instead:
+    // it's hidden everywhere, won't count as completed (done stays false), and the surviving row
+    // blocks regeneration via the unique constraint. One-off tasks are still truly deleted.
+    const isGenerated = !!(removed.recurring_id || removed.is_auto || removed.default_template_id)
     setTasks((prev) => prev.filter((t) => t.id !== id && t.parent_task_id !== id))
     const timeoutId = setTimeout(async () => {
-      await supabase.from('tasks').delete().eq('id', id)
+      if (isGenerated) await supabase.from('tasks').update({ skipped: true }).eq('id', id)
+      else await supabase.from('tasks').delete().eq('id', id)
     }, 5000)
     toast('Task deleted', {
       action: {
@@ -331,7 +350,12 @@ export default function TasksClient({
     if (fresh) setTasks(fresh as Task[])
   }
   async function updateRecurring(id: string, fields: Record<string, unknown>) {
-    const { data } = await supabase.from('recurring_templates').update(fields).eq('id', id).select().single()
+    // client_id / assigned_to are uuid columns - Postgres rejects '' (the "No client" /
+    // "Unassigned" option value), so coerce empty strings to null before writing.
+    const normalized = { ...fields }
+    if (normalized.client_id === '') normalized.client_id = null
+    if (normalized.assigned_to === '') normalized.assigned_to = null
+    const { data } = await supabase.from('recurring_templates').update(normalized).eq('id', id).select().single()
     if (data) setRecurring((prev) => prev.map((r) => (r.id === id ? (data as Recurring) : r)))
     await supabase.from('tasks').delete().eq('recurring_id', id).eq('done', false).gte('due_date', today)
     if (data && !(data as Recurring).paused) {
@@ -921,6 +945,16 @@ export default function TasksClient({
                             label: p,
                           }))}
                         />
+                        <CustomSelect
+                          value={(editRecurringForm.client_id as string) || ''}
+                          onChange={(v) => setEditRecurringForm((f) => ({ ...f, client_id: v }))}
+                          options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+                        />
+                        <CustomSelect
+                          value={(editRecurringForm.assigned_to as string) || ''}
+                          onChange={(v) => setEditRecurringForm((f) => ({ ...f, assigned_to: v }))}
+                          options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+                        />
                       </div>
                       <div className="flex gap-2">
                         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
@@ -956,6 +990,8 @@ export default function TasksClient({
                             title: r.title,
                             priority: r.priority,
                             frequency: r.frequency,
+                            client_id: r.client_id || '',
+                            assigned_to: r.assigned_to || '',
                           })
                         }}
                       >

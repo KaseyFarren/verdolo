@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { wasSelfAssigned } from '@/lib/selfNotify'
 
 // Plays a short ping when the current user is @mentioned in a message or assigned a task -
 // mounted once in AppShell (persistent layout) so it fires regardless of which page is open.
@@ -32,13 +33,14 @@ export default function NotificationSound({ orgId, userId }: { orgId: string; us
         if (incoming.sender_id !== userId && incoming.mentioned_user_ids?.includes(userId)) ping()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `org_id=eq.${orgId}` }, (payload) => {
-        const incoming = payload.new as { assigned_to: string | null; is_auto: boolean }
-        if (incoming.assigned_to === userId && !incoming.is_auto) ping()
+        const incoming = payload.new as { id: string; assigned_to: string | null; is_auto: boolean }
+        // Don't ping when you assign a task to yourself - only when someone else does.
+        if (incoming.assigned_to === userId && !incoming.is_auto && !wasSelfAssigned(incoming.id)) ping()
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `org_id=eq.${orgId}` }, (payload) => {
-        const incoming = payload.new as { assigned_to: string | null; is_auto: boolean }
+        const incoming = payload.new as { id: string; assigned_to: string | null; is_auto: boolean }
         const previous = payload.old as { assigned_to: string | null }
-        if (incoming.assigned_to === userId && previous.assigned_to !== userId && !incoming.is_auto) ping()
+        if (incoming.assigned_to === userId && previous.assigned_to !== userId && !incoming.is_auto && !wasSelfAssigned(incoming.id)) ping()
       })
       .subscribe()
 
