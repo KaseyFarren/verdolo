@@ -8,11 +8,17 @@ export default function DatePicker({
   onChange,
   placeholder = 'Pick a date…',
   className = '',
+  variant = 'pill',
+  allowClear = true,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   className?: string
+  /** 'pill' (default) is the filled pill button used in toolbars/forms. 'plain' is a
+   * borderless, text-like trigger for inline-editable table cells (Tasks list row cells). */
+  variant?: 'pill' | 'plain'
+  allowClear?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [viewMonth, setViewMonth] = useState((value || todayKey()).slice(0, 7))
@@ -64,10 +70,14 @@ export default function DatePicker({
       <button
         type="button"
         onClick={toggleOpen}
-        className="w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left"
+        className={
+          variant === 'plain'
+            ? 'flex items-center gap-1 rounded px-1 -mx-1 text-left hover:bg-sand/60'
+            : 'w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left'
+        }
       >
         <span className={`truncate ${value ? '' : 'text-sage'}`}>{value ? formatDate(value) : placeholder}</span>
-        <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-64 rounded-xl bg-white shadow-lg border border-ink/10 p-3">
@@ -114,7 +124,7 @@ export default function DatePicker({
                 )
               })}
           </div>
-          {value && (
+          {value && allowClear && (
             <button type="button" className="mt-2 text-xs text-sage hover:text-ink" onClick={() => select('')}>
               Clear
             </button>

@@ -16,6 +16,14 @@ export function stageColor(stage: string) {
   return '#2db87a'
 }
 
+/** Single source of truth for priority text color - red/yellow/green - used anywhere a task's
+ * priority is displayed (Tasks list, Dashboard, etc.) so a change here applies everywhere. */
+export function priorityColor(priority: string) {
+  if (priority === 'High') return 'text-red-600'
+  if (priority === 'Medium') return 'text-yellow-600'
+  return 'text-green'
+}
+
 export function getStage(client: { stage?: string | null; status?: string | null }): Stage {
   return (client.stage as Stage) || (client.status === 'inactive' ? 'Churned' : 'Active')
 }

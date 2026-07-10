@@ -114,6 +114,7 @@ export default function TasksClient({
   const [recurring, setRecurring] = useState<Recurring[]>(initialRecurring)
   const [defaults, setDefaults] = useState<Default[]>(initialDefaults)
   const [filter, setFilter] = useState('all')
+  const [sortBy, setSortBy] = useState<'due' | 'priority' | 'title' | 'client'>('due')
   const [selectedDate, setSelectedDate] = useState('')
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
   const [showAddTask, setShowAddTask] = useState(false)
@@ -434,9 +435,8 @@ export default function TasksClient({
   }, [tasks])
 
   // captures the assignee/client dimension of the current filter selection only - the
-  // date/done-status dimension (today/overdue/completed/all) is handled separately by
-  // visibleBuckets() and tasksForDate() below, since those two dimensions compose independently
-  // (e.g. a pinned date + an assignee filter) in a way the old single-bucket-per-chip model never needed to
+  // date/done-status dimension (today/overdue/completed/all) is handled separately below,
+  // since those two dimensions compose independently (e.g. a pinned date + an assignee filter)
   function matchesFilter(t: Task): boolean {
     if (filter === 'assignee:mine') return effectiveAssignees(t).includes(userId)
     if (filter === 'assignee:unassigned') return effectiveAssignees(t).length === 0
@@ -446,75 +446,38 @@ export default function TasksClient({
   }
 
   function tasksForDate(date: string) {
-    return sortTasks(visible.filter((t) => t.due_date === date && matchesFilter(t) && (filter !== 'completed' || t.done)))
+    return visible.filter((t) => t.due_date === date && matchesFilter(t) && (filter !== 'completed' || t.done))
   }
 
-  function visibleBuckets(): { label: string; items: Task[] }[] {
-    if (selectedDate)
-      return [
-        {
-          label: `Tasks for ${formatDate(selectedDate)}`,
-          items: tasksForDate(selectedDate),
-        },
-      ]
-    if (filter === 'overdue')
-      return [
-        {
-          label: 'Overdue',
-          items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)),
-        },
-      ]
-    if (filter === 'today')
-      return [
-        {
-          label: 'Today',
-          items: sortTasks(visible.filter((t) => t.due_date === today && !t.done)),
-        },
-      ]
-    if (filter === 'completed')
-      return [
-        {
-          label: 'Completed',
-          items: [...visible.filter((t) => t.done)].sort((a, b) => b.due_date.localeCompare(a.due_date)),
-        },
-      ]
-    if (filter.startsWith('assignee:')) {
-      const key = filter.slice('assignee:'.length)
-      const label = key === 'mine' ? 'Mine' : key === 'unassigned' ? 'Unassigned' : memberEmail(key)
-      const f = sortTasks(visible.filter((t) => matchesFilter(t))).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
-      return [{ label, items: f }]
-    }
-    if (filter !== 'all') {
-      const f = sortTasks(visible.filter((t) => matchesFilter(t))).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
-      return [{ label: clientName(filter), items: f }]
-    }
-    const tomorrow = getOffsetDate(1)
-    const yesterday = getOffsetDate(-1)
-    return [
-      {
-        label: 'Overdue',
-        items: sortTasks(visible.filter((t) => t.due_date < today && !t.done)),
-      },
-      {
-        label: 'Yesterday',
-        items: sortTasks(visible.filter((t) => t.due_date === yesterday && t.done)),
-      },
-      {
-        label: 'Today',
-        items: sortTasks(visible.filter((t) => t.due_date === today)),
-      },
-      {
-        label: 'Tomorrow',
-        items: sortTasks(visible.filter((t) => t.due_date === tomorrow)),
-      },
-      {
-        label: 'Upcoming',
-        items: sortTasks(visible.filter((t) => t.due_date > tomorrow)),
-      },
-    ].filter((b) => b.items.length > 0)
+  // No more date-bucket section headers (Overdue/Today/Tomorrow/...) - overdue tasks get an
+  // inline warning icon on their row instead (see TaskRow), and ordering is controlled by the
+  // Sort by dropdown. Completed tasks always sort to the bottom unless the Done filter is picked.
+  function applySort(items: Task[]): Task[] {
+    const sorted = [...items]
+    if (sortBy === 'due') sorted.sort((a, b) => a.due_date.localeCompare(b.due_date) || a.title.localeCompare(b.title))
+    else if (sortBy === 'priority') return applyDoneLast(sortTasks(sorted))
+    else if (sortBy === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title))
+    else if (sortBy === 'client') sorted.sort((a, b) => clientName(a.client_id).localeCompare(clientName(b.client_id)) || a.title.localeCompare(b.title))
+    return applyDoneLast(sorted)
+  }
+  // stable sort - only reorders across the done/not-done boundary, preserves the primary sort's
+  // relative order within each group
+  function applyDoneLast(items: Task[]): Task[] {
+    if (filter === 'completed') return items
+    return [...items].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
   }
 
-  const buckets = visibleBuckets()
+  function filteredTasks(): Task[] {
+    let items: Task[]
+    if (selectedDate) items = tasksForDate(selectedDate)
+    else if (filter === 'overdue') items = visible.filter((t) => t.due_date < today && !t.done)
+    else if (filter === 'today') items = visible.filter((t) => t.due_date === today && !t.done)
+    else if (filter === 'completed') items = visible.filter((t) => t.done)
+    else items = visible.filter(matchesFilter)
+    return applySort(items)
+  }
+
+  const filteredList = filteredTasks()
   // members only ever fetch their own + unassigned tasks (RLS-scoped); split those apart with
   // a header so "shared/unclaimed" work reads distinctly from "assigned to me". Admins/owners
   // see everyone's tasks flat (each row already shows its assignee) and use the chips instead.
@@ -627,6 +590,13 @@ export default function TasksClient({
       : []),
   ]
   const filterSelect = <CustomSelect value={filter} onChange={setFilter} options={filterOptions} groups={filterGroups} className="w-36" />
+  const sortOptions: SelectOption[] = [
+    { value: 'due', label: 'Sort: Due date' },
+    { value: 'priority', label: 'Sort: Priority' },
+    { value: 'title', label: 'Sort: Title' },
+    { value: 'client', label: 'Sort: Client' },
+  ]
+  const sortSelect = <CustomSelect value={sortBy} onChange={(v) => setSortBy(v as typeof sortBy)} options={sortOptions} className="w-36" />
 
   const [calY, calM] = calMonth.split('-').map(Number)
   const jsMonth = calM - 1
@@ -698,6 +668,7 @@ export default function TasksClient({
             <div className="flex flex-wrap items-center gap-2">
               {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
               {(view === 'list' || view === 'calendar') && filterSelect}
+              {view === 'list' && sortSelect}
             </div>
             {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
             <div className={`flex items-center gap-2 ${headerAction.open ? 'invisible pointer-events-none' : ''}`}>
@@ -800,7 +771,7 @@ export default function TasksClient({
                     <div className="overflow-x-auto">
                       <div className={ROW_MIN_WIDTH}>
                         <TaskListHeader />
-                        <AnimatePresence initial={false}>{tasksForDate(selectedDate).map((t) => renderTaskRow(t))}</AnimatePresence>
+                        <AnimatePresence initial={false}>{applySort(tasksForDate(selectedDate)).map((t) => renderTaskRow(t))}</AnimatePresence>
                       </div>
                     </div>
                   )}
@@ -811,37 +782,33 @@ export default function TasksClient({
 
           {view === 'list' && (
             <>
-              {buckets.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
-              {buckets.length > 0 && (
-                <div className="overflow-x-auto">
-                  <div className={ROW_MIN_WIDTH}>
-                    <TaskListHeader />
-                    {buckets.map((b) => {
-                      const { mine, unassigned } = splitBucket(b.items)
-                      const pendingCount = b.items.filter((t) => !t.done).length
-                      return (
-                        <div key={b.label} className="mb-5">
-                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-ink/10">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-sage">{b.label}</div>
-                            {pendingCount > 1 && (
-                              <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(b.items)}>
-                                Complete all ({pendingCount})
-                              </button>
-                            )}
-                          </div>
-                          <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
-                          {unassigned.length > 0 && (
-                            <>
-                              <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
-                              <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
-                            </>
+              {filteredList.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
+              {filteredList.length > 0 &&
+                (() => {
+                  const { mine, unassigned } = splitBucket(filteredList)
+                  const pendingCount = filteredList.filter((t) => !t.done).length
+                  return (
+                    <div className="overflow-x-auto">
+                      <div className={ROW_MIN_WIDTH}>
+                        <div className="flex items-center justify-end mb-1">
+                          {pendingCount > 1 && (
+                            <button className="text-xs text-sage hover:text-ink transition-colors" onClick={() => completeAll(filteredList)}>
+                              Complete all ({pendingCount})
+                            </button>
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+                        <TaskListHeader />
+                        <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
+                        {unassigned.length > 0 && (
+                          <>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                            <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
             </>
           )}
 

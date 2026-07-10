@@ -4,21 +4,23 @@ import { useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import CustomSelect from '@/components/ui/CustomSelect'
 import MultiSelect from '@/components/ui/MultiSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import Avatar from '@/components/ui/Avatar'
 import IconButton from '@/components/ui/IconButton'
-import { ClockArrowIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
+import { AlertTriangleIcon, ClockArrowIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
-import { PRIORITY } from '@/lib/agency'
+import { PRIORITY, priorityColor, todayKey } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 
 // No trailing `auto` track for actions - that reserved its full intrinsic width even while
 // invisible (opacity doesn't collapse grid tracks), which forced the row wider than its
 // container on anything but a very wide window. Actions are an absolutely-positioned overlay
 // instead (see the row below), so they cost zero width until actually shown on hover.
-export const ROW_GRID_COLS = 'grid-cols-[20px_minmax(0,3fr)_90px_100px_minmax(0,1fr)] md:grid-cols-[20px_minmax(0,3fr)_110px_90px_100px_80px_minmax(0,1fr)]'
-// Below this, the row's fixed-width columns no longer fit even with client/priority hidden -
+export const ROW_GRID_COLS =
+  'grid-cols-[20px_24px_minmax(0,3fr)_90px_100px_minmax(0,1fr)] md:grid-cols-[20px_24px_minmax(0,3fr)_80px_110px_90px_100px_70px_minmax(0,1fr)]'
+// Below this, the row's fixed-width columns no longer fit even with type/client/priority hidden -
 // the row list wraps in overflow-x-auto at this width so it scrolls instead of silently clipping.
-export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[720px]'
+export const ROW_MIN_WIDTH = 'min-w-0 md:min-w-[780px]'
 
 const PLAIN_FIELD = 'bg-transparent border border-transparent rounded px-1 -mx-1 outline-none hover:border-ink/10 focus:border-ink/20 focus:bg-white'
 
@@ -26,7 +28,9 @@ export function TaskListHeader() {
   return (
     <div className={`grid ${ROW_GRID_COLS} gap-3 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold uppercase tracking-wide text-sage/70`}>
       <div />
+      <div />
       <div>Title</div>
+      <div className="hidden md:block">Type</div>
       <div className="hidden md:block">Client</div>
       <div>Assigned</div>
       <div>Due</div>
@@ -96,7 +100,8 @@ export default function TaskRow({
   const hasOpenSubtasks = !isSubtask && openSubtasks.length > 0
 
   const assigneeIds = t.assignee_ids?.length ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : []
-  const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-amber-700' : 'text-green'
+  const isOverdue = !t.done && t.due_date < todayKey()
+  const taskType = t.is_auto ? 'Default' : t.recurring_id ? 'Recurring' : ''
 
   return (
     <div>
@@ -121,6 +126,13 @@ export default function TaskRow({
         >
           {t.done && <span className="text-[10px] text-white">✓</span>}
         </button>
+
+        {!t.done &&
+          (isTimerRunning ? (
+            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} className="!p-1" />
+          ) : (
+            <IconButton label="Start timer" tone="accent" icon={<PlayIcon />} onClick={startTimer} className="!p-1" />
+          ))}
 
         <div className="flex items-center gap-1 min-w-0">
           {!isSubtask && subtasks.length > 0 && (
@@ -149,14 +161,14 @@ export default function TaskRow({
               }
             }}
           />
-          {t.is_auto && <span className="text-xs text-sage shrink-0">auto</span>}
-          {t.recurring_id && <span className="text-xs text-sage shrink-0">↻</span>}
           {isTimerRunning && (
             <span className="text-xs font-mono text-green inline-flex items-center gap-1 shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
             </span>
           )}
         </div>
+
+        <div className="hidden md:block text-xs text-sage truncate">{taskType}</div>
 
         <div className="hidden md:block text-xs">
           <CustomSelect
@@ -189,12 +201,10 @@ export default function TaskRow({
           />
         </div>
 
-        <input
-          type="date"
-          className={`text-xs text-sage ${PLAIN_FIELD}`}
-          value={t.due_date}
-          onChange={(e) => updateField('due_date', e.target.value)}
-        />
+        <div className="flex items-center gap-1 text-xs">
+          {isOverdue && <AlertTriangleIcon size={13} className="text-red-600 shrink-0" />}
+          <DatePicker variant="plain" allowClear={false} value={t.due_date} onChange={(v) => updateField('due_date', v)} className={isOverdue ? 'text-red-600 font-medium' : 'text-sage'} />
+        </div>
 
         <div className="hidden md:block text-xs">
           {!t.quick && (
@@ -203,7 +213,7 @@ export default function TaskRow({
               value={t.priority}
               onChange={(v) => updateField('priority', v)}
               options={PRIORITY.map((p) => ({ value: p, label: p }))}
-              className={`font-medium ${priorityColor}`}
+              className={`font-medium ${priorityColor(t.priority)}`}
             />
           )}
         </div>
@@ -222,19 +232,13 @@ export default function TaskRow({
         />
 
         <div
-          className={`absolute right-0 top-0 h-full flex gap-0.5 shrink-0 items-center pl-6 bg-gradient-to-l from-cream from-70% to-transparent transition-opacity ${
+          className={`absolute right-0 top-0 h-full flex gap-1.5 shrink-0 items-center pl-8 bg-gradient-to-l from-cream from-60% to-transparent transition-opacity ${
             isTimerRunning ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
           }`}
         >
-          {!t.done &&
-            (isTimerRunning ? (
-              <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} />
-            ) : (
-              <IconButton label="Start timer" tone="sage" icon={<PlayIcon />} onClick={startTimer} />
-            ))}
           {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
           {!t.done && <IconButton label="Snooze - push to tomorrow" tone="sage" icon={<ClockArrowIcon />} onClick={snooze} />}
-          {!t.done && skip && <IconButton label="Skip this occurrence" tone="sage" icon={<SkipForwardIcon />} onClick={skip} />}
+          {!t.done && skip && <IconButton label="Skip this occurrence" tone="accent" icon={<SkipForwardIcon />} onClick={skip} />}
           <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
         </div>
       </motion.div>

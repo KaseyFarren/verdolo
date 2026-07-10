@@ -20,6 +20,7 @@ import {
   getOffsetDate,
   getStage,
   memberName,
+  priorityColor,
   sortTasks,
   todayKey,
   topByKey,
@@ -788,7 +789,6 @@ function SimpleTaskRow({
     )
   }
 
-  const priorityColor = t.priority === 'High' ? 'text-red-600' : t.priority === 'Medium' ? 'text-accent' : 'text-green'
   return (
     <motion.div
       layout
@@ -810,7 +810,7 @@ function SimpleTaskRow({
       <div className="flex-1 min-w-0">
         <div className={`text-sm ${t.done ? 'line-through text-sage' : 'text-ink'}`}>
           {t.title}
-          <span className={`ml-2 text-xs font-medium ${priorityColor}`}>{t.priority}</span>
+          <span className={`ml-2 text-xs font-medium ${priorityColor(t.priority)}`}>{t.priority}</span>
           {isTimerRunning && (
             <span className="ml-2 text-xs font-mono text-green inline-flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}
