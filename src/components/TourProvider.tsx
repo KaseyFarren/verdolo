@@ -83,8 +83,14 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
         finish()
         return
       }
+      if (index < 0) return
       localStorage.setItem(tourStepKey(orgId), String(index))
-      if (steps[index].path.split('?')[0] === pathname) {
+      // Soft-transition only when the FULL destination (including any ?view= query) matches where
+      // we already are - otherwise a step that just changes the query (e.g. Profile -> General
+      // settings tab) would stay on the wrong tab, never find its anchor, and appear to skip. A
+      // differing pathname OR query means a real navigation.
+      const currentFull = pathname + (typeof window !== 'undefined' ? window.location.search : '')
+      if (steps[index].path === currentFull) {
         setRect(null)
         setStepIndex(index)
       } else {
