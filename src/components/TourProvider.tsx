@@ -116,6 +116,9 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
         // the page (fill the add-client form, start a timer) right next to the popover, and driver
         // otherwise treats those clicks as "close". The popover's own X (onCloseClick) still exits.
         allowClose: false,
+        // Lighter dim on steps the user fills in, so a form that opens below the highlight stays
+        // clearly legible; heavier dim on read-only steps for stronger focus.
+        overlayOpacity: step.interactive ? 0.45 : 0.7,
         onCloseClick: () => {
           finish()
           instance.destroy()

@@ -18,6 +18,9 @@ export type TourStep = {
   title: string
   description: string
   roles: Role[]
+  // Steps where the user actually types/selects on the page get a lighter dimming overlay so the
+  // fields they're filling (especially a form that opens below the highlight) stay clearly legible.
+  interactive?: boolean
 }
 
 const ALL: Role[] = ['owner', 'admin', 'member']
@@ -39,6 +42,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Type the name you want shown across tasks, messages and the team here - it replaces your email everywhere. You can add a profile picture just above too.',
     roles: ALL,
+    interactive: true,
   },
   {
     path: '/settings?view=general',
@@ -47,6 +51,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Choose the currency your clients actually pay you in - USD, GBP, or EUR. It sets the symbol everywhere: Reports, Revenue, Clients, and invoices.',
     roles: MANAGERS,
+    interactive: true,
   },
   {
     path: '/settings?view=general',
@@ -55,6 +60,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Enter what you want to realize per hour here. Verdolo compares it against your effective rate in Reports → Profitability and Revenue, so you can see which clients are actually worth it.',
     roles: MANAGERS,
+    interactive: true,
   },
   {
     path: '/clients',
@@ -63,6 +69,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Click "+ New client" to create one, then fill in the whole form right here - the tour stays open. Give it a name, choose Retainer or Hourly and enter the rate; that number drives your reports, revenue, and invoices, so it\'s worth getting right. Hit Next when you\'re done.',
     roles: MANAGERS,
+    interactive: true,
   },
   {
     path: '/tasks',
@@ -71,6 +78,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Hit "+ New task" to capture work. Quick mode just needs a title; detailed mode lets you set a client, assignee, due date and priority. This is your day-to-day to-do list.',
     roles: ALL,
+    interactive: true,
   },
   {
     path: '/tasks',
@@ -79,6 +87,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Click the circle to the left of a task to mark it done. Completed tasks feed your reports and, for client work, your revenue and effective-rate numbers.',
     roles: ALL,
+    interactive: true,
   },
   {
     path: '/time',
@@ -87,6 +96,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       'Pick a client (and optionally a task) and hit Start, or use "Log time manually" below to backfill hours you already worked. Time logged here powers effective-rate and profitability reporting.',
     roles: ALL,
+    interactive: true,
   },
   {
     path: '/revenue',
@@ -111,6 +121,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       "Enter a teammate's email and pick their role to bring them into the org. Owners see everything, admins run day-to-day, members focus on their own tasks and time.",
     roles: MANAGERS,
+    interactive: true,
   },
   {
     path: '/dashboard',
