@@ -156,43 +156,63 @@ export default function ClientsClient({
     const name = (form.name as string) || ''
     if (!name.trim()) return
     const isHourly = form.billing_mode === 'hourly'
-    const { data } = await supabase
-      .from('clients')
-      .insert({
-        org_id: orgId,
-        name,
-        business: form.business as string,
-        platform: (form.platform as string) || null,
-        service: form.service as string,
-        notes: form.notes as string,
-        tone: form.tone as string,
-        talking_points: form.talking_points as string,
-        cadence_days: form.cadence_days as number,
-        stage: form.stage as string,
-        billing_mode: (form.billing_mode as string) || 'retainer',
-        retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
-        hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
-        billing_day: Math.min(31, Math.max(1, Number(form.billing_day) || 1)),
-        contract_ends: (form.contract_ends as string) || null,
-        contact_email: (form.contact_email as string) || null,
-        contact_domain: (form.contact_domain as string) || null,
-        primary_contact_id: (form.owner as string) || null,
-        added_date: today,
-      })
-      .select()
-      .single()
-    if (data) {
-      setClients((prev) => [...prev, data as Client].sort((a, b) => a.name.localeCompare(b.name)))
-      toast.success(`${name} added`)
+    // Optimistic: id is client-generated, so show the client and clear the form immediately.
+    const id = crypto.randomUUID()
+    const insertRow = {
+      id,
+      org_id: orgId,
+      name,
+      business: form.business as string,
+      platform: (form.platform as string) || null,
+      service: form.service as string,
+      notes: form.notes as string,
+      tone: form.tone as string,
+      talking_points: form.talking_points as string,
+      cadence_days: form.cadence_days as number,
+      stage: form.stage as string,
+      billing_mode: (form.billing_mode as string) || 'retainer',
+      retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
+      hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
+      billing_day: Math.min(31, Math.max(1, Number(form.billing_day) || 1)),
+      contract_ends: (form.contract_ends as string) || null,
+      contact_email: (form.contact_email as string) || null,
+      contact_domain: (form.contact_domain as string) || null,
+      primary_contact_id: (form.owner as string) || null,
+      added_date: today,
     }
+    const optimisticClient: Client = { ...insertRow, status: null, last_contacted: null, quick_note: null, awaiting_reply: false }
+    setClients((prev) => [...prev, optimisticClient].sort((a, b) => a.name.localeCompare(b.name)))
     setForm(emptyForm)
     setShowAdd(false)
+    const { data, error } = await supabase.from('clients').insert(insertRow).select().single()
+    if (error) {
+      setClients((prev) => prev.filter((c) => c.id !== id))
+      toast.error('Could not add that client')
+      return
+    }
+    toast.success(`${name} added`)
+    if (data) setClients((prev) => prev.map((c) => (c.id === id ? (data as Client) : c)))
   }
 
   async function updateClient(id: string, fields: Record<string, unknown>) {
-    const { data } = await supabase.from('clients').update(fields).eq('id', id).select().single()
-    if (data) setClients((prev) => prev.map((c) => (c.id === id ? (data as Client) : c)))
+    // Optimistic: apply the edit locally, capturing the pre-edit row (inside the updater so rapid
+    // successive edits each roll back to their own true prior state) for rollback on failure.
+    let prevClient: Client | undefined
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c
+        prevClient = c
+        return { ...c, ...fields } as Client
+      }),
+    )
     setEditing(false)
+    const { data, error } = await supabase.from('clients').update(fields).eq('id', id).select().single()
+    if (error) {
+      if (prevClient) setClients((prev) => prev.map((c) => (c.id === id ? (prevClient as Client) : c)))
+      toast.error('Could not save that change')
+      return
+    }
+    if (data) setClients((prev) => prev.map((c) => (c.id === id ? (data as Client) : c)))
   }
 
   async function deleteClient(id: string) {
@@ -204,22 +224,42 @@ export default function ClientsClient({
       danger: true,
     })
     if (!ok) return
-    await supabase.from('clients').delete().eq('id', id)
-    await supabase.from('tasks').delete().eq('client_id', id)
-    setClients((prev) => prev.filter((c) => c.id !== id))
+    // Optimistic: drop the client immediately, restoring the full prior list if the delete fails.
+    let snapshot: Client[] = []
+    setClients((prev) => {
+      snapshot = prev
+      return prev.filter((c) => c.id !== id)
+    })
     setSelectedId(null)
+    const { error } = await supabase.from('clients').delete().eq('id', id)
+    if (error) {
+      setClients(snapshot)
+      toast.error('Could not delete that client')
+      return
+    }
+    await supabase.from('tasks').delete().eq('client_id', id)
     toast.success(`${name} deleted`)
   }
 
   async function addNote(clientId: string, text: string) {
     if (!text.trim()) return
-    const { data } = await supabase
+    const trimmed = text.trim()
+    // Optimistic: id is client-generated, so show the note and clear the input immediately.
+    const id = crypto.randomUUID()
+    const optimisticNote: Note = { id, client_id: clientId, text: trimmed, created_at: new Date().toISOString(), author_id: userId }
+    setNotes((prev) => [optimisticNote, ...prev])
+    setNoteInput('')
+    const { data, error } = await supabase
       .from('client_notes')
-      .insert({ org_id: orgId, client_id: clientId, author_id: userId, text: text.trim() })
+      .insert({ id, org_id: orgId, client_id: clientId, author_id: userId, text: trimmed })
       .select()
       .single()
-    if (data) setNotes((prev) => [data as Note, ...prev])
-    setNoteInput('')
+    if (error) {
+      setNotes((prev) => prev.filter((n) => n.id !== id))
+      toast.error('Could not add that note')
+      return
+    }
+    if (data) setNotes((prev) => prev.map((n) => (n.id === id ? (data as Note) : n)))
   }
   async function deleteNote(id: string) {
     const ok = await confirm({
@@ -229,8 +269,17 @@ export default function ClientsClient({
       danger: true,
     })
     if (!ok) return
-    await supabase.from('client_notes').delete().eq('id', id)
-    setNotes((prev) => prev.filter((n) => n.id !== id))
+    // Optimistic: drop the note immediately, restoring the full prior list if the delete fails.
+    let snapshot: Note[] = []
+    setNotes((prev) => {
+      snapshot = prev
+      return prev.filter((n) => n.id !== id)
+    })
+    const { error } = await supabase.from('client_notes').delete().eq('id', id)
+    if (error) {
+      setNotes(snapshot)
+      toast.error('Could not delete that note')
+    }
   }
 
   if (selected) {

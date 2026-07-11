@@ -197,38 +197,57 @@ export default function TimeClient({
   async function startTimer() {
     if (!timerClientId) return
     setStarting(true)
-    const { data } = await supabase
-      .from('time_entries')
-      .insert({
-        org_id: orgId,
-        client_id: timerClientId,
-        task_id: timerTaskId || null,
-        user_id: userId,
-        started_at: new Date().toISOString(),
-        note: timerNote || null,
-        billable: true,
-      })
-      .select()
-      .single()
-    if (data) setEntries((prev) => [data as Entry, ...prev])
+    // Optimistic: id is client-generated so we can show the running timer before the round-trip
+    // and reconcile with the server row once it lands.
+    const id = crypto.randomUUID()
+    const insertRow = {
+      id,
+      org_id: orgId,
+      client_id: timerClientId,
+      task_id: timerTaskId || null,
+      user_id: userId,
+      started_at: new Date().toISOString(),
+      note: timerNote || null,
+      billable: true,
+    }
+    const optimisticEntry: Entry = { ...insertRow, ended_at: null, duration_seconds: null }
+    setEntries((prev) => [optimisticEntry, ...prev])
+    const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
+    if (error) {
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+      toast.error('Could not start the timer')
+    } else if (data) {
+      setEntries((prev) => prev.map((e) => (e.id === id ? (data as Entry) : e)))
+    }
     setStarting(false)
   }
 
   async function stopTimer() {
     if (!running) return
+    const stoppedId = running.id
     const endedAt = new Date()
     const startedAt = new Date(running.started_at)
     const durationSeconds = Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000))
-    const { data } = await supabase
-      .from('time_entries')
-      .update({ ended_at: endedAt.toISOString(), duration_seconds: durationSeconds })
-      .eq('id', running.id)
-      .select()
-      .single()
-    if (data) setEntries((prev) => prev.map((e) => (e.id === running.id ? (data as Entry) : e)))
+    const fields = { ended_at: endedAt.toISOString(), duration_seconds: durationSeconds }
+    // Optimistic: stop the timer locally, capturing the still-running row to roll back to on error.
+    let prevEntry: Entry | undefined
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (e.id !== stoppedId) return e
+        prevEntry = e
+        return { ...e, ...fields }
+      }),
+    )
     setTimerClientId('')
     setTimerTaskId('')
     setTimerNote('')
+    const { data, error } = await supabase.from('time_entries').update(fields).eq('id', stoppedId).select().single()
+    if (error) {
+      if (prevEntry) setEntries((prev) => prev.map((e) => (e.id === stoppedId ? (prevEntry as Entry) : e)))
+      toast.error('Could not stop the timer')
+      return
+    }
+    if (data) setEntries((prev) => prev.map((e) => (e.id === stoppedId ? (data as Entry) : e)))
   }
 
   async function addManualEntry() {
@@ -237,27 +256,34 @@ export default function TimeClient({
     const startedAt = `${manualDate}T12:00:00`
     const durationSeconds = Math.round(hours * 3600)
     const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString()
-    const { data } = await supabase
-      .from('time_entries')
-      .insert({
-        org_id: orgId,
-        client_id: manualClientId,
-        task_id: manualTaskId || null,
-        user_id: userId,
-        started_at: startedAt,
-        ended_at: endedAt,
-        duration_seconds: durationSeconds,
-        note: manualNote || null,
-        billable: manualBillable,
-      })
-      .select()
-      .single()
-    if (data) setEntries((prev) => [data as Entry, ...prev])
+    // Optimistic: id is client-generated, so show the entry and clear the form immediately.
+    const id = crypto.randomUUID()
+    const insertRow = {
+      id,
+      org_id: orgId,
+      client_id: manualClientId,
+      task_id: manualTaskId || null,
+      user_id: userId,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: durationSeconds,
+      note: manualNote || null,
+      billable: manualBillable,
+    }
+    const optimisticEntry: Entry = { ...insertRow }
+    setEntries((prev) => [optimisticEntry, ...prev])
     setManualClientId('')
     setManualTaskId('')
     setManualHours('')
     setManualNote('')
     setShowManual(false)
+    const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
+    if (error) {
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+      toast.error('Could not add that entry')
+      return
+    }
+    if (data) setEntries((prev) => prev.map((e) => (e.id === id ? (data as Entry) : e)))
   }
 
   function deleteEntry(id: string) {
@@ -405,21 +431,31 @@ export default function TimeClient({
     if (!editClientId || !hours || hours <= 0) return
     const durationSeconds = Math.round(hours * 3600)
     const endedAt = new Date(new Date(e.started_at).getTime() + durationSeconds * 1000).toISOString()
-    const { data } = await supabase
-      .from('time_entries')
-      .update({
-        client_id: editClientId,
-        task_id: editTaskId || null,
-        duration_seconds: durationSeconds,
-        ended_at: endedAt,
-        note: editNote || null,
-        billable: editBillable,
-      })
-      .eq('id', e.id)
-      .select()
-      .single()
-    if (data) setEntries((prev) => prev.map((x) => (x.id === e.id ? (data as Entry) : x)))
+    const fields = {
+      client_id: editClientId,
+      task_id: editTaskId || null,
+      duration_seconds: durationSeconds,
+      ended_at: endedAt,
+      note: editNote || null,
+      billable: editBillable,
+    }
+    // Optimistic: apply the edit locally, capturing the pre-edit row for rollback on failure.
+    let prevEntry: Entry | undefined
+    setEntries((prev) =>
+      prev.map((x) => {
+        if (x.id !== e.id) return x
+        prevEntry = x
+        return { ...x, ...fields }
+      }),
+    )
     setEditingId(null)
+    const { data, error } = await supabase.from('time_entries').update(fields).eq('id', e.id).select().single()
+    if (error) {
+      if (prevEntry) setEntries((prev) => prev.map((x) => (x.id === e.id ? (prevEntry as Entry) : x)))
+      toast.error('Could not save that change')
+      return
+    }
+    if (data) setEntries((prev) => prev.map((x) => (x.id === e.id ? (data as Entry) : x)))
   }
 
   function archivedSecondsFor(clientId: string | null, memberId?: string) {
