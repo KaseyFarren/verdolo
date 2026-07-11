@@ -122,7 +122,7 @@ export default function BillingClient({
         )}
         {subscriptionStatus === 'past_due' && <div className="text-sm mb-1 text-amber-700 font-semibold">Payment past due - update your payment method</div>}
         <div className="text-xs text-sage">
-          {planType === 'lifetime' ? '2 seats included for life · $17/mo per additional seat' : '$47/mo (2 seats included) · $17/mo per additional seat'} ·{' '}
+          {planType === 'lifetime' ? '2 seats included for life · £17/mo per additional seat' : '£29/mo (owner + 2 seats included) · £17/mo per additional seat'} ·{' '}
           {activeMemberCount} of {seatsPurchased} seat{seatsPurchased === 1 ? '' : 's'} used
         </div>
       </div>
