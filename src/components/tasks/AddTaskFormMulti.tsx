@@ -2,6 +2,7 @@
 
 import MultiSelect from '@/components/ui/MultiSelect'
 import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import { PRIORITY, memberName } from '@/lib/agency'
 
 export type TaskFormStateMulti = {
@@ -68,12 +69,7 @@ export default function AddTaskFormMulti({
         autoFocus
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-        <input
-          type="date"
-          className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-          value={form.dueDate}
-          onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
-        />
+        <DatePicker value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} placeholder="Due date" allowClear={false} />
         {detailed && (
           <CustomSelect
             value={form.priority}

@@ -127,9 +127,9 @@ export default function TaskRow({
 
         {!t.done &&
           (isTimerRunning ? (
-            <IconButton label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} className="!p-1" />
+            <IconButton data-tour="task-timer" label="Pause timer" tone="green" icon={<PauseIcon />} onClick={stopTimer} className="!p-1" />
           ) : (
-            <IconButton label="Start timer" tone="accent" icon={<PlayIcon />} onClick={startTimer} className="!p-1" />
+            <IconButton data-tour="task-timer" label="Start timer" tone="accent" icon={<PlayIcon />} onClick={startTimer} className="!p-1" />
           ))}
         {t.done && <span />}
 
@@ -213,6 +213,7 @@ export default function TaskRow({
             entering time only QuickAddTime shows, so its expanded input never overflows the cell
             into the priority column. */}
         <div
+          data-tour="task-actions"
           className={`flex gap-1 shrink-0 items-center justify-end transition-opacity ${
             isTimerRunning || addingTime ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
           }`}

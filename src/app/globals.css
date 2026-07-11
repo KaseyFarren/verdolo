@@ -105,6 +105,12 @@ body.driver-active .driver-overlay path {
   pointer-events: none !important;
 }
 
+/* The task row's snooze/skip/delete cluster only appears on hover. When the tour highlights it as
+   the active step, force it visible so the popover isn't pointing at an invisible target. */
+[data-tour='task-actions'].driver-active-element {
+  opacity: 1 !important;
+}
+
 .driver-popover {
   background-color: var(--cream) !important;
   color: var(--ink) !important;

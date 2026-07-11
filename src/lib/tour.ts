@@ -21,6 +21,10 @@ export type TourStep = {
   // Steps where the user actually types/selects on the page get a lighter dimming overlay so the
   // fields they're filling (especially a form that opens below the highlight) stay clearly legible.
   interactive?: boolean
+  // Preferred popover placement relative to the highlight. Omit to let driver.js auto-fit; set it
+  // where a fixed side keeps the popover clear of the inputs the user needs to reach.
+  side?: 'top' | 'bottom' | 'left' | 'right'
+  align?: 'start' | 'center' | 'end'
 }
 
 const ALL: Role[] = ['owner', 'admin', 'member']
@@ -82,10 +86,28 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     path: '/tasks',
+    selector: '[data-tour="task-timer"]',
+    title: 'Time a task',
+    description:
+      'Hit the play button next to a task to start a live timer against it - it turns into a pause button while running. That logged time flows straight into your Time page and effective-rate reporting, no manual entry needed.',
+    roles: ALL,
+    interactive: true,
+  },
+  {
+    path: '/tasks',
     selector: '[data-tour="task-checkbox"]',
     title: 'Complete a task',
     description:
       'Click the circle to the left of a task to mark it done. Completed tasks feed your reports and, for client work, your revenue and effective-rate numbers.',
+    roles: ALL,
+    interactive: true,
+  },
+  {
+    path: '/tasks',
+    selector: '[data-tour="task-actions"]',
+    title: 'Snooze, skip and more',
+    description:
+      'Hover a task and these actions appear on the right: the clock logs time manually, the moon snoozes it to tomorrow, skip drops a single recurring occurrence, and the trash deletes it. Quick housekeeping without opening the task.',
     roles: ALL,
     interactive: true,
   },

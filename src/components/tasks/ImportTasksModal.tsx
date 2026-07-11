@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import Button from '@/components/ui/Button'
 import { UploadCloudIcon, XIcon, TrashIcon } from '@/components/ui/icons'
 import { PRIORITY, todayKey } from '@/lib/agency'
@@ -268,11 +269,11 @@ export default function ImportTasksModal({
                           onChange={(e) => updateDraft(i, { title: e.target.value })}
                         />
                         <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="date"
-                            className="rounded-[6px] border border-ink/10 bg-white px-2 py-1.5 text-xs"
+                          <DatePicker
                             value={d.due_date || ''}
-                            onChange={(e) => updateDraft(i, { due_date: e.target.value || null })}
+                            onChange={(v) => updateDraft(i, { due_date: v || null })}
+                            placeholder="Due date"
+                            className="text-xs"
                           />
                           <CustomSelect
                             value={d.priority}

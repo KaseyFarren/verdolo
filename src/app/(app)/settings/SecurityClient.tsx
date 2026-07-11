@@ -7,6 +7,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { clearPin, getIdleMinutes, hasPinSet, setIdleMinutes, setPin } from '@/components/PinLock'
 import { Row, Section } from '@/components/settings/SettingsUI'
 import Button from '@/components/ui/Button'
+import CustomSelect from '@/components/ui/CustomSelect'
 
 export default function SecurityClient() {
   return (
@@ -169,17 +170,13 @@ function PinSection() {
       )}
       {hasPin && (
         <Row title="Lock after" subtitle="Minutes of inactivity before locking">
-          <select
-            value={idleMinutes}
-            onChange={(e) => changeIdle(Number(e.target.value))}
-            className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
-          >
-            {[2, 5, 10, 15, 30].map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
+          <div className="w-28">
+            <CustomSelect
+              value={String(idleMinutes)}
+              onChange={(v) => changeIdle(Number(v))}
+              options={[2, 5, 10, 15, 30].map((m) => ({ value: String(m), label: `${m} min` }))}
+            />
+          </div>
         </Row>
       )}
     </Section>

@@ -8,6 +8,7 @@ import { AVATAR_COLORS, formatDate, getInitials, memberName, todayKey } from '@/
 import { periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import IconButton from '@/components/ui/IconButton'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
@@ -742,12 +743,7 @@ export default function TimeClient({
               disabled={!manualClientId}
               options={[{ value: '', label: 'No task' }, ...manualTasks.map((t) => ({ value: t.id, label: t.title }))]}
             />
-            <input
-              type="date"
-              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-              value={manualDate}
-              onChange={(e) => setManualDate(e.target.value)}
-            />
+            <DatePicker value={manualDate} onChange={setManualDate} placeholder="Date" allowClear={false} />
             <input
               type="number"
               step="0.25"
@@ -891,13 +887,7 @@ export default function TimeClient({
             detail is removed. The current month can&apos;t be cleared this way.
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="date"
-              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-              value={clearCutoff}
-              max={maxClearCutoff}
-              onChange={(e) => setClearCutoff(e.target.value > maxClearCutoff ? maxClearCutoff : e.target.value)}
-            />
+            <DatePicker value={clearCutoff} onChange={(v) => setClearCutoff(v > maxClearCutoff ? maxClearCutoff : v)} max={maxClearCutoff} allowClear={false} />
             <button
               className="rounded bg-red-600 text-white shadow-md px-3 py-2 text-sm font-medium disabled:opacity-50"
               onClick={clearOldEntries}

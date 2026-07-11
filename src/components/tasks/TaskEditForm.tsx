@@ -1,6 +1,7 @@
 'use client'
 
 import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import { PRIORITY, memberName } from '@/lib/agency'
 
 type Client = { id: string; name: string }
@@ -48,11 +49,10 @@ export default function TaskEditForm({
           options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
         />
         {showDueDate && (
-          <input
-            type="date"
-            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+          <DatePicker
             value={(editForm.due_date as string) || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
+            onChange={(v) => setEditForm((f) => ({ ...f, due_date: v }))}
+            placeholder="Due date"
           />
         )}
       </div>

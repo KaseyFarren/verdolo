@@ -23,6 +23,7 @@ import {
 } from '@/lib/agency'
 import { isFullCalendarMonth, billingCycleElapsedFraction, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
+import DatePicker from '@/components/ui/DatePicker'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
 type Client = {
@@ -451,12 +452,7 @@ export default function RevenueClient({
                         value={chargeAmount}
                         onChange={(e) => setChargeAmount(e.target.value)}
                       />
-                      <input
-                        type="date"
-                        className="rounded border border-ink/10 bg-white px-2 py-1.5 text-xs"
-                        value={chargeDate}
-                        onChange={(e) => setChargeDate(e.target.value)}
-                      />
+                      <DatePicker value={chargeDate} onChange={setChargeDate} placeholder="Date" allowClear={false} className="text-xs" />
                       <Button variant="primary" className="!px-3 !py-1.5 text-xs" disabled={saving} onClick={() => addCharge(r.client.id)}>
                         Add
                       </Button>

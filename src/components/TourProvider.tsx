@@ -133,8 +133,10 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
             popover: {
               title: `${step.title} (${index + 1}/${steps.length})`,
               description: step.description,
-              side: 'right',
-              align: 'start',
+              // Let driver auto-fit by default so the popover lands on whichever side has room and
+              // doesn't cover the input; a step can force a side when auto-fit picks poorly.
+              ...(step.side ? { side: step.side } : {}),
+              ...(step.align ? { align: step.align } : {}),
               // First step has nowhere to go back to, so drop the Previous button there.
               showButtons: index === 0 ? ['next', 'close'] : ['previous', 'next', 'close'],
               nextBtnText: isLast ? 'Done' : 'Next',

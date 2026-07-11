@@ -10,6 +10,8 @@ export default function DatePicker({
   className = '',
   variant = 'pill',
   allowClear = true,
+  min,
+  max,
 }: {
   value: string
   onChange: (v: string) => void
@@ -19,6 +21,9 @@ export default function DatePicker({
    * borderless, text-like trigger for inline-editable table cells (Tasks list row cells). */
   variant?: 'pill' | 'plain'
   allowClear?: boolean
+  /** Optional inclusive YYYY-MM-DD bounds; days outside are shown disabled. */
+  min?: string
+  max?: string
 }) {
   const [open, setOpen] = useState(false)
   const [viewMonth, setViewMonth] = useState((value || todayKey()).slice(0, 7))
@@ -110,13 +115,21 @@ export default function DatePicker({
                 const k = `${y}-${String(jsMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
                 const isToday = k === today
                 const isSel = k === value
+                const disabled = (min && k < min) || (max && k > max)
                 return (
                   <button
                     type="button"
                     key={d}
+                    disabled={!!disabled}
                     onClick={() => select(k)}
                     className={`text-center py-1.5 rounded-full text-sm ${
-                      isSel ? 'bg-accent text-white font-semibold' : isToday ? 'bg-ink/5 text-accent font-medium' : 'hover:bg-sand'
+                      disabled
+                        ? 'text-sage/30 cursor-not-allowed'
+                        : isSel
+                          ? 'bg-accent text-white font-semibold'
+                          : isToday
+                            ? 'bg-ink/5 text-accent font-medium'
+                            : 'hover:bg-sand'
                     }`}
                   >
                     {d}

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section, Toggle } from '@/components/settings/SettingsUI'
 import InfoTooltip from '@/components/ui/InfoTooltip'
+import CustomSelect from '@/components/ui/CustomSelect'
 import { CURRENCIES, currencySymbol, type Currency } from '@/lib/agency'
 
 type Settings = {
@@ -64,18 +65,14 @@ export default function GeneralClient({
         }
         subtitle="Show banner after this hour"
       >
-        <select
-          className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
-          value={eodHour}
-          disabled={!isAdmin}
-          onChange={(e) => { const v = Number(e.target.value); setEodHour(v); saveSettings({ eod_hour: v }) }}
-        >
-          {[14, 15, 16, 17, 18, 19, 20].map((h) => (
-            <option key={h} value={h}>
-              {h < 12 ? h + 'am' : h === 12 ? '12pm' : h - 12 + 'pm'}
-            </option>
-          ))}
-        </select>
+        <div className="w-28">
+          <CustomSelect
+            value={String(eodHour)}
+            disabled={!isAdmin}
+            onChange={(v) => { const n = Number(v); setEodHour(n); saveSettings({ eod_hour: n }) }}
+            options={[14, 15, 16, 17, 18, 19, 20].map((h) => ({ value: String(h), label: h < 12 ? h + 'am' : h === 12 ? '12pm' : h - 12 + 'pm' }))}
+          />
+        </div>
       </Row>
       <Row
         title="Desktop notifications"
@@ -88,19 +85,14 @@ export default function GeneralClient({
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
       <Row title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, Clients, and invoices">
-        <select
-          className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
-          data-tour="billing-currency"
-          value={currency}
-          disabled={!isAdmin}
-          onChange={(e) => { const v = e.target.value as Currency; setCurrency(v); saveSettings({ currency: v }) }}
-        >
-          {CURRENCIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <div className="w-32" data-tour="billing-currency">
+          <CustomSelect
+            value={currency}
+            disabled={!isAdmin}
+            onChange={(v) => { setCurrency(v as Currency); saveSettings({ currency: v as Currency }) }}
+            options={CURRENCIES.map((c) => ({ value: c.value, label: c.label }))}
+          />
+        </div>
       </Row>
       <Row title="Target hourly rate" subtitle="What you want to realize per hour - compared against effective rate in Reports → Profitability and Revenue">
         <div className="flex items-center gap-1">

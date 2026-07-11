@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { getInitials, memberName } from '@/lib/agency'
+import CustomSelect from '@/components/ui/CustomSelect'
 
 type Member = {
   id: string
@@ -168,15 +169,18 @@ export default function MembersList({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {canTouch ? (
-                <select
-                  value={m.role}
-                  onChange={(e) => changeRole(m, e.target.value as 'owner' | 'admin' | 'member')}
-                  className="rounded border border-ink/10 bg-white px-1.5 py-1 text-xs"
-                >
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                  {canManageOwners && <option value="owner">owner</option>}
-                </select>
+                <div className="w-28">
+                  <CustomSelect
+                    value={m.role}
+                    onChange={(v) => changeRole(m, v as 'owner' | 'admin' | 'member')}
+                    className="text-xs"
+                    options={[
+                      { value: 'member', label: 'member' },
+                      { value: 'admin', label: 'admin' },
+                      ...(canManageOwners ? [{ value: 'owner', label: 'owner' }] : []),
+                    ]}
+                  />
+                </div>
               ) : (
                 <span className="text-sage">{m.role}</span>
               )}

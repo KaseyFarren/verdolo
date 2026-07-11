@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import ClientFiles from '@/components/ClientFiles'
 import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { periodBounds, type PeriodValue } from '@/lib/period'
 import {
@@ -698,16 +699,12 @@ function ClientForm({
         onChange={(e) => setForm((f) => ({ ...f, business: e.target.value }))}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-        <select
-          className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+        <CustomSelect
           value={(form.platform as string) || ''}
-          onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value }))}
-        >
-          <option value="">Platform…</option>
-          {PLATFORMS.map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
+          onChange={(v) => setForm((f) => ({ ...f, platform: v }))}
+          placeholder="Platform…"
+          options={PLATFORMS.map((p) => ({ value: p, label: p }))}
+        />
         <input
           className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
           placeholder="Service"
@@ -757,17 +754,19 @@ function ClientForm({
         onChange={(e) => setForm((f) => ({ ...f, talking_points: e.target.value }))}
       />
       <label className="block text-xs text-sage mb-1">Check-in cadence</label>
-      <select
-        className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-4"
-        value={(form.cadence_days as number) || 7}
-        onChange={(e) => setForm((f) => ({ ...f, cadence_days: Number(e.target.value) }))}
-      >
-        <option value={1}>Daily</option>
-        <option value={2}>Every 2 days</option>
-        <option value={7}>Weekly</option>
-        <option value={14}>Bi-weekly</option>
-        <option value={30}>Monthly</option>
-      </select>
+      <div className="mb-4">
+        <CustomSelect
+          value={String((form.cadence_days as number) || 7)}
+          onChange={(v) => setForm((f) => ({ ...f, cadence_days: Number(v) }))}
+          options={[
+            { value: '1', label: 'Daily' },
+            { value: '2', label: 'Every 2 days' },
+            { value: '7', label: 'Weekly' },
+            { value: '14', label: 'Bi-weekly' },
+            { value: '30', label: 'Monthly' },
+          ]}
+        />
+      </div>
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">Pipeline &amp; billing</div>
       <label className="block text-xs text-sage mb-1">Pipeline stage</label>
@@ -833,11 +832,10 @@ function ClientForm({
         )}
         <div>
           <label className="block text-xs text-sage mb-1">Contract ends</label>
-          <input
-            type="date"
-            className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+          <DatePicker
             value={(form.contract_ends as string) || ''}
-            onChange={(e) => setForm((f) => ({ ...f, contract_ends: e.target.value }))}
+            onChange={(v) => setForm((f) => ({ ...f, contract_ends: v }))}
+            placeholder="No end date"
           />
         </div>
       </div>
@@ -860,18 +858,14 @@ function ClientForm({
       )}
       <label className="block text-xs text-sage mb-1">Owner</label>
       <div className="text-xs text-sage/70 mb-1">Who&apos;s the point of contact - check-ins assign to them, and replies default to their connected mailbox</div>
-      <select
-        className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm mb-4"
-        value={(form.owner as string) || ''}
-        onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
-      >
-        <option value="">Unassigned</option>
-        {members.map((m) => (
-          <option key={m.user_id} value={m.user_id}>
-            {memberName(m)}
-          </option>
-        ))}
-      </select>
+      <div className="mb-4">
+        <CustomSelect
+          value={(form.owner as string) || ''}
+          onChange={(v) => setForm((f) => ({ ...f, owner: v }))}
+          placeholder="Unassigned"
+          options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
+        />
+      </div>
 
       <div className="flex gap-2 pt-1">
         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>

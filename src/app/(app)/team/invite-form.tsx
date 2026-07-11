@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Button from '@/components/ui/Button'
+import CustomSelect from '@/components/ui/CustomSelect'
 
 export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; canInviteOwner: boolean }) {
   const router = useRouter()
@@ -46,15 +47,17 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
           required
           className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
         />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as 'member' | 'admin' | 'owner')}
-          className="rounded-lg border border-ink/15 bg-white px-2 py-2 text-sm"
-        >
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-          {canInviteOwner && <option value="owner">Owner</option>}
-        </select>
+        <div className="w-32">
+          <CustomSelect
+            value={role}
+            onChange={(v) => setRole(v as 'member' | 'admin' | 'owner')}
+            options={[
+              { value: 'member', label: 'Member' },
+              { value: 'admin', label: 'Admin' },
+              ...(canInviteOwner ? [{ value: 'owner', label: 'Owner' }] : []),
+            ]}
+          />
+        </div>
         <Button type="submit" variant="primary" disabled={status === 'loading'}>
           {status === 'loading' ? 'Sending…' : 'Invite'}
         </Button>
