@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section } from '@/components/settings/SettingsUI'
 import { AVATAR_COLORS, getInitials } from '@/lib/agency'
-import { startTourReplay } from '@/lib/tour'
+import { startTourReplay, tourReplayKey, tourStepKey } from '@/lib/tour'
 
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 
@@ -15,11 +15,13 @@ export default function ProfileClient({
   userId,
   initialDisplayName,
   initialAvatarUrl,
+  canTestOnboarding = false,
 }: {
   orgId: string
   userId: string
   initialDisplayName: string
   initialAvatarUrl: string | null
+  canTestOnboarding?: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
@@ -45,6 +47,27 @@ export default function ProfileClient({
     } else if (result === 'denied') {
       toast.error('Blocked - allow notifications for this site in your browser settings')
     }
+  }
+
+  const [testingOnboarding, setTestingOnboarding] = useState(false)
+  async function testOnboarding() {
+    setTestingOnboarding(true)
+    const res = await fetch('/api/onboarding/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Could not reset onboarding' }))
+      toast.error(error || 'Could not reset onboarding')
+      setTestingOnboarding(false)
+      return
+    }
+    // Clear any leftover tour progress so the auto first-run tour starts clean from step 0, then
+    // land on the dashboard where TourProvider auto-fires it (owner + no completion timestamp).
+    localStorage.removeItem(tourStepKey(orgId))
+    localStorage.removeItem(tourReplayKey(orgId))
+    window.location.assign('/dashboard')
   }
 
   async function saveDisplayName() {
@@ -188,6 +211,20 @@ export default function ProfileClient({
           Replay tour
         </button>
       </Row>
+      {canTestOnboarding && (
+        <Row
+          title="Test onboarding"
+          subtitle="Reset first-run state so the new-owner tour auto-fires on the dashboard, exactly as a brand-new owner sees it - visible only on your account"
+        >
+          <button
+            className="rounded border border-ink/10 bg-white px-3 py-1.5 text-sm hover:bg-sand/60 disabled:opacity-50"
+            disabled={testingOnboarding}
+            onClick={testOnboarding}
+          >
+            {testingOnboarding ? 'Resetting…' : 'Test onboarding'}
+          </button>
+        </Row>
+      )}
     </Section>
   )
 }

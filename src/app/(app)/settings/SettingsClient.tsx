@@ -38,6 +38,7 @@ export default function SettingsClient({
   userId,
   role,
   isAdmin,
+  canTestOnboarding,
   settings,
   initialAccentColor,
   initialDisplayName,
@@ -54,6 +55,7 @@ export default function SettingsClient({
   userId: string
   role: Role
   isAdmin: boolean
+  canTestOnboarding: boolean
   settings: Settings
   initialAccentColor: string
   initialDisplayName: string
@@ -99,7 +101,7 @@ export default function SettingsClient({
         </nav>
         <div className="flex-1 min-w-0">
           {view === 'general' && <GeneralClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
-          {view === 'profile' && <ProfileClient orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} initialAvatarUrl={initialAvatarUrl} />}
+          {view === 'profile' && <ProfileClient orgId={orgId} userId={userId} initialDisplayName={initialDisplayName} initialAvatarUrl={initialAvatarUrl} canTestOnboarding={canTestOnboarding} />}
           {view === 'appearance' && <AppearanceClient orgId={orgId} isAdmin={isAdmin} initialAccentColor={initialAccentColor} />}
           {view === 'voice' && <VoiceClient orgId={orgId} isAdmin={isAdmin} settings={settings} />}
           {view === 'integrations' && (

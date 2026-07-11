@@ -9,6 +9,13 @@ export function isAdminRole(role: Role) {
   return role === 'owner' || role === 'admin'
 }
 
+// Personal super-admin gate for dev/testing affordances that shouldn't ship to real users (e.g.
+// the "Test onboarding" reset button). Defaults to the founder's account; override via env.
+const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'kasey@kaseyfarren.com'
+export function isSuperAdmin(email?: string | null) {
+  return !!email && email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function hasActiveAccess(org: any) {
   if (org.subscription_status === 'active' || org.subscription_status === 'past_due') return true

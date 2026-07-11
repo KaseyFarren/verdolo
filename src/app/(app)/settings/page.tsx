@@ -1,4 +1,4 @@
-import { isAdminRole, requireOrgContext } from '@/lib/org'
+import { isAdminRole, isSuperAdmin, requireOrgContext } from '@/lib/org'
 import { getAiCreditStatus } from '@/lib/aiCredits'
 import SettingsClient from './SettingsClient'
 
@@ -7,6 +7,7 @@ export default async function SettingsPage() {
   // needs to reach every section here (not just get bounced straight to Billing) to fix it
   const { supabase, user, orgId, role, org } = await requireOrgContext({ skipPaywall: true })
   const isAdmin = isAdminRole(role)
+  const canTestOnboarding = isSuperAdmin(user.email)
 
   const [{ data: membership }, { count: activeMemberCount }, aiCredits] = await Promise.all([
     supabase.from('org_members').select('display_name, avatar_url').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
@@ -20,6 +21,7 @@ export default async function SettingsPage() {
       userId={user.id}
       role={role}
       isAdmin={isAdmin}
+      canTestOnboarding={canTestOnboarding}
       settings={org?.settings ?? {}}
       initialAccentColor={org?.accent_color ?? '#dd6b2c'}
       initialDisplayName={membership?.display_name ?? ''}
