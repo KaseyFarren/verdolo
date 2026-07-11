@@ -190,7 +190,10 @@ export default function TimeClient({
     return () => clearInterval(iv)
   }, [running?.id])
 
-  const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || '-'
+  // A null/unmatched client_id means the client was deleted (client is required at entry creation),
+  // so the entry is orphaned but kept - time_entries.client_id is ON DELETE SET NULL to preserve
+  // billable/reporting history. Label it clearly instead of a bare '-'.
+  const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || 'No client'
   const taskTitle = (id: string | null) => allTasks.find((t) => t.id === id)?.title || null
   const memberEmail = (id: string) => memberName(members.find((m) => m.user_id === id))
 
