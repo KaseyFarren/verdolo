@@ -71,16 +71,19 @@ const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="clients-add-region"]',
     title: 'Add your first client',
     description:
-      'Click "+ New client" to create one, then fill in the whole form right here - the tour stays open. Give it a name, choose Retainer or Hourly and enter the rate; that number drives your reports, revenue, and invoices, so it\'s worth getting right. Hit Next when you\'re done.',
+      'Click "+ New client", fill in the form, and press its Save button to add them - the tour stays open the whole time. The name plus Retainer/Hourly rate is what drives your reports, revenue, and invoices. Hit Next once the client is saved.',
     roles: MANAGERS,
     interactive: true,
+    // Push the popover into the left margin so it never sits on top of the full-width form fields.
+    side: 'left',
+    align: 'start',
   },
   {
     path: '/tasks',
     selector: '[data-tour="add-task-button"]',
     title: 'Add your first task',
     description:
-      'Hit "+ New task" to capture work. Quick mode just needs a title; detailed mode lets you set a client, assignee, due date and priority. This is your day-to-day to-do list.',
+      'Hit "+ New task", then Add task to save it. Quick mode just needs a title; detailed mode lets you set a client, assignee, due date and priority. This is your day-to-day to-do list.',
     roles: ALL,
     interactive: true,
   },

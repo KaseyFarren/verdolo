@@ -27,7 +27,8 @@ export default function ProfileClient({
   const router = useRouter()
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
-  const [saved, setSaved] = useState(false)
+  const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const nameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default')
@@ -70,10 +71,20 @@ export default function ProfileClient({
     window.location.assign('/dashboard')
   }
 
-  async function saveDisplayName() {
-    await supabase.from('org_members').update({ display_name: displayName.trim() || null }).eq('org_id', orgId).eq('user_id', userId)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+  // Save as the user types (debounced) as well as on blur, so they get a clear "Saved" without
+  // having to click off the field first - and see "Saving…/Saved ✓" the whole time.
+  async function saveDisplayName(value = displayName) {
+    setNameStatus('saving')
+    await supabase.from('org_members').update({ display_name: value.trim() || null }).eq('org_id', orgId).eq('user_id', userId)
+    setNameStatus('saved')
+    setTimeout(() => setNameStatus((s) => (s === 'saved' ? 'idle' : s)), 2000)
+  }
+
+  function onNameChange(value: string) {
+    setDisplayName(value)
+    setNameStatus('saving')
+    if (nameDebounce.current) clearTimeout(nameDebounce.current)
+    nameDebounce.current = setTimeout(() => saveDisplayName(value), 700)
   }
 
   async function uploadAvatar(file: File) {
@@ -197,10 +208,12 @@ export default function ProfileClient({
             className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm w-40"
             placeholder="Your name"
             value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            onBlur={saveDisplayName}
+            onChange={(e) => onNameChange(e.target.value)}
+            onBlur={() => saveDisplayName()}
           />
-          {saved && <span className="text-xs text-green">Saved</span>}
+          <span className="text-xs w-14 shrink-0">
+            {nameStatus === 'saving' ? <span className="text-sage">Saving…</span> : nameStatus === 'saved' ? <span className="text-green">Saved ✓</span> : null}
+          </span>
         </div>
       </Row>
       <Row title="Guided tour" subtitle="Replay the walkthrough of where to enter your info, tailored to your role">
