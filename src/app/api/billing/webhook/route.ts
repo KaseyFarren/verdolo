@@ -62,9 +62,18 @@ export async function POST(request: Request) {
       if (!session.metadata?.org_id) {
         const admin = createAdminClient()
         const isLifetime = session.mode === 'payment'
-        const subscriptionId = session.mode === 'subscription' && session.subscription
-          ? ((await getStripe().subscriptions.retrieve(session.subscription as string)).id)
-          : null
+
+        // Lifetime is a one-time payment that includes 2 seats. A pre-account subscription's
+        // base $29 tier includes owner + 2 = 3 seats, and the buyer may have bought more at the
+        // Payment Link - seed from the subscription's actual quantity (floored at the 3 included)
+        // so claim_purchase_token doesn't cap the new org below what they paid for.
+        let subscriptionId: string | null = null
+        let seatsPurchased = 2
+        if (session.mode === 'subscription' && session.subscription) {
+          const sub = await getStripe().subscriptions.retrieve(session.subscription as string)
+          subscriptionId = sub.id
+          seatsPurchased = Math.max(sub.items.data[0]?.quantity ?? 3, 3)
+        }
 
         await admin.from('purchase_tokens').upsert(
           {
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
             stripe_subscription_id: subscriptionId,
             plan_type: isLifetime ? 'lifetime' : 'subscription',
             email: session.customer_details?.email ?? '',
-            seats_purchased: 2,
+            seats_purchased: seatsPurchased,
             expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           },
           { onConflict: 'stripe_checkout_session_id', ignoreDuplicates: true }
