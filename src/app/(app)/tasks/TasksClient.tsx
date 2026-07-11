@@ -752,7 +752,7 @@ export default function TasksClient({
                   </span>
                 </Button>
               )}
-              <Button variant="primary" size="lg" className="rounded-full" onClick={headerAction.onClick}>
+              <Button variant="primary" size="lg" className="rounded-full" data-tour="add-task-button" onClick={headerAction.onClick}>
                 + New task
               </Button>
             </div>

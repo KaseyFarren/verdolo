@@ -329,7 +329,7 @@ export default function ReportsClient({
 
   return (
     <div>
-      <div className="mb-5">
+      <div className="mb-5" data-tour="reports-summary">
         <div className="font-heading text-2xl font-bold text-ink">Reports</div>
         <div className="text-sm text-sage mt-1">Client activity, profitability, team capacity, and the weekly recap library.</div>
       </div>

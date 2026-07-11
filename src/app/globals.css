@@ -91,6 +91,20 @@ button:focus-visible {
    (see TourProvider), which lands after this stylesheet in the cascade - !important on every
    property here is load-bearing, not decoration, since same-specificity + later source order
    would otherwise let the library's own defaults win. */
+/* Interactive tour: driver.js's own stylesheet sets `pointer-events: none` on every element except
+   the highlighted one, so the forms a step points at (add a client, start a timer) can't actually
+   be filled. Re-enable interaction across the whole page while the tour is active, but keep the dim
+   overlay itself click-through so it never intercepts the clicks meant for the page beneath it. The
+   overlay rules are more specific than the blanket one, so they win regardless of source order.
+   Paired with allowClose:false in TourProvider, the tour still advances only via its own buttons. */
+body.driver-active * {
+  pointer-events: auto !important;
+}
+body.driver-active .driver-overlay,
+body.driver-active .driver-overlay path {
+  pointer-events: none !important;
+}
+
 .driver-popover {
   background-color: var(--cream) !important;
   color: var(--ink) !important;

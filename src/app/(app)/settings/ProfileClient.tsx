@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section } from '@/components/settings/SettingsUI'
 import { AVATAR_COLORS, getInitials } from '@/lib/agency'
+import { startTourReplay } from '@/lib/tour'
 
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 
@@ -169,6 +170,7 @@ export default function ProfileClient({
       <Row title="Nickname" subtitle="Shown instead of your email across the app">
         <div className="flex items-center gap-2">
           <input
+            data-tour="display-name"
             className="rounded border border-ink/10 bg-white px-2 py-1.5 text-sm w-40"
             placeholder="Your name"
             value={displayName}
@@ -177,6 +179,14 @@ export default function ProfileClient({
           />
           {saved && <span className="text-xs text-green">Saved</span>}
         </div>
+      </Row>
+      <Row title="Guided tour" subtitle="Replay the walkthrough of where to enter your info, tailored to your role">
+        <button
+          className="rounded border border-ink/10 bg-white px-3 py-1.5 text-sm hover:bg-sand/60"
+          onClick={() => startTourReplay(orgId)}
+        >
+          Replay tour
+        </button>
       </Row>
     </Section>
   )

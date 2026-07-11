@@ -109,6 +109,7 @@ export default function GeneralClient({
             type="number"
             min="0"
             step="1"
+            data-tour="target-hourly-rate"
             className="w-20 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
             value={hourlyCost}
             disabled={!isAdmin}

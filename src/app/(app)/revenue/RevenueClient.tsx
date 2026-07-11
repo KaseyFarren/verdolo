@@ -314,7 +314,7 @@ export default function RevenueClient({
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3" data-tour="revenue-summary">
         <div className="rounded-2xl bg-white shadow-md p-5">
           <div className="text-xs text-sage mb-1">Total revenue</div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>

@@ -111,6 +111,7 @@ export default function TaskRow({
         className={`grid ${ROW_GRID_COLS} gap-2 items-center py-2 group ${t.notes ? '' : 'border-b border-ink/10'} ${isTimerRunning ? 'bg-green/5' : ''} ${isSubtask ? 'pl-6' : ''}`}
       >
         <button
+          data-tour="task-checkbox"
           onClick={() => {
             if (!t.done && hasOpenSubtasks) return
             if (t.done) uncomplete()

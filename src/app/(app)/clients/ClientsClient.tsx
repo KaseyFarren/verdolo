@@ -563,7 +563,11 @@ export default function ClientsClient({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      {/* The tour anchors to this header row (not the button alone): the "+ New client" button
+          unmounts when showAdd flips, but the row itself stays put and stays small - the add form
+          opens as a sibling below, so the tour popover keeps its position instead of being shoved
+          off-screen by a growing highlight. */}
+      <div className="flex items-center justify-between mb-5" data-tour="clients-add-region">
         <h1 className="text-xl font-semibold">
           Clients <span className="text-sm font-normal text-sage">({clients.length})</span>
         </h1>
