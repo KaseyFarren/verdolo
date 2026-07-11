@@ -420,6 +420,43 @@ export default function TimeClient({
     }
   }
 
+  const [clearingOrphaned, setClearingOrphaned] = useState(false)
+
+  // Entries whose client was deleted have client_id set to null (ON DELETE SET NULL) and render as
+  // "No client". Unlike clearOldEntries there's nothing to roll up - a deleted client has no
+  // client-level history worth preserving - so this just hard-deletes them. The count is read from
+  // the DB (not the paginated local list) so the confirm is accurate even when entries aren't all
+  // loaded. Admin-gated; is_org_admin lets the delete reach other members' orphaned rows too.
+  async function clearOrphaned() {
+    const { count } = await supabase
+      .from('time_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .is('client_id', null)
+    if (!count) {
+      toast('No entries without a client to clear')
+      return
+    }
+    const noun = count === 1 ? 'entry' : 'entries'
+    const ok = await confirm({
+      title: `Delete ${count} ${noun} with no client?`,
+      message:
+        "These entries are no longer tied to an active client (the client was deleted), so clearing them won't affect any client's history. This cannot be undone.",
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    setClearingOrphaned(true)
+    const { error } = await supabase.from('time_entries').delete().eq('org_id', orgId).is('client_id', null)
+    setClearingOrphaned(false)
+    if (error) {
+      toast.error('Could not clear those entries')
+      return
+    }
+    setEntries((prev) => prev.filter((e) => e.client_id))
+    toast.success(`Cleared ${count} ${noun}`)
+  }
+
   function startEdit(e: Entry) {
     setEditingId(e.id)
     setEditClientId(e.client_id || '')
@@ -823,6 +860,15 @@ export default function TimeClient({
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-sage">Entries</div>
         <div className="flex items-center gap-3">
+          {isAdmin && entries.some((e) => !e.client_id) && (
+            <button
+              onClick={clearOrphaned}
+              disabled={clearingOrphaned}
+              className="text-xs text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
+            >
+              {clearingOrphaned ? 'Clearing…' : 'Clear no-client'}
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => setShowClearOld((v) => !v)}
