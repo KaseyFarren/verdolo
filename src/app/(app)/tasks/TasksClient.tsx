@@ -69,7 +69,7 @@ const emptyTaskForm = {
   clientId: '',
   assigneeIds: [] as string[],
   dueDate: todayKey(),
-  priority: 'Medium',
+  priority: '',
   notes: '',
 }
 const emptyRecurringForm = {
@@ -220,7 +220,7 @@ export default function TasksClient({
       assignee_ids: assigneeIds,
       assigned_to: deriveAssignedTo(assigneeIds),
       due_date: taskForm.dueDate,
-      priority: taskForm.priority,
+      priority: taskForm.priority || 'Medium',
       notes: taskForm.notes,
       quick: taskMode === 'quick',
       done: false,

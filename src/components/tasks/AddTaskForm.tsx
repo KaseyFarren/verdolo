@@ -68,6 +68,7 @@ export default function AddTaskForm({
             value={form.priority}
             onChange={(v) => setForm((f) => ({ ...f, priority: v }))}
             options={PRIORITY.map((p) => ({ value: p, label: p }))}
+            placeholder="Priority"
           />
         )}
         {mode === 'detailed' && (

@@ -75,6 +75,7 @@ export default function AddTaskFormMulti({
             value={form.priority}
             onChange={(v) => setForm((f) => ({ ...f, priority: v }))}
             options={PRIORITY.map((p) => ({ value: p, label: p }))}
+            placeholder="Priority"
           />
         )}
         {detailed && (

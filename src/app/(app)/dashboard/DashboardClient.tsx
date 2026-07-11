@@ -155,7 +155,7 @@ export default function DashboardClient({
   const [sentClientIds, setSentClientIds] = useState<Set<string>>(new Set(initialSentToday))
   const [showAddTask, setShowAddTask] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
-  const [taskForm, setTaskForm] = useState<TaskFormState>({ title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: 'Medium', notes: '' })
+  const [taskForm, setTaskForm] = useState<TaskFormState>({ title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: '', notes: '' })
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
 
@@ -241,7 +241,7 @@ export default function DashboardClient({
         client_id: taskForm.clientId || null,
         assigned_to: taskForm.assignedTo || (taskMode === 'quick' ? userId : null),
         due_date: taskForm.dueDate,
-        priority: taskForm.priority,
+        priority: taskForm.priority || 'Medium',
         notes: taskForm.notes,
         quick: taskMode === 'quick',
         done: false,
