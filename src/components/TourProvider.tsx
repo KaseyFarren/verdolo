@@ -1,171 +1,237 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { stepsForRole, tourReplayKey, tourStepKey, type Role, type TourStep } from '@/lib/tour'
 
-// Mounted once in AppShell for every role. Two ways it activates:
-//   1. Owner first-run - if the org has never completed the tour, it starts automatically. This is
-//      about getting the agency's initial setup done, so only the owner is auto-prompted.
-//   2. Replay - any role can re-trigger it from Settings (startTourReplay sets the replay flag);
-//      that path never persists completion and is filtered to a role-appropriate set of steps.
-// Each step lives on a specific page; progress is kept in localStorage so it survives the full
-// page load between steps (see goToStep for why that has to be a hard navigation).
+const PAD = 14 // gap between the card and page content
+const HOLE = 6 // padding around the spotlight cutout
+const CARD_W = 300
+
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v))
+}
+
+type Rect = { top: number; left: number; width: number; height: number }
+
+// Mounted once in AppShell for every role. Activates either as the owner's automatic first-run tour
+// or via replay (any role, from Settings). Instead of a blocking overlay it uses a box-shadow
+// "spotlight" - the page stays fully interactive, the cutout is rounded, and the guide card is
+// placed in whatever margin is free so it never covers page content. Progress lives in localStorage
+// so it survives the hard navigation between steps that live on different pages; same-page steps
+// transition softly so an in-flight save isn't aborted by a reload.
 export default function TourProvider({ orgId, role }: { orgId: string; role?: Role }) {
   const pathname = usePathname()
   const [active, setActive] = useState(false)
-  // A replay runs the tour without persisting completion (and for non-owners is the only entry).
   const [isReplay, setIsReplay] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
+  const [rect, setRect] = useState<Rect | null>(null)
+  const [cardPos, setCardPos] = useState<{ left: number; top: number } | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
   const checkedRef = useRef(false)
+
+  const steps = useMemo(() => (role ? stepsForRole(role) : []), [role])
+  const step: TourStep | undefined = active ? steps[stepIndex] : undefined
 
   useEffect(() => {
     if (!role || checkedRef.current) return
     checkedRef.current = true
+    const stored = Number(localStorage.getItem(tourStepKey(orgId)) ?? '0')
+    const initial = Number.isInteger(stored) && stored >= 0 ? stored : 0
 
-    // Replay is armed synchronously in localStorage before the navigation that lands us here, so
-    // it takes precedence and needs no network round-trip.
     if (localStorage.getItem(tourReplayKey(orgId)) === '1') {
       setIsReplay(true)
+      setStepIndex(initial)
       setActive(true)
       return
     }
-
-    // Otherwise only the owner gets the automatic first-run tour.
     if (role !== 'owner') return
     let cancelled = false
     ;(async () => {
       const supabase = createClient()
       const { data: org } = await supabase.from('orgs').select('onboarding_tour_completed_at').eq('id', orgId).maybeSingle()
-      if (!cancelled && !org?.onboarding_tour_completed_at) setActive(true)
+      if (!cancelled && !org?.onboarding_tour_completed_at) {
+        setStepIndex(initial)
+        setActive(true)
+      }
     })()
     return () => {
       cancelled = true
     }
   }, [orgId, role])
 
-  useEffect(() => {
-    if (!active || !role) return
-    const steps: TourStep[] = stepsForRole(role)
-    if (steps.length === 0) return
-
-    let cancelled = false
-    let finished = false
-    let unmounting = false
-    let driverObj: { destroy: () => void } | null = null
-
-    async function finish() {
-      if (finished) return
-      finished = true
-      localStorage.removeItem(tourStepKey(orgId))
-      localStorage.removeItem(tourReplayKey(orgId))
-      // Persist completion only for the owner's genuine first run - the API is owner-only, and a
-      // replay (any role) shouldn't stamp or re-stamp the org's onboarding flag.
-      if (!isReplay && role === 'owner') {
-        await fetch('/api/onboarding/complete-tour', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orgId }),
-        })
-      }
+  const finish = useCallback(async () => {
+    setActive(false)
+    localStorage.removeItem(tourStepKey(orgId))
+    localStorage.removeItem(tourReplayKey(orgId))
+    if (!isReplay && role === 'owner') {
+      await fetch('/api/onboarding/complete-tour', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId }),
+      })
     }
+  }, [orgId, isReplay, role])
 
-    function goToStep(index: number) {
-      localStorage.setItem(tourStepKey(orgId), String(index))
-      // Hard navigation, not router.push - every step lives on a page whose page.tsx wraps
-      // AppShell itself (there's no shared authenticated layout), so a client-side transition
-      // would leave this component's old instance alive in Next's router cache instead of tearing
-      // it down, and its stale closure (still watching the old page's DOM) can then misfire.
-      window.location.assign(steps[index].path)
-    }
-
-    async function start() {
-      const stored = Number(localStorage.getItem(tourStepKey(orgId)) ?? '0')
-      const index = Number.isInteger(stored) && stored >= 0 && stored < steps.length ? stored : 0
-      const step = steps[index]
-      // Steps may deep-link a settings tab (path has a ?view= query); match on the pathname only.
-      if (step.path.split('?')[0] !== pathname) return
-
-      if (index === 0 && window.innerWidth < 768) {
-        document.getElementById('mobile-nav-toggle')?.click()
-      }
-
-      // The target element may not exist yet right after navigation (page fade-in, data fetch).
-      for (let attempt = 0; attempt < 30 && !cancelled; attempt++) {
-        if (document.querySelector(step.selector)) break
-        await new Promise((r) => setTimeout(r, 100))
-      }
-      if (cancelled) return
-
-      // A step's anchor can be legitimately absent (e.g. "complete a task" when there are no tasks
-      // yet, or a role landing on an empty state). Rather than stall the whole tour, skip ahead -
-      // the final step anchors on the always-present nav, so this can't loop forever.
-      if (!document.querySelector(step.selector)) {
-        if (index < steps.length - 1) goToStep(index + 1)
-        else finish()
+  // Advance to an index. Same-page steps transition softly (no reload, so an in-flight optimistic
+  // save isn't cut off); cross-page steps hard-navigate. The current pathname is captured so a
+  // stale closure can't misroute after navigation.
+  const goToStep = useCallback(
+    (index: number) => {
+      if (index >= steps.length) {
+        finish()
         return
       }
+      localStorage.setItem(tourStepKey(orgId), String(index))
+      if (steps[index].path.split('?')[0] === pathname) {
+        setRect(null)
+        setStepIndex(index)
+      } else {
+        window.location.assign(steps[index].path)
+      }
+    },
+    [steps, pathname, orgId, finish]
+  )
 
-      const { driver } = await import('driver.js')
-      await import('driver.js/dist/driver.css')
-      if (cancelled) return
+  // Track the spotlight + card position for the current step, and wire auto-advance.
+  useEffect(() => {
+    if (!active || !step) return
+    if (step.path.split('?')[0] !== pathname) return // wrong page; a hard nav will remount us here
 
-      const isLast = index === steps.length - 1
-      const instance = driver({
-        // Never dismiss on an outside/overlay click - several steps ask the user to interact with
-        // the page (fill the add-client form, start a timer) right next to the popover, and driver
-        // otherwise treats those clicks as "close". The popover's own X (onCloseClick) still exits.
-        allowClose: false,
-        // Lighter dim on steps the user fills in, so a form that opens below the highlight stays
-        // clearly legible; heavier dim on read-only steps for stronger focus.
-        overlayOpacity: step.interactive ? 0.45 : 0.7,
-        onCloseClick: () => {
-          finish()
-          instance.destroy()
-        },
-        onDestroyed: () => {
-          if (unmounting) return
-          finish()
-        },
-        steps: [
-          {
-            element: step.selector,
-            popover: {
-              title: `${step.title} (${index + 1}/${steps.length})`,
-              description: step.description,
-              // Let driver auto-fit by default so the popover lands on whichever side has room and
-              // doesn't cover the input; a step can force a side when auto-fit picks poorly.
-              ...(step.side ? { side: step.side } : {}),
-              ...(step.align ? { align: step.align } : {}),
-              // First step has nowhere to go back to, so drop the Previous button there.
-              showButtons: index === 0 ? ['next', 'close'] : ['previous', 'next', 'close'],
-              nextBtnText: isLast ? 'Done' : 'Next',
-              onNextClick: () => {
-                if (isLast) {
-                  finish()
-                  instance.destroy()
-                } else {
-                  goToStep(index + 1)
-                }
-              },
-              onPrevClick: () => {
-                if (index > 0) goToStep(index - 1)
-              },
-            },
-          },
-        ],
-      })
-      driverObj = instance
-      instance.drive()
+    // Reserve the right rail so page content reflows out from under the card.
+    document.body.classList.add('tour-active')
+
+    let raf = 0
+    let cancelled = false
+    let advanced = false
+
+    // Card lives in a fixed rail (right on desktop, bottom on mobile) that page content reflows
+    // away from (see body.tour-active in globals.css), so it never covers a real element. Vertical
+    // position tracks the spotlight so the guidance stays next to what it's describing.
+    function positionCard(target: Rect | null) {
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const cardH = cardRef.current?.offsetHeight || 220
+      if (vw < 768) {
+        setCardPos({ left: clamp((vw - CARD_W) / 2, PAD, vw - CARD_W - PAD), top: vh - cardH - PAD })
+        return
+      }
+      const left = vw - 30 - CARD_W
+      const top = target ? clamp(target.top + target.height / 2 - cardH / 2, PAD, vh - cardH - PAD) : clamp(vh / 2 - cardH / 2, PAD, vh - cardH - PAD)
+      setCardPos({ left, top })
     }
 
-    start()
+    // No selector => card only, no spotlight (intro / outro).
+    if (!step.selector) {
+      setRect(null)
+      positionCard(null)
+      return () => {
+        document.body.classList.remove('tour-active')
+      }
+    }
+
+    let waited = 0
+    let marked: Element | null = null
+    function loop() {
+      if (cancelled) return
+      const el = document.querySelector(step!.selector)
+      if (el) {
+        // Flag the spotlighted element so CSS can force-show controls that are otherwise
+        // hover-only (the task row's snooze/skip cluster).
+        if (marked !== el) {
+          marked?.removeAttribute('data-tour-active')
+          el.setAttribute('data-tour-active', '')
+          marked = el
+        }
+        const r = el.getBoundingClientRect()
+        const target = { top: r.top, left: r.left, width: r.width, height: r.height }
+        setRect(target)
+        positionCard(target)
+      } else {
+        // Anchor absent (e.g. "complete a task" with no tasks). Give it a moment, then skip ahead.
+        waited += 16
+        if (waited > 2500 && !advanced) {
+          advanced = true
+          goToStep(stepIndex + 1)
+          return
+        }
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+
+    // Auto-advance when the user performs the step's action. Delay the hop so the optimistic save
+    // and its DB write settle before any page navigation.
+    function onDocClick(e: MouseEvent) {
+      if (advanced || !step!.advanceOn) return
+      if ((e.target as Element)?.closest(step!.advanceOn)) {
+        advanced = true
+        setTimeout(() => {
+          if (!cancelled) goToStep(stepIndex + 1)
+        }, 800)
+      }
+    }
+    document.addEventListener('click', onDocClick, true)
+
     return () => {
       cancelled = true
-      unmounting = true
-      driverObj?.destroy()
+      cancelAnimationFrame(raf)
+      document.removeEventListener('click', onDocClick, true)
+      marked?.removeAttribute('data-tour-active')
+      document.body.classList.remove('tour-active')
     }
-  }, [active, isReplay, pathname, orgId, role])
+  }, [active, step, pathname, stepIndex, goToStep])
 
-  return null
+  if (!active || !step || step.path.split('?')[0] !== pathname || !cardPos) return null
+
+  const isLast = stepIndex === steps.length - 1
+
+  return (
+    <>
+      {rect && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            top: rect.top - HOLE,
+            left: rect.left - HOLE,
+            width: rect.width + HOLE * 2,
+            height: rect.height + HOLE * 2,
+            borderRadius: 12,
+            boxShadow: '0 0 0 9999px rgba(20, 20, 18, 0.55)',
+            pointerEvents: 'none',
+            zIndex: 100000,
+            transition: 'all 0.15s ease',
+          }}
+        />
+      )}
+      {!rect && (
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(20, 20, 18, 0.55)', pointerEvents: 'none', zIndex: 100000 }} />
+      )}
+      <div
+        ref={cardRef}
+        style={{ position: 'fixed', left: cardPos.left, top: cardPos.top, width: CARD_W, zIndex: 100001 }}
+        className="rounded-2xl bg-cream border border-ink/10 shadow-lg p-5"
+      >
+        <button aria-label="Close tour" onClick={finish} className="absolute top-3 right-3 text-sage hover:text-ink text-sm leading-none">
+          ✕
+        </button>
+        <div className="font-heading font-bold text-ink text-base pr-6">
+          {step.title} <span className="text-sage font-normal text-sm">({stepIndex + 1}/{steps.length})</span>
+        </div>
+        <p className="text-sm text-sage mt-2 leading-relaxed">{step.description}</p>
+        <div className="flex items-center justify-end gap-2 mt-4">
+          {stepIndex > 0 && (
+            <button onClick={() => goToStep(stepIndex - 1)} className="rounded-full px-3 py-1.5 text-sm text-sage hover:text-ink hover:bg-sand transition-colors">
+              Previous
+            </button>
+          )}
+          <button onClick={() => goToStep(stepIndex + 1)} className="rounded-full bg-accent text-white shadow-md px-4 py-1.5 text-sm font-medium hover:brightness-110 transition">
+            {isLast ? 'Done' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }

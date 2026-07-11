@@ -735,32 +735,35 @@ export default function TasksClient({
         </nav>
         <div className="flex-1 min-w-0">
           {/* Always rendered in the same spot on all four tabs - the "+ New task" button never
-              moves or changes as you switch tabs; only the controls to its left change. */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
-              {(view === 'list' || view === 'calendar') && filterSelect}
-              {view === 'list' && sortSelect}
-            </div>
-            {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
-            <div className={`flex items-center gap-2 ${headerAction.open ? 'invisible pointer-events-none' : ''}`}>
-              {view === 'list' && (
-                <Button variant="secondary" size="lg" className="rounded-full" onClick={() => setShowImportTasks(true)}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <UploadCloudIcon size={14} />
-                    Import from doc
-                  </span>
+              moves or changes as you switch tabs; only the controls to its left change. The tour
+              spotlights this whole region so the add form lights up as it opens. */}
+          <div data-tour="add-task-region">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
+                {(view === 'list' || view === 'calendar') && filterSelect}
+                {view === 'list' && sortSelect}
+              </div>
+              {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
+              <div className={`flex items-center gap-2 ${headerAction.open ? 'invisible pointer-events-none' : ''}`}>
+                {view === 'list' && (
+                  <Button variant="secondary" size="lg" className="rounded-full" onClick={() => setShowImportTasks(true)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <UploadCloudIcon size={14} />
+                      Import from doc
+                    </span>
+                  </Button>
+                )}
+                <Button variant="primary" size="lg" className="rounded-full" data-tour="add-task-button" onClick={headerAction.onClick}>
+                  + New task
                 </Button>
-              )}
-              <Button variant="primary" size="lg" className="rounded-full" data-tour="add-task-button" onClick={headerAction.onClick}>
-                + New task
-              </Button>
+              </div>
             </div>
-          </div>
 
-          {view === 'list' && showAddTask && (
-            <AddTaskFormMulti mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
-          )}
+            {view === 'list' && showAddTask && (
+              <AddTaskFormMulti mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
+            )}
+          </div>
 
           {showImportTasks && (
             <ImportTasksModal

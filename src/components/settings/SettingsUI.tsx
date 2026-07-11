@@ -11,13 +11,15 @@ export function Row({
   title,
   subtitle,
   children,
+  dataTour,
 }: {
   title: React.ReactNode
   subtitle: React.ReactNode
   children: React.ReactNode
+  dataTour?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-ink/10 last:border-b-0 last:pb-0 first:pt-0">
+    <div data-tour={dataTour} className="flex items-center justify-between py-2.5 border-b border-ink/10 last:border-b-0 last:pb-0 first:pt-0">
       <div>
         <div className="text-sm font-medium">{title}</div>
         <div className="text-xs text-sage mt-0.5">{subtitle}</div>

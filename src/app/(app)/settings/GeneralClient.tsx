@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section, Toggle } from '@/components/settings/SettingsUI'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -32,6 +32,22 @@ export default function GeneralClient({
   const [hourlyCost, setHourlyCost] = useState(String((settings.hourly_cost_cents ?? 0) / 100))
   const [currency, setCurrency] = useState<Currency>(settings.currency ?? 'usd')
   const [saved, setSaved] = useState(false)
+  const [rateStatus, setRateStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const rateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Target rate saves as you type (debounced) with its own Saving/Saved feedback, so the value is
+  // committed without needing to click off the field.
+  function onRateChange(v: string) {
+    setHourlyCost(v)
+    if (!isAdmin) return
+    setRateStatus('saving')
+    if (rateDebounce.current) clearTimeout(rateDebounce.current)
+    rateDebounce.current = setTimeout(async () => {
+      await saveSettings({ hourly_cost_cents: Math.round(parseFloat(v) * 100) || 0 })
+      setRateStatus('saved')
+      setTimeout(() => setRateStatus((s) => (s === 'saved' ? 'idle' : s)), 2000)
+    }, 700)
+  }
 
   // Spread the full settings object (not just this component's own fields) - otherwise saving
   // here would silently wipe out settings owned by other tabs (e.g. VoiceClient's brand_voice)
@@ -84,8 +100,8 @@ export default function GeneralClient({
       >
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
-      <Row title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, Clients, and invoices">
-        <div className="w-32" data-tour="billing-currency">
+      <Row dataTour="currency-row" title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, Clients, and invoices">
+        <div className="w-32">
           <CustomSelect
             value={currency}
             disabled={!isAdmin}
@@ -94,18 +110,20 @@ export default function GeneralClient({
           />
         </div>
       </Row>
-      <Row title="Target hourly rate" subtitle="What you want to realize per hour - compared against effective rate in Reports → Profitability and Revenue">
+      <Row dataTour="rate-row" title="Target hourly rate" subtitle="What you want to realize per hour - compared against effective rate in Reports → Profitability and Revenue">
         <div className="flex items-center gap-1">
+          <span className="text-xs w-14 text-right shrink-0">
+            {rateStatus === 'saving' ? <span className="text-sage">Saving…</span> : rateStatus === 'saved' ? <span className="text-green">Saved ✓</span> : null}
+          </span>
           <span className="text-sm text-sage">{currencySymbol(currency)}</span>
           <input
             type="number"
             min="0"
             step="1"
-            data-tour="target-hourly-rate"
             className="w-20 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
             value={hourlyCost}
             disabled={!isAdmin}
-            onChange={(e) => setHourlyCost(e.target.value)}
+            onChange={(e) => onRateChange(e.target.value)}
             onBlur={() => saveSettings({})}
           />
           <span className="text-sm text-sage">/hr</span>

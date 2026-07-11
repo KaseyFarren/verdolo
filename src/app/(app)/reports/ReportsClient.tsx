@@ -367,7 +367,7 @@ export default function ReportsClient({
             />
           </div>
 
-          <div className="mb-8">
+          <div className="mb-8" data-tour="reports-recap">
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Weekly overall recap</div>
             {recap ? (
               <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">

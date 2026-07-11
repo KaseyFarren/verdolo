@@ -102,7 +102,7 @@ export default function AddTaskFormMulti({
         <button type="button" className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button" className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={onSubmit}>
+        <button type="button" data-tour-advance="add-task" className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={onSubmit}>
           {submitLabel}
         </button>
       </div>

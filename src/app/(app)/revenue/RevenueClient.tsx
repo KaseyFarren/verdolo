@@ -376,7 +376,7 @@ export default function RevenueClient({
         )}
       </div>
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">By client</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2" data-tour="revenue-billables">By client</div>
       {clientRows.length === 0 ? (
         <div className="text-sm text-sage py-4 mb-6">No revenue or time logged this period.</div>
       ) : (

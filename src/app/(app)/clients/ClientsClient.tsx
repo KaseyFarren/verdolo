@@ -564,24 +564,24 @@ export default function ClientsClient({
 
   return (
     <div>
-      {/* The tour anchors to this header row (not the button alone): the "+ New client" button
-          unmounts when showAdd flips, but the row itself stays put and stays small - the add form
-          opens as a sibling below, so the tour popover keeps its position instead of being shoved
-          off-screen by a growing highlight. */}
-      <div className="flex items-center justify-between mb-5" data-tour="clients-add-region">
-        <h1 className="text-xl font-semibold">
-          Clients <span className="text-sm font-normal text-sage">({clients.length})</span>
-        </h1>
-        {canEdit && !showAdd && (
-          <Button variant="primary" data-tour="add-client-button" onClick={() => setShowAdd(true)}>
-            + New client
-          </Button>
+      {/* The tour spotlights this whole region: it holds the "+ New client" button and, once open,
+          the add form - so the form itself lights up (bright) while the user fills it in. */}
+      <div data-tour="clients-add-region">
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-semibold">
+            Clients <span className="text-sm font-normal text-sage">({clients.length})</span>
+          </h1>
+          {canEdit && !showAdd && (
+            <Button variant="primary" data-tour="add-client-button" onClick={() => setShowAdd(true)}>
+              + New client
+            </Button>
+          )}
+        </div>
+
+        {canEdit && showAdd && (
+          <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} currencySign={currencySign} />
         )}
       </div>
-
-      {canEdit && showAdd && (
-        <ClientForm title="New client" form={form} setForm={setForm} onCancel={() => setShowAdd(false)} onSave={addClient} members={members} currencySign={currencySign} />
-      )}
 
       {clients.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -871,7 +871,7 @@ function ClientForm({
         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={onCancel}>
           Cancel
         </button>
-        <button className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={onSave}>
+        <button data-tour-advance="save-client" className="flex-1 rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={onSave}>
           Save
         </button>
       </div>
