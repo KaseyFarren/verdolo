@@ -108,6 +108,29 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
     toast.success('Task restored')
   }
 
+  async function clearTasks() {
+    if (!isAdmin) return
+    const ok = await confirm({
+      title: 'Clear all tasks?',
+      message: 'This permanently deletes every task for this org. Clients, time logs, and revenue records are kept, and completed-task history stays on your reports. This cannot be undone.',
+      confirmLabel: 'Clear tasks',
+      danger: true,
+    })
+    if (!ok) return
+    const res = await fetch('/api/data/clear-tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Could not clear tasks' }))
+      toast.error(error || 'Could not clear tasks')
+      return
+    }
+    toast.success('All tasks cleared')
+    if (archiveOpen) loadArchived()
+  }
+
   async function resetAll() {
     if (!isAdmin) return
     const ok = await confirm({
@@ -171,6 +194,13 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
               </div>
             ))}
         </div>
+      )}
+      {isAdmin && (
+        <Row title="Clear all tasks" subtitle="Delete every task, but keep clients, time logs, revenue, and completed-task history">
+          <button className="text-xs text-red-600" onClick={clearTasks}>
+            Clear tasks
+          </button>
+        </Row>
       )}
       {isAdmin && (
         <Row title="Reset all data" subtitle="Delete tasks, clients, and notes for this org">
