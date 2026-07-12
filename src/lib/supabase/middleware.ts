@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { buildCsp, generateNonce } from '@/lib/security/csp'
 
 const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/create-account', '/accept-invite']
 
@@ -9,6 +10,14 @@ export async function updateSession(request: NextRequest) {
   // inbound copy must never survive - this is the trust boundary for that shortcut.
   request.headers.delete('x-user-id')
   request.headers.delete('x-user-email')
+
+  // Per-request CSP nonce. Setting Content-Security-Policy on the forwarded request headers
+  // is how Next.js discovers the nonce and stamps it onto its own inline/bootstrap scripts;
+  // x-nonce is exposed so Server Components can nonce any manual <script> they add later.
+  const nonce = generateNonce()
+  const csp = buildCsp(nonce)
+  request.headers.set('x-nonce', nonce)
+  request.headers.set('Content-Security-Policy', csp)
 
   let pendingCookies: { name: string; value: string; options?: CookieOptions }[] = []
 
@@ -37,7 +46,9 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    redirect.headers.set('Content-Security-Policy', csp)
+    return redirect
   }
 
   // Middleware already validated this session with Supabase's auth server (a real network
@@ -49,6 +60,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const supabaseResponse = NextResponse.next({ request })
+  supabaseResponse.headers.set('Content-Security-Policy', csp)
   pendingCookies.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
 
   return supabaseResponse

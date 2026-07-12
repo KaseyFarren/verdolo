@@ -20,6 +20,12 @@ export const metadata: Metadata = {
   description: "Run your agency - clients, tasks, time, and billing in one place.",
 };
 
+// The per-request CSP nonce (set in the proxy middleware) can only be stamped onto
+// script tags during dynamic rendering. Statically prerendered pages would ship
+// without a nonce and get blocked by 'strict-dynamic', so opt the whole app into
+// dynamic rendering. This app is almost entirely per-request already.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
