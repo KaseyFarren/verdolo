@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       },
     ],
     subscription_data: trialDaysRemaining > 0 ? { trial_period_days: trialDaysRemaining, metadata: { org_id: orgId } } : { metadata: { org_id: orgId } },
+    allow_promotion_codes: true,
     return_url: `${origin}/settings?view=billing&checkout=success`,
     metadata: { org_id: orgId },
   })
