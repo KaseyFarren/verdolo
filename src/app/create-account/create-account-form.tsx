@@ -50,6 +50,20 @@ export default function CreateAccountForm({
       .then(({ data }) => setHasSession(!!data.session))
   }, [])
 
+  // On the first submit we stash the agency name locally so that returning from the email
+  // confirmation link (a fresh page load, on possibly the same device/browser) can finish the
+  // claim without asking the buyer to type it again.
+  useEffect(() => {
+    if (!hasSession || !sessionId) return
+    const stored = window.localStorage.getItem(`pending_org_name_${sessionId}`)
+    if (!stored) return
+    window.localStorage.removeItem(`pending_org_name_${sessionId}`)
+    setOrgName(stored)
+    setLoading(true)
+    finishClaim(stored)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSession, sessionId])
+
   useEffect(() => {
     if (!polling || !sessionId) return
     const maxAttempts = Math.ceil(POLL_TIMEOUT_MS / POLL_INTERVAL_MS)
@@ -71,11 +85,11 @@ export default function CreateAccountForm({
     return () => clearInterval(interval)
   }, [polling, sessionId])
 
-  async function finishClaim() {
+  async function finishClaim(name: string) {
     const supabase = createClient()
     const { error: claimError } = await supabase.rpc('claim_purchase_token', {
       p_session_id: sessionId,
-      p_org_name: orgName,
+      p_org_name: name,
     })
     if (claimError) {
       toast.error('This link is no longer valid. Contact support to finish setting up your account.')
@@ -90,6 +104,10 @@ export default function CreateAccountForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+
+    if (sessionId) {
+      window.localStorage.setItem(`pending_org_name_${sessionId}`, orgName)
+    }
 
     const supabase = createClient()
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -112,13 +130,13 @@ export default function CreateAccountForm({
       return
     }
 
-    await finishClaim()
+    await finishClaim(orgName)
   }
 
   async function handleClaimSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await finishClaim()
+    await finishClaim(orgName)
   }
 
   if (polling) {
@@ -161,6 +179,14 @@ export default function CreateAccountForm({
         <p className="text-sm text-sage text-center">
           We sent a confirmation link to {email}. Click it to finish setting up your account.
         </p>
+      </Shell>
+    )
+  }
+
+  if (hasSession && loading) {
+    return (
+      <Shell>
+        <p className="text-sm text-sage text-center">Finishing up your purchase...</p>
       </Shell>
     )
   }
