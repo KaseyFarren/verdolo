@@ -67,8 +67,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const weekEnd = todayKey(new Date(new Date(weekAnchor).getTime() + 7 * 86400000))
 
   // Profitability has its own month picker (defaults to the current month) - the trend chart
-  // covers that month plus the 5 before it, so monthTimeEntries/monthPaidInvoices below span
-  // that whole 6-month window rather than just "this month".
+  // covers that month plus the 5 before it, so monthTimeEntries below spans that whole
+  // 6-month window rather than just "this month".
   const now = new Date()
   const pMonth = /^\d{4}-\d{2}$/.test(pMonthParam ?? '') ? (pMonthParam as string) : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const { start: trendStart, end: trendEnd, monthKeys } = trendWindow(pMonth)
@@ -82,7 +82,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { data: openTasks },
     { data: weekTimeEntries },
     { data: monthTimeEntries },
-    { data: monthPaidInvoices },
   ] = await Promise.all([
     supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day').eq('org_id', orgId).order('name'),
     supabase
@@ -120,13 +119,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .not('duration_seconds', 'is', null)
       .gte('started_at', trendStart)
       .lt('started_at', trendEnd),
-    supabase
-      .from('invoices')
-      .select('client_id, amount_cents, paid_at')
-      .eq('org_id', orgId)
-      .eq('status', 'paid')
-      .gte('paid_at', trendStart)
-      .lt('paid_at', trendEnd),
   ])
 
   return (
@@ -143,7 +135,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       openTasks={openTasks ?? []}
       weekTimeEntries={weekTimeEntries ?? []}
       monthTimeEntries={monthTimeEntries ?? []}
-      monthPaidInvoices={monthPaidInvoices ?? []}
       targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
       pMonth={pMonth}
       trendMonthKeys={monthKeys}

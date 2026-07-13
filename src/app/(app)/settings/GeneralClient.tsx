@@ -100,7 +100,7 @@ export default function GeneralClient({
       >
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
       </Row>
-      <Row dataTour="currency-row" title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, Clients, and invoices">
+      <Row dataTour="currency-row" title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, and Clients">
         <div className="w-32">
           <CustomSelect
             value={currency}

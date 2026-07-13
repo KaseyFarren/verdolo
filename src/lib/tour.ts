@@ -44,7 +44,7 @@ const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="currency-row"]',
     title: 'Pick your billing currency',
     description:
-      'Choose the currency your clients actually pay you in - USD, GBP, or EUR. It sets the symbol everywhere: Reports, Revenue, Clients, and invoices.',
+      'Choose the currency your clients actually pay you in - USD, GBP, or EUR. It sets the symbol everywhere: Reports, Revenue, and Clients.',
     roles: MANAGERS,
   },
   {
@@ -60,7 +60,7 @@ const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="clients-add-region"]',
     title: 'Add your first client',
     description:
-      'Click "+ New client", fill in the highlighted form, and press its Save button - that adds the client and moves the tour on automatically. The name plus Retainer/Hourly rate is what drives your reports, revenue and invoices.',
+      'Click "+ New client", fill in the highlighted form, and press its Save button - that adds the client and moves the tour on automatically. The name plus Retainer/Hourly rate is what drives your reports and revenue.',
     roles: MANAGERS,
     advanceOn: '[data-tour-advance="save-client"]',
   },

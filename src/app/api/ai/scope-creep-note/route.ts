@@ -61,22 +61,18 @@ export async function POST(request: Request) {
   const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
   const periodLabel = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
-  const [{ data: entries }, { data: paidInvoices }] = await Promise.all([
-    supabase
-      .from('time_entries')
-      .select('duration_seconds')
-      .eq('org_id', orgId)
-      .eq('client_id', clientId)
-      .not('duration_seconds', 'is', null)
-      .gte('started_at', monthStart)
-      .lt('started_at', monthEnd),
-    supabase.from('invoices').select('amount_cents').eq('org_id', orgId).eq('client_id', clientId).eq('status', 'paid').gte('paid_at', monthStart).lt('paid_at', monthEnd),
-  ])
+  const { data: entries } = await supabase
+    .from('time_entries')
+    .select('duration_seconds')
+    .eq('org_id', orgId)
+    .eq('client_id', clientId)
+    .not('duration_seconds', 'is', null)
+    .gte('started_at', monthStart)
+    .lt('started_at', monthEnd)
 
   const hours = (entries || []).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
-  const paidCents = (paidInvoices || []).reduce((s, i) => s + i.amount_cents, 0)
   // Mirrors profitabilityForMonth in ReportsClient.tsx - revenue and hours must describe the
-  // same window (the calendar month), or an unpaid mid-cycle retainer client looks like it
+  // same window (the calendar month), or a retainer client billed mid-month looks like it
   // made its full monthly revenue already, pushing effectiveRateCents above target even when
   // the header (which prorates by calendar month too) shows the client below it.
   //
@@ -88,8 +84,7 @@ export async function POST(request: Request) {
   const today = /^\d{4}-\d{2}-\d{2}$/.test(clientToday ?? '') ? clientToday : todayKey()
   const monthKey = `${y}-${String(m).padStart(2, '0')}`
   const retainerFraction = monthElapsedFraction(monthKey, today)
-  const estimatedCents = Math.round((client.retainer_cents || 0) * retainerFraction)
-  const revenueCents = paidCents || estimatedCents
+  const revenueCents = Math.round((client.retainer_cents || 0) * retainerFraction)
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
 
   try {
@@ -99,7 +94,7 @@ export async function POST(request: Request) {
       revenueCents,
       effectiveRateCents,
       targetRateCents,
-      isEstimatedRevenue: !paidCents,
+      isEstimatedRevenue: true,
       periodLabel,
       currencySign,
     })

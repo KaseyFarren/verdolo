@@ -3,24 +3,21 @@ import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/age
 import { billingCycleElapsedFraction } from '@/lib/period'
 import DashboardClient from './DashboardClient'
 
-// Retainer prorated by billing cycle + hourly billable hours × rate, paid invoices overriding
-// the estimate where they exist - same methodology as Reports' profitabilityForMonth, just
-// summed to one number instead of broken out per client. Kept server-side only: billing rows
-// (retainer_cents, hourly_rate_cents) never reach the client bundle for non-admin sessions.
+// Retainer prorated by billing cycle + hourly billable hours × rate - same methodology as
+// Reports' profitabilityForMonth, just summed to one number instead of broken out per client.
+// Kept server-side only: billing rows (retainer_cents, hourly_rate_cents) never reach the
+// client bundle for non-admin sessions.
 function estimateMonthRevenueCents(
   billingClients: { id: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
-  invoices: { client_id: string; amount_cents: number }[],
 ) {
   let total = 0
   for (const c of billingClients) {
     const clientEntries = entries.filter((e) => e.client_id === c.id)
-    const paidCents = invoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
     const isHourly = c.billing_mode === 'hourly'
-    const estimatedCents = isHourly
+    total += isHourly
       ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
       : Math.round((c.retainer_cents || 0) * billingCycleElapsedFraction(c.billing_day || 1))
-    total += paidCents || estimatedCents
   }
   return total
 }
@@ -49,7 +46,6 @@ export default async function DashboardPage() {
     { data: weekCompletedTasks },
     { data: billingClients },
     { data: monthEntries },
-    { data: monthPaidInvoices },
   ] = await Promise.all([
     // .limit(2000) is a defensive ceiling against pathological growth, not user-facing pagination.
     // The active-tasks query below is intentionally left unbounded - the Today/Overdue/Upcoming
@@ -116,18 +112,9 @@ export default async function DashboardPage() {
           .gte('started_at', `${monthStart}T00:00:00`)
           .lt('started_at', `${monthEnd}T00:00:00`)
       : Promise.resolve({ data: [] }),
-    isAdmin
-      ? supabase
-          .from('invoices')
-          .select('client_id, amount_cents')
-          .eq('org_id', orgId)
-          .eq('status', 'paid')
-          .gte('paid_at', `${monthStart}T00:00:00`)
-          .lt('paid_at', `${monthEnd}T00:00:00`)
-      : Promise.resolve({ data: [] }),
   ])
 
-  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? [], monthPaidInvoices ?? []) : 0
+  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? []) : 0
   const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
 
   return (
