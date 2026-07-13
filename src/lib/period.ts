@@ -101,13 +101,21 @@ function clampedBillingDate(year: number, month1indexed: number, billingDay: num
   return new Date(year, month1indexed - 1, Math.min(billingDay, dim))
 }
 
-/** Fraction of a client's current billing cycle elapsed as of today, given the day of the
- * month their retainer renews on (1-31; see clampedBillingDate for how short months are
- * handled). Unlike monthElapsedFraction this doesn't assume every client resets on the 1st: a
- * client billed on the 15th is starting a fresh cycle on the 15th, not the 1st. Counts today as
- * a whole elapsed day (same convention as monthElapsedFraction's dayOfMonth/daysInMonth), so a
+export type BillingCycleProgress = {
+  cycleStart: string
+  cycleEnd: string
+  cycleLengthDays: number
+  elapsedDays: number
+  fraction: number
+}
+
+/** Full detail behind a client's current billing cycle as of today, given the day of the month
+ * their retainer renews on (1-31; see clampedBillingDate for how short months are handled).
+ * Unlike monthElapsedFraction this doesn't assume every client resets on the 1st: a client
+ * billed on the 15th is starting a fresh cycle on the 15th, not the 1st. Counts today as a whole
+ * elapsed day (same convention as monthElapsedFraction's dayOfMonth/daysInMonth), so a
  * billing_day of 1 reproduces monthElapsedFraction exactly for clients left at the default. */
-export function billingCycleElapsedFraction(billingDay: number, today: string = todayKey()): number {
+export function billingCycleProgress(billingDay: number, today: string = todayKey()): BillingCycleProgress {
   const [y, m, d] = today.split('-').map(Number)
   const thisMonthBillingDate = clampedBillingDate(y, m, billingDay)
   const cycleStartsThisMonth = d >= thisMonthBillingDate.getDate()
@@ -123,7 +131,19 @@ export function billingCycleElapsedFraction(billingDay: number, today: string = 
   const now = new Date(y, m - 1, d)
   const cycleLengthDays = Math.round((cycleEnd.getTime() - cycleStart.getTime()) / 86400000)
   const elapsedDays = Math.round((now.getTime() - cycleStart.getTime()) / 86400000) + 1
-  return Math.min(1, Math.max(0, elapsedDays / cycleLengthDays))
+  return {
+    cycleStart: todayKey(cycleStart),
+    cycleEnd: todayKey(cycleEnd),
+    cycleLengthDays,
+    elapsedDays,
+    fraction: Math.min(1, Math.max(0, elapsedDays / cycleLengthDays)),
+  }
+}
+
+/** Fraction of a client's current billing cycle elapsed as of today - see billingCycleProgress
+ * for the full breakdown (cycle dates, day counts) this is derived from. */
+export function billingCycleElapsedFraction(billingDay: number, today: string = todayKey()): number {
+  return billingCycleProgress(billingDay, today).fraction
 }
 
 /** Every renewal date (clamped per clampedBillingDate) that falls within [rangeStart, rangeEnd)

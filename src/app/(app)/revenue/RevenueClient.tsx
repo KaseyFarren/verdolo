@@ -13,6 +13,7 @@ import {
   currencySymbol,
   dollarsToCents,
   effectiveRate,
+  formatDate,
   getInitials,
   getStage,
   isRateComparisonMeaningful,
@@ -21,7 +22,7 @@ import {
   todayKey,
   type Currency,
 } from '@/lib/agency'
-import { isFullCalendarMonth, billingCycleElapsedFraction, billingDatesInRange, periodBounds, type PeriodValue } from '@/lib/period'
+import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import DatePicker from '@/components/ui/DatePicker'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -187,7 +188,8 @@ export default function RevenueClient({
         // 1st). For anything narrower (a week, a custom range), a partial slice isn't a real event
         // - so instead recognize the full retainer on whichever day(s) in that range are actually
         // this client's renewal date, and nothing otherwise.
-        const retainerFraction = period.period === 'this_month' ? billingCycleElapsedFraction(c.billing_day || 1) : 1
+        const cycleProgress = period.period === 'this_month' ? billingCycleProgress(c.billing_day || 1) : null
+        const retainerFraction = cycleProgress ? cycleProgress.fraction : 1
         const billingDatesThisRange = !isHourly && !isFullMonth && rangeStart && rangeEnd ? billingDatesInRange(c.billing_day || 1, rangeStart, rangeEnd) : []
         const retainerRevenue = isHourly
           ? 0
@@ -213,7 +215,21 @@ export default function RevenueClient({
         const hours = seconds / 3600
         const rate = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
-        return { client: c, isHourly, chargesTotal, totalRevenue, rateRevenueCents, seconds, hours, rate, rateDeltaCents, billedThisRange: billingDatesThisRange.length > 0 }
+        return {
+          client: c,
+          isHourly,
+          chargesTotal,
+          totalRevenue,
+          rateRevenueCents,
+          seconds,
+          hours,
+          rate,
+          rateDeltaCents,
+          billedThisRange: billingDatesThisRange.length > 0,
+          billingDatesThisRange,
+          cycleProgress: !isHourly ? cycleProgress : null,
+          retainerRevenue,
+        }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
@@ -435,12 +451,23 @@ export default function RevenueClient({
                     {r.isHourly ? (
                       <span className="text-sage ml-2 text-xs">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr hourly</span>
                     ) : r.client.retainer_cents ? (
-                      <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span>
+                      <span className="text-sage ml-2 text-xs">
+                        {fmtMoney(r.client.retainer_cents)}/mo retainer · renews day {r.client.billing_day || 1}
+                      </span>
+                    ) : null}
+                    {r.cycleProgress && r.client.retainer_cents ? (
+                      <InfoTooltip
+                        content={`Day ${r.cycleProgress.elapsedDays} of ${r.cycleProgress.cycleLengthDays} in this billing cycle (${formatDate(
+                          r.cycleProgress.cycleStart,
+                        )} – ${formatDate(r.cycleProgress.cycleEnd)}) - ${Math.round(r.cycleProgress.fraction * 100)}% of ${fmtMoney(
+                          r.client.retainer_cents,
+                        )} = ${fmtMoney(r.retainerRevenue)} recognized so far.`}
+                      />
                     ) : null}
                     {r.billedThisRange && (
                       <span
                         className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 align-middle"
-                        title="Retainer renews in this period - full amount recognized on that day"
+                        title={`Renews ${r.billingDatesThisRange.map((d) => formatDate(d)).join(', ')} - full retainer recognized that day`}
                       >
                         Billed this period
                       </span>
