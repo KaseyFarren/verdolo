@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
-import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
+import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, currencySymbol, type Currency } from '@/lib/agency'
 import { monthElapsedFraction, billingCycleElapsedFraction, addDays } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
@@ -284,7 +284,12 @@ export default function ReportsClient({
           : Math.round((c.retainer_cents || 0) * retainerFraction)
         const revenueCents = paidCents || estimatedCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
-        const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
+        // Hourly clients used to be excluded here on the theory that their rate is tautologically
+        // their contracted hourly_rate_cents - but `hours` is ALL logged hours while `revenueCents`
+        // only counts billable ones, so non-billable time dilutes the real effective rate below the
+        // nominal one. That's a genuine "are we over-serving this account" signal, not a tautology,
+        // so every client with a computable rate gets a delta.
+        const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
         const isPartialMonth = retainerFraction < 1
         return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth }
       })
@@ -297,26 +302,35 @@ export default function ReportsClient({
   }
 
   // A single week is never a full billing cycle, so - matching the Revenue page's isFullMonth
-  // rule - retainer clients only contribute revenue here if they actually had an invoice paid
-  // that week; no prorated estimate the way the month view has one. Hourly revenue still scales
-  // to any period length.
+  // rule - retainer clients only contribute *actual* revenue here if they had an invoice paid
+  // that week (used for the Revenue $ bar chart); no fictional weekly slice of the retainer.
+  // But "effective rate" answers a different question (was this account worth the time this
+  // week?), and that needs *some* revenue proxy to divide by - a retainer client with real
+  // logged hours but zero weekly "revenue" would otherwise read as a terrible rate every single
+  // week, even in a month where the full-month view shows them comfortably above target. So
+  // rateRevenueCents spreads the monthly retainer evenly across that month's weeks, used only
+  // for the effective-rate line - never surfaced as an actual $ figure.
   function profitabilityForWeek(weekStart: string) {
     const weekEnd = addDays(weekStart, 7)
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
     const weekInvoices = monthPaidInvoices.filter((i) => i.paid_at >= weekStart && i.paid_at < weekEnd)
+    const [wy, wm] = weekStart.split('-').map(Number)
+    const daysInWeekMonth = new Date(wy, wm, 0).getDate()
+    const weeklyRetainerFraction = 7 / daysInWeekMonth
     return clients
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = weekInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
-        const estimatedCents = isHourly
-          ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-          : 0
-        const revenueCents = paidCents || estimatedCents
-        const effectiveRateCents = effectiveRate(revenueCents, hours)
-        const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth: false }
+        const hourlyEstimateCents = Math.round(
+          (clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0),
+        )
+        const revenueCents = isHourly ? paidCents || hourlyEstimateCents : paidCents
+        const rateRevenueCents = isHourly ? revenueCents : paidCents || Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
+        const effectiveRateCents = effectiveRate(rateRevenueCents, hours)
+        const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
+        return { client: c, isHourly, hours, revenueCents, rateRevenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth: false }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
   }
@@ -362,14 +376,17 @@ export default function ReportsClient({
     return buildWeekKeys(anchorMonday, weekCount).map((weekStart) => {
       const perClient = profitabilityForWeek(weekStart)
       const totalRevenueCents = perClient.reduce((s, r) => s + r.revenueCents, 0)
+      const totalRateRevenueCents = perClient.reduce((s, r) => s + r.rateRevenueCents, 0)
       const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
       return {
         key: weekStart,
         label: weekTick(weekStart),
         fullLabel: `Week of ${formatDate(weekStart)}`,
         totalRevenueCents,
-        blendedRateCents: effectiveRate(totalRevenueCents, totalHours),
-        hasData: effectiveRate(totalRevenueCents, totalHours) !== null,
+        // Uses totalRateRevenueCents (retainer spread across the month's weeks), not
+        // totalRevenueCents (actual $ only) - see profitabilityForWeek's comment.
+        blendedRateCents: effectiveRate(totalRateRevenueCents, totalHours),
+        hasData: effectiveRate(totalRateRevenueCents, totalHours) !== null,
       }
     })
   }, [trendGranularity, monthCount, weekCount, trendMonthKeys, clients, monthTimeEntries, monthPaidInvoices, targetRateCents, pMonth, weekAnchor])
