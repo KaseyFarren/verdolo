@@ -76,7 +76,7 @@ export async function POST(request: Request) {
           seatsPurchased = Math.max(sub.items.data[0]?.quantity ?? 3, 3)
         }
 
-        await admin.from('purchase_tokens').upsert(
+        const { error: upsertError } = await admin.from('purchase_tokens').upsert(
           {
             stripe_checkout_session_id: session.id,
             stripe_customer_id: session.customer as string,
@@ -88,6 +88,10 @@ export async function POST(request: Request) {
           },
           { onConflict: 'stripe_checkout_session_id', ignoreDuplicates: true }
         )
+        if (upsertError) {
+          console.error('[api] Failed to record purchase_token for session', session.id, upsertError)
+          return NextResponse.json({ error: 'Failed to record purchase' }, { status: 500 })
+        }
         break
       }
 
