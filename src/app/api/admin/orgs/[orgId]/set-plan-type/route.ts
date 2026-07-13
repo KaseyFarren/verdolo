@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const update: Record<string, unknown> = { plan_type: planType }
   if (planType === 'lifetime') {
     update.subscription_status = 'active'
-    update.seats_purchased = Math.max(org.seats_purchased || 1, 2)
+    update.seats_purchased = Math.max(org.seats_purchased || 1, 4)
   }
 
   await admin.from('orgs').update(update).eq('id', orgId)

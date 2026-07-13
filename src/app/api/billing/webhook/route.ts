@@ -63,12 +63,13 @@ export async function POST(request: Request) {
         const admin = createAdminClient()
         const isLifetime = session.mode === 'payment'
 
-        // Lifetime is a one-time payment that includes 2 seats. A pre-account subscription's
-        // base $29 tier includes owner + 2 = 3 seats, and the buyer may have bought more at the
-        // Payment Link - seed from the subscription's actual quantity (floored at the 3 included)
-        // so claim_purchase_token doesn't cap the new org below what they paid for.
+        // Lifetime is a one-time payment that includes owner + 3 = 4 seats. A pre-account
+        // subscription's base $29 tier includes owner + 2 = 3 seats, and the buyer may have
+        // bought more at the Payment Link - seed from the subscription's actual quantity
+        // (floored at the 3 included) so claim_purchase_token doesn't cap the new org below
+        // what they paid for.
         let subscriptionId: string | null = null
-        let seatsPurchased = 2
+        let seatsPurchased = 4
         if (session.mode === 'subscription' && session.subscription) {
           const sub = await getStripe().subscriptions.retrieve(session.subscription as string)
           subscriptionId = sub.id

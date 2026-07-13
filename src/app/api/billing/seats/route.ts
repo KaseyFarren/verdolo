@@ -36,8 +36,8 @@ export async function POST(request: Request) {
   if (seats < (activeCount || 0)) {
     return NextResponse.json({ error: `You have ${activeCount} active members - remove someone before lowering seats below that` }, { status: 400 })
   }
-  if (org.plan_type === 'lifetime' && seats < 2) {
-    return NextResponse.json({ error: 'A lifetime license always includes 2 seats' }, { status: 400 })
+  if (org.plan_type === 'lifetime' && seats < 4) {
+    return NextResponse.json({ error: 'A lifetime license always includes 4 seats' }, { status: 400 })
   }
 
   const stripe = getStripe()
@@ -47,9 +47,9 @@ export async function POST(request: Request) {
   // res.json() call chokes on, leaving the "Updating…" button stuck forever with no error shown.
   try {
     if (org.plan_type === 'lifetime') {
-      // The lifetime one-time payment already covers the first 2 seats - only seats beyond that
-      // are ever billed, on a separate flat (non-tiered) subscription created on demand.
-      const extraSeats = Math.max(seats - 2, 0)
+      // The lifetime one-time payment already covers the first 4 seats (owner + 3) - only seats
+      // beyond that are ever billed, on a separate flat (non-tiered) subscription created on demand.
+      const extraSeats = Math.max(seats - 4, 0)
       if (org.stripe_subscription_id) {
         const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id)
         const itemId = subscription.items.data[0]?.id
