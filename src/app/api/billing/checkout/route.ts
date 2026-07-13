@@ -44,6 +44,7 @@ export async function POST(request: Request) {
   const trialDaysRemaining = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86400000)) : 0
 
   const session = await stripe.checkout.sessions.create({
+    ui_mode: 'embedded_page',
     mode: 'subscription',
     customer: customerId,
     line_items: [
@@ -54,10 +55,9 @@ export async function POST(request: Request) {
       },
     ],
     subscription_data: trialDaysRemaining > 0 ? { trial_period_days: trialDaysRemaining, metadata: { org_id: orgId } } : { metadata: { org_id: orgId } },
-    success_url: `${origin}/settings?view=billing&checkout=success`,
-    cancel_url: `${origin}/settings?view=billing&checkout=cancelled`,
+    return_url: `${origin}/settings?view=billing&checkout=success`,
     metadata: { org_id: orgId },
   })
 
-  return NextResponse.json({ url: session.url })
+  return NextResponse.json({ clientSecret: session.client_secret })
 }

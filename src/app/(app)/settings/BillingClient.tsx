@@ -1,7 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
+import { loadStripe } from '@stripe/stripe-js'
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js'
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 type Status = 'trialing' | 'active' | 'past_due' | 'canceled' | null
 
@@ -26,6 +30,7 @@ export default function BillingClient({
 }) {
   const [loading, setLoading] = useState<'checkout' | 'portal' | 'seats' | null>(null)
   const [seatsInput, setSeatsInput] = useState(seatsPurchased)
+  const [checkoutSecret, setCheckoutSecret] = useState<string | null>(null)
 
   const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0
   const trialExpired = subscriptionStatus === 'trialing' && trialDaysLeft <= 0
@@ -43,8 +48,11 @@ export default function BillingClient({
       setLoading(null)
       return
     }
-    window.location.href = body.url
+    setCheckoutSecret(body.clientSecret)
+    setLoading(null)
   }
+
+  const fetchClientSecret = useCallback(async () => checkoutSecret!, [checkoutSecret])
 
   async function openPortal() {
     setLoading('portal')
@@ -168,6 +176,23 @@ export default function BillingClient({
             </button>
           </div>
           <div className="text-xs text-sage mt-2">Changing seats prorates your next invoice.</div>
+        </div>
+      )}
+
+      {checkoutSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="relative w-full max-w-lg rounded-lg bg-white p-2 shadow-xl">
+            <button
+              className="absolute right-3 top-3 z-10 text-sm text-sage hover:text-ink"
+              onClick={() => setCheckoutSecret(null)}
+              aria-label="Close checkout"
+            >
+              ✕
+            </button>
+            <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
+              <EmbeddedCheckout />
+            </EmbeddedCheckoutProvider>
+          </div>
         </div>
       )}
     </div>
