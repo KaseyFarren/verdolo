@@ -204,7 +204,7 @@ export default function ReportsClient({
       const res = await fetch('/api/ai/scope-creep-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, clientId, periodStart: pMonth }),
+        body: JSON.stringify({ orgId, clientId, periodStart: pMonth, today: todayKey() }),
       })
       const body = await res.json()
       if (res.ok) setScopeNotes((prev) => ({ ...prev, [clientId]: body.note }))

@@ -7,7 +7,7 @@ import { currencySymbol, effectiveRate, todayKey } from '@/lib/agency'
 import { billingCycleElapsedFraction, monthElapsedFraction } from '@/lib/period'
 
 export async function POST(request: Request) {
-  const { orgId, clientId, periodStart } = await request.json()
+  const { orgId, clientId, periodStart, today: clientToday } = await request.json()
   const supabase = await createClient()
   const {
     data: { user },
@@ -81,9 +81,16 @@ export async function POST(request: Request) {
   // retainer client always looks like it made its full monthly revenue already, which can
   // push effectiveRateCents above target even when the header (which does prorate) shows
   // the client below it - the two numbers must agree since the same client card links to both.
+  //
+  // "today" must come from the browser, not `new Date()` on the server: todayKey() reads
+  // local calendar fields, and a serverless function's local clock is UTC while the caller's
+  // browser is in their own timezone - for hours around midnight in any zone ahead of UTC the
+  // two disagree on which calendar day it is, which shifts the elapsed-cycle fraction by a
+  // full day and produces a revenue figure that doesn't match what the header just rendered.
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(clientToday ?? '') ? clientToday : todayKey()
   const monthKey = `${y}-${String(m).padStart(2, '0')}`
-  const isCurrentMonth = monthKey === todayKey().slice(0, 7)
-  const retainerFraction = isCurrentMonth ? billingCycleElapsedFraction(client.billing_day || 1) : monthElapsedFraction(monthKey)
+  const isCurrentMonth = monthKey === today.slice(0, 7)
+  const retainerFraction = isCurrentMonth ? billingCycleElapsedFraction(client.billing_day || 1, today) : monthElapsedFraction(monthKey)
   const estimatedCents = Math.round((client.retainer_cents || 0) * retainerFraction)
   const revenueCents = paidCents || estimatedCents
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
