@@ -85,6 +85,22 @@ export function monthElapsedFraction(monthKey: string): number {
   return dayOfMonth / daysInMonth
 }
 
+/** Fraction of a Monday-anchored week elapsed as of today (1 for a fully past week, 0 for a
+ * future one). A retainer's weekly slice (see profitabilityForWeek's weeklyRetainerFraction)
+ * assumes a full 7 days of the client's time - for the current, still-in-progress week that
+ * overstates revenue against the necessarily-partial hours logged so far, spiking the effective
+ * rate as the week starts. Scaling the slice by this fraction keeps both sides of the ratio
+ * referring to the same "as of today" window. */
+export function weekElapsedFraction(weekStart: string, today: string = todayKey()): number {
+  const weekEnd = addDays(weekStart, 7)
+  if (weekEnd <= today) return 1
+  if (weekStart > today) return 0
+  const [wy, wm, wd] = weekStart.split('-').map(Number)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const elapsedDays = Math.round((new Date(ty, tm - 1, td).getTime() - new Date(wy, wm - 1, wd).getTime()) / 86400000) + 1
+  return Math.min(1, elapsedDays / 7)
+}
+
 function daysInMonthOf(year: number, month1indexed: number) {
   return new Date(year, month1indexed, 0).getDate()
 }

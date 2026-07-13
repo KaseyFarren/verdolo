@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, currencySymbol, type Currency } from '@/lib/agency'
-import { monthElapsedFraction, billingCycleElapsedFraction, billingDatesInRange, addDays } from '@/lib/period'
+import { monthElapsedFraction, billingCycleElapsedFraction, billingDatesInRange, weekElapsedFraction, addDays } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
@@ -316,7 +316,7 @@ export default function ReportsClient({
     const weekInvoices = monthPaidInvoices.filter((i) => i.paid_at >= weekStart && i.paid_at < weekEnd)
     const [wy, wm] = weekStart.split('-').map(Number)
     const daysInWeekMonth = new Date(wy, wm, 0).getDate()
-    const weeklyRetainerFraction = 7 / daysInWeekMonth
+    const weeklyRetainerFraction = (7 / daysInWeekMonth) * weekElapsedFraction(weekStart)
     return clients
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
