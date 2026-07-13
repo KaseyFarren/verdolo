@@ -40,7 +40,15 @@ export default function CreateAccountForm({
   const [orgName, setOrgName] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
+  const [hasSession, setHasSession] = useState(false)
   const attempts = useRef(0)
+
+  useEffect(() => {
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => setHasSession(!!data.session))
+  }, [])
 
   useEffect(() => {
     if (!polling || !sessionId) return
@@ -63,23 +71,8 @@ export default function CreateAccountForm({
     return () => clearInterval(interval)
   }, [polling, sessionId])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-
+  async function finishClaim() {
     const supabase = createClient()
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
-    if (signUpError) {
-      toast.error(signUpError.message)
-      setLoading(false)
-      return
-    }
-    if (!data.session) {
-      toast.error('Check your email to confirm your account, then come back to this link to finish setup.')
-      setLoading(false)
-      return
-    }
-
     const { error: claimError } = await supabase.rpc('claim_purchase_token', {
       p_session_id: sessionId,
       p_org_name: orgName,
@@ -92,6 +85,40 @@ export default function CreateAccountForm({
 
     router.push('/dashboard')
     router.refresh()
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+
+    const supabase = createClient()
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+          `/create-account?session_id=${sessionId}`
+        )}`,
+      },
+    })
+    if (signUpError) {
+      toast.error(signUpError.message)
+      setLoading(false)
+      return
+    }
+    if (!data.session) {
+      setAwaitingConfirmation(true)
+      setLoading(false)
+      return
+    }
+
+    await finishClaim()
+  }
+
+  async function handleClaimSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    await finishClaim()
   }
 
   if (polling) {
@@ -123,6 +150,39 @@ export default function CreateAccountForm({
             ? 'This link has expired. Contact support to finish setting up your account.'
             : "We couldn't find a purchase matching this link. Contact support if you believe this is a mistake."}
         </p>
+      </Shell>
+    )
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <Shell>
+        <h1 className="text-xl font-semibold text-center">Check your email</h1>
+        <p className="text-sm text-sage text-center">
+          We sent a confirmation link to {email}. Click it to finish setting up your account.
+        </p>
+      </Shell>
+    )
+  }
+
+  if (hasSession) {
+    return (
+      <Shell>
+        <h1 className="text-xl font-semibold text-center">Almost done</h1>
+        <p className="text-sm text-sage text-center">Your email is confirmed - name your agency to finish setup.</p>
+        <form onSubmit={handleClaimSubmit} className="flex flex-col gap-3">
+          <input
+            type="text"
+            placeholder="Agency name"
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            required
+            className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <Button type="submit" variant="primary" disabled={loading} className="w-full">
+            {loading ? 'Setting up...' : 'Create account'}
+          </Button>
+        </form>
       </Shell>
     )
   }
