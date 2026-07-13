@@ -1,5 +1,5 @@
 // Verdolo's mark: a rounded badge in the brand green with a bold "V", plus an orange accent
-// underline - the same palette used on the marketing site (verdolo.com) Elementor Kit.
+// underline - the same palette used on the marketing site (verdolo.com).
 export function LogoMark({ size = 36 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
