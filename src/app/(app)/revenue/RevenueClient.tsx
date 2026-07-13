@@ -469,7 +469,7 @@ export default function RevenueClient({
                   </span>
                 </button>
                 {expanded && (
-                  <div className="mx-4 mb-4 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
+                  <div className="mx-4 pb-4 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
                     {clientCharges.length > 0 && (
                       <div className="space-y-1">
                         {clientCharges.map((c) => (
