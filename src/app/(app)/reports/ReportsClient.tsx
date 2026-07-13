@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, currencySymbol, type Currency } from '@/lib/agency'
-import { monthElapsedFraction, billingCycleElapsedFraction, billingDatesInRange, weekElapsedFraction, addDays } from '@/lib/period'
+import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
@@ -273,12 +273,14 @@ export default function ReportsClient({
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const paidCents = monthInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
-        // A fully-elapsed or future month prorates by calendar bounds regardless of billing day
-        // (the retainer was either fully realized already or hasn't started); only the currently
-        // in-progress month uses the client's own billing-cycle day to determine how much of
-        // their retainer has "renewed" so far.
-        const isCurrentMonth = monthKey === todayKey().slice(0, 7)
-        const retainerFraction = isCurrentMonth ? billingCycleElapsedFraction(c.billing_day || 1) : monthElapsedFraction(monthKey)
+        // Revenue and hours must describe the same window - the calendar month being viewed -
+        // or a retainer client billed mid-month (billing_day != 1) shows a revenue cliff at
+        // their renewal date with no matching change in hours: hours are always summed by
+        // calendar month, but a per-client billing-cycle fraction can span two calendar months,
+        // so the two would disagree on which days even count. billing_day still drives exact
+        // renewal-date precision elsewhere (dashboard, Revenue page) where that IS the thing
+        // being measured; here it's only an estimate to compare against calendar-month hours.
+        const retainerFraction = monthElapsedFraction(monthKey)
         const estimatedCents = isHourly
           ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
           : Math.round((c.retainer_cents || 0) * retainerFraction)
@@ -314,9 +316,7 @@ export default function ReportsClient({
     const weekEnd = addDays(weekStart, 7)
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
     const weekInvoices = monthPaidInvoices.filter((i) => i.paid_at >= weekStart && i.paid_at < weekEnd)
-    const [wy, wm] = weekStart.split('-').map(Number)
-    const daysInWeekMonth = new Date(wy, wm, 0).getDate()
-    const weeklyRetainerFraction = (7 / daysInWeekMonth) * weekElapsedFraction(weekStart)
+    const weeklyRetainerFraction = weeklyRetainerShare(weekStart) * weekElapsedFraction(weekStart)
     return clients
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
@@ -688,7 +688,7 @@ export default function ReportsClient({
               ‹
             </button>
             {/* Click the month itself to jump to any month/year, not just step one at a time. */}
-            <MonthPicker value={pMonth} onChange={onMonthChange} className="w-44" />
+            <MonthPicker value={pMonth} onChange={onMonthChange} className="w-44" disableFuture />
             <button
               type="button"
               className="w-8 h-8 rounded-full border border-ink/10 bg-white shadow-md text-sage hover:text-ink hover:bg-sand/60 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
@@ -774,7 +774,8 @@ export default function ReportsClient({
             )}
             {trendGranularity === 'week' && (
               <div className="text-xs text-sage mb-2">
-                Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in.
+                Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in - unlike
+                the Revenue chart above, so a week showing $0 revenue there can still show a healthy rate here.
               </div>
             )}
             {trendBuckets.every((b) => !b.hasData) ? (

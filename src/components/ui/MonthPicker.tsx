@@ -18,11 +18,16 @@ export default function MonthPicker({
   onChange,
   placeholder = 'Pick a month…',
   className = '',
+  disableFuture = false,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   className?: string
+  // Mirrors a "next month" arrow elsewhere on the page that stops at the current month - without
+  // this the grid popup let you click straight past that same boundary, a contradiction between
+  // the two controls for picking the exact same value.
+  disableFuture?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [viewYear, setViewYear] = useState(Number((value || todayKey()).slice(0, 4)))
@@ -75,7 +80,12 @@ export default function MonthPicker({
               ‹
             </button>
             <div className="text-sm font-medium">{viewYear}</div>
-            <button type="button" onClick={() => setViewYear((y) => y + 1)} className="text-sage px-2 rounded-full">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              disabled={disableFuture && viewYear >= todayY}
+              className="text-sage px-2 rounded-full disabled:opacity-30 disabled:hover:bg-transparent"
+            >
               ›
             </button>
           </div>
@@ -83,12 +93,14 @@ export default function MonthPicker({
             {MONTHS.map((label, i) => {
               const isToday = viewYear === todayY && i + 1 === todayM
               const isSel = viewYear === selY && i + 1 === selM
+              const isFuture = disableFuture && (viewYear > todayY || (viewYear === todayY && i + 1 > todayM))
               return (
                 <button
                   type="button"
                   key={label}
                   onClick={() => select(i)}
-                  className={`text-center py-2 rounded-full text-sm ${
+                  disabled={isFuture}
+                  className={`text-center py-2 rounded-full text-sm disabled:opacity-30 disabled:hover:bg-transparent ${
                     isSel ? 'bg-accent text-white font-semibold' : isToday ? 'bg-ink/5 text-accent font-medium' : 'hover:bg-sand'
                   }`}
                 >

@@ -74,13 +74,16 @@ export function isFullCalendarMonth(value: PeriodValue) {
 
 /** Fraction of a calendar month elapsed as of today (1 for any month that's fully passed,
  * 0 for a future month). Used to prorate monthly figures like a retainer that get attributed
- * to an in-progress month, so revenue ÷ hours-logged-so-far doesn't spike. */
-export function monthElapsedFraction(monthKey: string): number {
-  const todayMonthKey = todayKey().slice(0, 7)
+ * to an in-progress month, so revenue ÷ hours-logged-so-far doesn't spike. Takes an optional
+ * `today` override (rather than always reading the local clock) so a server caller can be handed
+ * the browser's own todayKey() and stay in agreement with a client-rendered figure it needs to
+ * match - the server's runtime timezone otherwise disagrees with the caller's near midnight. */
+export function monthElapsedFraction(monthKey: string, today: string = todayKey()): number {
+  const todayMonthKey = today.slice(0, 7)
   if (monthKey < todayMonthKey) return 1
   if (monthKey > todayMonthKey) return 0
   const [y, m] = monthKey.split('-').map(Number)
-  const dayOfMonth = Number(todayKey().slice(8, 10))
+  const dayOfMonth = Number(today.slice(8, 10))
   const daysInMonth = new Date(y, m, 0).getDate()
   return dayOfMonth / daysInMonth
 }
@@ -99,6 +102,20 @@ export function weekElapsedFraction(weekStart: string, today: string = todayKey(
   const [ty, tm, td] = today.split('-').map(Number)
   const elapsedDays = Math.round((new Date(ty, tm - 1, td).getTime() - new Date(wy, wm - 1, wd).getTime()) / 86400000) + 1
   return Math.min(1, elapsedDays / 7)
+}
+
+/** A full week's fair share of a monthly retainer, as a fraction of the retainer - normally
+ * 7/daysInMonth, but a week spanning two calendar months (e.g. Jan 28-Feb 3) would understate
+ * or overstate its share if every day were assumed to belong to whichever month weekStart falls
+ * in. Sums each day's own 1/daysInThatMonth instead, so a straddling week gets the blended share
+ * its 7 days actually add up to. Multiply by weekElapsedFraction for a still-in-progress week. */
+export function weeklyRetainerShare(weekStart: string): number {
+  let share = 0
+  for (let i = 0; i < 7; i++) {
+    const [dy, dm] = addDays(weekStart, i).split('-').map(Number)
+    share += 1 / daysInMonthOf(dy, dm)
+  }
+  return share
 }
 
 function daysInMonthOf(year: number, month1indexed: number) {
