@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
 import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
-import { currencySymbol, effectiveRate } from '@/lib/agency'
+import { currencySymbol, effectiveRate, todayKey } from '@/lib/agency'
+import { billingCycleElapsedFraction, monthElapsedFraction } from '@/lib/period'
 
 export async function POST(request: Request) {
   const { orgId, clientId, periodStart } = await request.json()
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currencySign = currencySymbol((membership.orgs as any)?.settings?.currency)
 
-  const { data: client } = await supabase.from('clients').select('id, name, retainer_cents, billing_mode').eq('id', clientId).eq('org_id', orgId).single()
+  const { data: client } = await supabase.from('clients').select('id, name, retainer_cents, billing_mode, billing_day').eq('id', clientId).eq('org_id', orgId).single()
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
   // "using more hours than revenue justifies at target rate" doesn't apply to hourly clients -
   // more hours means proportionally more revenue by definition, no scope-creep risk in the
@@ -74,7 +75,17 @@ export async function POST(request: Request) {
 
   const hours = (entries || []).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
   const paidCents = (paidInvoices || []).reduce((s, i) => s + i.amount_cents, 0)
-  const revenueCents = paidCents || client.retainer_cents || 0
+  // Mirrors profitabilityForMonth in ReportsClient.tsx - a client's retainer only counts in
+  // full once its billing cycle has actually elapsed; an in-progress month only "earns"
+  // whatever fraction of the cycle has passed so far. Without this, an unpaid mid-cycle
+  // retainer client always looks like it made its full monthly revenue already, which can
+  // push effectiveRateCents above target even when the header (which does prorate) shows
+  // the client below it - the two numbers must agree since the same client card links to both.
+  const monthKey = `${y}-${String(m).padStart(2, '0')}`
+  const isCurrentMonth = monthKey === todayKey().slice(0, 7)
+  const retainerFraction = isCurrentMonth ? billingCycleElapsedFraction(client.billing_day || 1) : monthElapsedFraction(monthKey)
+  const estimatedCents = Math.round((client.retainer_cents || 0) * retainerFraction)
+  const revenueCents = paidCents || estimatedCents
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
 
   try {
