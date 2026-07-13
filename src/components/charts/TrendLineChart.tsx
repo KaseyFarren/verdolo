@@ -46,11 +46,16 @@ function monthTick(monthKey: string) {
 
 export default function TrendLineChart({
   months,
+  labels,
   series,
   formatValue,
   referenceLine,
 }: {
   months: string[]
+  // Display labels for the x-axis/tooltip, parallel to `months` - defaults to a "Jul"-style
+  // month tick when omitted. Lets callers pass week-bucket data (months holds YYYY-MM-DD keys,
+  // which monthTick alone can't label unambiguously since it ignores the day).
+  labels?: string[]
   series: TrendSeries[]
   formatValue: (cents: number) => string
   referenceLine?: { value: number; label: string }
@@ -69,6 +74,7 @@ export default function TrendLineChart({
 
   const plotW = WIDTH - PAD_LEFT - PAD_RIGHT
   const plotH = HEIGHT - PAD_TOP - PAD_BOTTOM
+  const labelStride = Math.max(1, Math.ceil(months.length / 10))
 
   function xAt(i: number) {
     return months.length <= 1 ? PAD_LEFT + plotW / 2 : PAD_LEFT + (i / (months.length - 1)) * plotW
@@ -120,11 +126,15 @@ export default function TrendLineChart({
           </g>
         ))}
 
-        {months.map((m, i) => (
-          <text key={m} x={xAt(i)} y={HEIGHT - 8} textAnchor="middle" fontSize={10} fill="#898781">
-            {monthTick(m)}
-          </text>
-        ))}
+        {months.map((m, i) => {
+          // Thin out labels so they don't collide when there are many points (e.g. 26 weeks).
+          if (i % labelStride !== 0 && i !== months.length - 1) return null
+          return (
+            <text key={m} x={xAt(i)} y={HEIGHT - 8} textAnchor="middle" fontSize={10} fill="#898781">
+              {labels ? labels[i] : monthTick(m)}
+            </text>
+          )
+        })}
 
         {referenceLine && (
           <g>
@@ -190,7 +200,7 @@ export default function TrendLineChart({
         {/* End labels, nudged apart top-to-bottom so converging lines don't overlap (marks-and-anatomy.md). */}
         {(() => {
           const MIN_GAP = 13
-          const labels = series
+          const endLabels = series
             // Anchor each end label to that series' last month that actually has data, so a
             // trailing no-data month doesn't drop the label to the axis floor (or hide it).
             .map((s) => {
@@ -202,10 +212,10 @@ export default function TrendLineChart({
             })
             .filter((l): l is { key: string; text: string; y: number } => l !== null)
             .sort((a, b) => a.y - b.y)
-          for (let i = 1; i < labels.length; i++) {
-            if (labels[i].y - labels[i - 1].y < MIN_GAP) labels[i].y = labels[i - 1].y + MIN_GAP
+          for (let i = 1; i < endLabels.length; i++) {
+            if (endLabels[i].y - endLabels[i - 1].y < MIN_GAP) endLabels[i].y = endLabels[i - 1].y + MIN_GAP
           }
-          const byKey = new Map(labels.map((l) => [l.key, l]))
+          const byKey = new Map(endLabels.map((l) => [l.key, l]))
           const lastIdx = months.length - 1
           return series.map((s) => {
             const label = byKey.get(s.key)
@@ -228,7 +238,7 @@ export default function TrendLineChart({
             transform: xAt(hoverIdx) / WIDTH > 0.7 ? 'translateX(-100%)' : undefined,
           }}
         >
-          <div className="font-semibold text-ink mb-1">{monthTick(months[hoverIdx])}</div>
+          <div className="font-semibold text-ink mb-1">{labels ? labels[hoverIdx] : monthTick(months[hoverIdx])}</div>
           {series.map((s) => (
             <div key={s.key} className="flex items-center gap-1.5 justify-between">
               <span className="flex items-center gap-1.5 text-sage">

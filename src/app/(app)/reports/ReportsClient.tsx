@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
-import { formatDate, todayKey, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
-import { monthElapsedFraction, billingCycleElapsedFraction } from '@/lib/period'
+import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, isRateComparisonMeaningful, currencySymbol, type Currency } from '@/lib/agency'
+import { monthElapsedFraction, billingCycleElapsedFraction, addDays } from '@/lib/period'
+import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -34,6 +35,31 @@ function monthLabel(monthStart: string) {
   const [y, m] = monthStart.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
+
+function monthTick(monthKey: string) {
+  const [y, m] = monthKey.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' })
+}
+
+function weekTick(weekStart: string) {
+  const [y, m, d] = weekStart.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// Walks backward `count` Mondays from (and including) `anchorMonday`, oldest first.
+function buildWeekKeys(anchorMonday: string, count: number) {
+  const keys: string[] = []
+  let cur = anchorMonday
+  for (let i = 0; i < count; i++) {
+    keys.unshift(cur)
+    cur = addDays(cur, -7)
+  }
+  return keys
+}
+
+type TrendGranularity = 'month' | 'week'
+const MONTH_COUNT_OPTIONS = [3, 6, 12]
+const WEEK_COUNT_OPTIONS = [4, 8, 12, 26]
 
 function reportLabel(r: Report) {
   return r.period_type === 'week' ? `Week of ${formatDate(r.period_start)}` : monthLabel(r.period_start)
@@ -237,7 +263,7 @@ export default function ReportsClient({
   // only hours logged vs. revenue. Effective rate (revenue ÷ hours) compared against the
   // team's target rate gives the same "is this account worth the time it's taking" signal
   // without pretending to know a real P&L. Shared by the selected-month breakdown below and
-  // by monthlyTrend (run once per month in the trailing window).
+  // by trendBuckets (run once per bucket in the trailing window).
   function profitabilityForMonth(monthKey: string) {
     const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
     const monthInvoices = monthPaidInvoices.filter((i) => i.paid_at.slice(0, 7) === monthKey)
@@ -270,28 +296,83 @@ export default function ReportsClient({
       })
   }
 
+  // A single week is never a full billing cycle, so - matching the Revenue page's isFullMonth
+  // rule - retainer clients only contribute revenue here if they actually had an invoice paid
+  // that week; no prorated estimate the way the month view has one. Hourly revenue still scales
+  // to any period length.
+  function profitabilityForWeek(weekStart: string) {
+    const weekEnd = addDays(weekStart, 7)
+    const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
+    const weekInvoices = monthPaidInvoices.filter((i) => i.paid_at >= weekStart && i.paid_at < weekEnd)
+    return clients
+      .map((c) => {
+        const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
+        const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
+        const paidCents = weekInvoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
+        const isHourly = c.billing_mode === 'hourly'
+        const estimatedCents = isHourly
+          ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
+          : 0
+        const revenueCents = paidCents || estimatedCents
+        const effectiveRateCents = effectiveRate(revenueCents, hours)
+        const rateDeltaCents = isRateComparisonMeaningful(c) && effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
+        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth: false }
+      })
+      .filter((r) => r.revenueCents > 0 || r.hours > 0)
+  }
+
   const profitability = useMemo(
     () => profitabilityForMonth(pMonth),
     [clients, monthTimeEntries, monthPaidInvoices, targetRateCents, pMonth],
   )
 
-  const monthlyTrend = useMemo(() => {
-    return trendMonthKeys.map((monthKey) => {
-      const perClient = profitabilityForMonth(monthKey)
-      const totalRevenue = perClient.reduce((s, r) => s + r.revenueCents, 0)
+  const [trendGranularity, setTrendGranularity] = useState<TrendGranularity>('month')
+  const [monthCount, setMonthCount] = useState(6)
+  const [weekCount, setWeekCount] = useState(8)
+
+  // Trend chart data for both the "Effective rate" line and the new "Revenue" bar chart - one
+  // pass over whichever bucket keys the granularity/count controls pick, entirely client-side
+  // (the server always sends a 12-month superset, see reports/page.tsx's trendWindow) so toggling
+  // Month/Week or the trailing-count doesn't need a round trip.
+  const trendBuckets = useMemo(() => {
+    if (trendGranularity === 'month') {
+      return trendMonthKeys.slice(-monthCount).map((monthKey) => {
+        const perClient = profitabilityForMonth(monthKey)
+        const totalRevenueCents = perClient.reduce((s, r) => s + r.revenueCents, 0)
+        const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
+        return {
+          key: monthKey,
+          label: monthTick(monthKey),
+          fullLabel: monthLabel(`${monthKey}-01`),
+          totalRevenueCents,
+          // An effective rate needs a denominator - a bucket with retainer revenue but zero
+          // logged hours has no *rate* to report, not a rate of $0. null (not 0) so the trend
+          // line gaps over it instead of diving to the axis floor and reading as a real, terrible
+          // rate.
+          blendedRateCents: effectiveRate(totalRevenueCents, totalHours),
+          hasData: effectiveRate(totalRevenueCents, totalHours) !== null,
+        }
+      })
+    }
+    const isCurrentMonth = pMonth === todayKey().slice(0, 7)
+    const [y, m] = pMonth.split('-').map(Number)
+    // Weekly buckets anchor on "this week" when pMonth is the current month (the common case),
+    // or on the last week of pMonth otherwise - both stay within the server's 12-month window.
+    const anchorMonday = isCurrentMonth ? weekAnchor : getWeekAnchor(new Date(y, m, 0))
+    return buildWeekKeys(anchorMonday, weekCount).map((weekStart) => {
+      const perClient = profitabilityForWeek(weekStart)
+      const totalRevenueCents = perClient.reduce((s, r) => s + r.revenueCents, 0)
       const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
       return {
-        month: monthKey,
-        // An effective rate needs a denominator - a month with retainer revenue but zero
-        // logged hours has no *rate* to report, not a rate of $0 (retainer_cents is always
-        // "current", so every month trivially has revenue even before a client was active).
-        // null (not 0) for a month with no logged hours so the trend line gaps over it instead
-        // of diving to the axis floor and reading as a real, terrible rate.
-        blendedRateCents: effectiveRate(totalRevenue, totalHours),
-        hasData: effectiveRate(totalRevenue, totalHours) !== null,
+        key: weekStart,
+        label: weekTick(weekStart),
+        fullLabel: `Week of ${formatDate(weekStart)}`,
+        totalRevenueCents,
+        blendedRateCents: effectiveRate(totalRevenueCents, totalHours),
+        hasData: effectiveRate(totalRevenueCents, totalHours) !== null,
       }
     })
-  }, [clients, monthTimeEntries, monthPaidInvoices, targetRateCents, trendMonthKeys])
+  }, [trendGranularity, monthCount, weekCount, trendMonthKeys, clients, monthTimeEntries, monthPaidInvoices, targetRateCents, pMonth, weekAnchor])
 
   function onMonthChange(next: string) {
     router.push(`/reports?pMonth=${next}`)
@@ -309,6 +390,11 @@ export default function ReportsClient({
   function formatRateDelta(centsPerHour: number) {
     const sign = centsPerHour >= 0 ? '+' : '−'
     return `${sign}${currencySign}${Math.round(Math.abs(centsPerHour) / 100).toLocaleString()}/hr`
+  }
+  function fmtRevenueAxis(cents: number) {
+    const dollars = cents / 100
+    if (Math.abs(dollars) >= 1000) return `${currencySign}${(dollars / 1000).toFixed(dollars % 1000 === 0 ? 0 : 1)}k`
+    return `${currencySign}${Math.round(dollars).toLocaleString()}`
   }
 
   const capacity = useMemo(() => {
@@ -592,21 +678,76 @@ export default function ReportsClient({
             </div>
           )}
 
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex gap-1 bg-sand/60 rounded-full p-1 w-fit">
+              {(['month', 'week'] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setTrendGranularity(g)}
+                  className={`relative rounded-full px-3 py-1.5 text-sm capitalize transition-colors ${
+                    trendGranularity === g ? 'font-medium text-ink' : 'text-sage hover:text-ink'
+                  }`}
+                >
+                  {trendGranularity === g && (
+                    <motion.div
+                      layoutId="trend-granularity-active"
+                      className="absolute inset-0 rounded-full bg-white"
+                      style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative">{g === 'month' ? 'By month' : 'By week'}</span>
+                </button>
+              ))}
+            </div>
+            <CustomSelect
+              value={String(trendGranularity === 'month' ? monthCount : weekCount)}
+              onChange={(v) => (trendGranularity === 'month' ? setMonthCount(Number(v)) : setWeekCount(Number(v)))}
+              options={(trendGranularity === 'month' ? MONTH_COUNT_OPTIONS : WEEK_COUNT_OPTIONS).map((n) => ({
+                value: String(n),
+                label: `Last ${n} ${trendGranularity === 'month' ? (n === 1 ? 'month' : 'months') : n === 1 ? 'week' : 'weeks'}`,
+              }))}
+              className="w-40"
+            />
+          </div>
+
           <div className="mb-8">
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
-              Effective rate · last 6 months <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
+              Revenue <InfoTooltip content="Total revenue across all clients in each period" />
             </div>
-            {pMonth === todayKey().slice(0, 7) && (
+            {trendBuckets.every((b) => b.totalRevenueCents === 0) ? (
+              <div className="text-sm text-sage py-3">No revenue yet in this range.</div>
+            ) : (
+              <div className="rounded-2xl bg-white shadow-md p-5">
+                <BarChart
+                  labels={trendBuckets.map((b) => b.label)}
+                  values={trendBuckets.map((b) => b.totalRevenueCents)}
+                  formatValue={(cents) => fmtRevenueAxis(cents)}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="mb-8">
+            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+              Effective rate <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
+            </div>
+            {trendGranularity === 'month' && pMonth === todayKey().slice(0, 7) && (
               <div className="text-xs text-sage mb-2">
                 This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
               </div>
             )}
-            {monthlyTrend.every((m) => !m.hasData) ? (
+            {trendGranularity === 'week' && (
+              <div className="text-xs text-sage mb-2">Retainer revenue isn&apos;t prorated to a single week - only billables and hourly work show up here.</div>
+            )}
+            {trendBuckets.every((b) => !b.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
             ) : (
               <div className="rounded-2xl bg-white shadow-md p-5">
                 <TrendLineChart
-                  months={trendMonthKeys}
+                  months={trendBuckets.map((b) => b.key)}
+                  labels={trendBuckets.map((b) => b.label)}
                   formatValue={(cents) => formatRate(cents)}
                   referenceLine={targetRateCents > 0 ? { value: targetRateCents, label: `Target ${formatRate(targetRateCents)}` } : undefined}
                   series={[
@@ -614,10 +755,10 @@ export default function ReportsClient({
                       key: 'rate',
                       label: 'Effective rate',
                       color: '#898781',
-                      values: monthlyTrend.map((m) => m.blendedRateCents),
+                      values: trendBuckets.map((b) => b.blendedRateCents),
                       pointColors:
                         targetRateCents > 0
-                          ? monthlyTrend.map((m) => (!m.hasData || m.blendedRateCents === null ? '#c3c2b7' : m.blendedRateCents >= targetRateCents ? '#2a78d6' : '#e05070'))
+                          ? trendBuckets.map((b) => (!b.hasData || b.blendedRateCents === null ? '#c3c2b7' : b.blendedRateCents >= targetRateCents ? '#2a78d6' : '#e05070'))
                           : undefined,
                     },
                   ]}

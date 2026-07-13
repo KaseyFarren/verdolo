@@ -15,6 +15,8 @@ import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
 import {
   AVATAR_COLORS,
+  centsToDollars,
+  currencySymbol,
   formatDate,
   getInitials,
   getOffsetDate,
@@ -22,8 +24,12 @@ import {
   memberName,
   priorityColor,
   sortTasks,
+  stageColor,
+  stageLabel,
+  STAGES,
   todayKey,
   topByKey,
+  type Currency,
 } from '@/lib/agency'
 
 type Client = {
@@ -70,6 +76,9 @@ export default function DashboardClient({
   orgId,
   userId,
   isAdmin,
+  monthRevenueCents,
+  mrrCents,
+  currency,
   initialClients,
   initialTasks,
   initialRecurring,
@@ -87,6 +96,9 @@ export default function DashboardClient({
   orgId: string
   userId: string
   isAdmin: boolean
+  monthRevenueCents: number
+  mrrCents: number
+  currency?: Currency
   initialClients: Client[]
   initialTasks: Task[]
   initialRecurring: Recurring[]
@@ -187,6 +199,17 @@ export default function DashboardClient({
   const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
+
+  const clientHealth = STAGES.map((stage) => ({
+    stage,
+    count: clients.filter((c) => getStage(c) === stage).length,
+  })).filter((s) => s.count > 0)
+  const atRiskCount = clients.filter((c) => getStage(c) === 'At Risk').length
+
+  const currencySign = currencySymbol(currency)
+  function fmtMoney(cents: number) {
+    return `${currencySign}${centsToDollars(cents).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  }
 
   // Team-today panel: one shared query (page.tsx), RLS does the role-scoping for free -
   // admins/owners get every member's rows back, members only get their own. So the same
@@ -609,6 +632,56 @@ export default function DashboardClient({
               )}
             </div>
           )}
+
+          {isAdmin && (
+            <div className="rounded-2xl bg-white shadow-md p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-sage">Revenue · this month</div>
+                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
+                  See more →
+                </Link>
+              </div>
+              <div className="flex gap-6">
+                <div>
+                  <div className="text-xs text-sage mb-0.5">Revenue</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(monthRevenueCents)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-sage mb-0.5">MRR</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl bg-white shadow-md p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Client health</div>
+              <Link href="/clients" className="text-xs text-sage hover:text-ink">
+                See more →
+              </Link>
+            </div>
+            {clientHealth.length === 0 ? (
+              <div className="text-sm text-sage">No clients yet.</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {clientHealth.map((s) => (
+                  <div
+                    key={s.stage}
+                    className="rounded-lg px-2.5 py-1.5 text-xs"
+                    style={{ background: `${stageColor(s.stage)}14`, color: stageColor(s.stage) }}
+                  >
+                    <span className="font-semibold">{s.count}</span> {stageLabel(s.stage)}
+                  </div>
+                ))}
+              </div>
+            )}
+            {atRiskCount > 0 && (
+              <div className="mt-2 text-xs text-red-600">
+                ⚠ {atRiskCount} client{atRiskCount !== 1 ? 's' : ''} at risk
+              </div>
+            )}
+          </div>
 
           <div className="rounded-2xl bg-white shadow-md p-5 flex flex-col flex-1 min-h-[220px]">
             <div className="flex items-center justify-between mb-2">

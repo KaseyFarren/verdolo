@@ -32,12 +32,14 @@ function monthKeyBounds(y: number, m: number) {
   return { start, end }
 }
 
-// Profitability's date filter - the picked month plus the 5 before it, so the trend chart
-// always ends on whatever month the per-client breakdown/bar chart below it is showing.
+// Profitability's date filter - the picked month plus the 11 before it, so the trend chart
+// always ends on whatever month the per-client breakdown/bar chart below it is showing. 12
+// months is a superset wide enough for the client to bucket into either a 12-month trend or
+// up to a 52-week trend without a second server round trip when the granularity toggle changes.
 function trendWindow(pMonth: string) {
   const [y, m] = pMonth.split('-').map(Number)
   const monthKeys: string[] = []
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(y, m - 1 - i, 1)
     monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }

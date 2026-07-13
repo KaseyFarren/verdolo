@@ -1,13 +1,40 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOffsetDate, getWeekAnchor, todayKey } from '@/lib/agency'
+import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { billingCycleElapsedFraction } from '@/lib/period'
 import DashboardClient from './DashboardClient'
+
+// Retainer prorated by billing cycle + hourly billable hours × rate, paid invoices overriding
+// the estimate where they exist - same methodology as Reports' profitabilityForMonth, just
+// summed to one number instead of broken out per client. Kept server-side only: billing rows
+// (retainer_cents, hourly_rate_cents) never reach the client bundle for non-admin sessions.
+function estimateMonthRevenueCents(
+  billingClients: { id: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }[],
+  entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
+  invoices: { client_id: string; amount_cents: number }[],
+) {
+  let total = 0
+  for (const c of billingClients) {
+    const clientEntries = entries.filter((e) => e.client_id === c.id)
+    const paidCents = invoices.filter((i) => i.client_id === c.id).reduce((s, i) => s + i.amount_cents, 0)
+    const isHourly = c.billing_mode === 'hourly'
+    const estimatedCents = isHourly
+      ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
+      : Math.round((c.retainer_cents || 0) * billingCycleElapsedFraction(c.billing_day || 1))
+    total += paidCents || estimatedCents
+  }
+  return total
+}
 
 export default async function DashboardPage() {
   const { supabase, user, orgId, role, org } = await requireOrgContext()
+  const isAdmin = isAdminRole(role)
 
   const weekAnchor = getWeekAnchor()
   const today = todayKey()
   const tomorrow = getOffsetDate(1)
+  const monthStart = `${today.slice(0, 7)}-01`
+  const nextMonthDate = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 1)
+  const monthEnd = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`
   const [
     { data: clients },
     { data: tasks },
@@ -20,6 +47,9 @@ export default async function DashboardPage() {
     { data: reports },
     { data: sentTodayRows },
     { data: weekCompletedTasks },
+    { data: billingClients },
+    { data: monthEntries },
+    { data: monthPaidInvoices },
   ] = await Promise.all([
     // .limit(2000) is a defensive ceiling against pathological growth, not user-facing pagination.
     // The active-tasks query below is intentionally left unbounded - the Today/Overdue/Upcoming
@@ -71,13 +101,43 @@ export default async function DashboardPage() {
       .eq('done', true)
       .gte('completed_at', `${weekAnchor}T00:00:00`)
       .lt('completed_at', `${tomorrow}T00:00:00`),
+    // Revenue widget is admin-only (same gate as the Revenue/Reports pages) - skip fetching
+    // billing rows entirely for members rather than fetching-then-hiding, since retainer/hourly
+    // rate cents must never reach a non-admin session's RSC payload (see stripBillingInfo).
+    isAdmin
+      ? supabase.from('clients').select('id, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId)
+      : Promise.resolve({ data: [] }),
+    isAdmin
+      ? supabase
+          .from('time_entries')
+          .select('client_id, duration_seconds, billable')
+          .eq('org_id', orgId)
+          .not('duration_seconds', 'is', null)
+          .gte('started_at', `${monthStart}T00:00:00`)
+          .lt('started_at', `${monthEnd}T00:00:00`)
+      : Promise.resolve({ data: [] }),
+    isAdmin
+      ? supabase
+          .from('invoices')
+          .select('client_id, amount_cents')
+          .eq('org_id', orgId)
+          .eq('status', 'paid')
+          .gte('paid_at', `${monthStart}T00:00:00`)
+          .lt('paid_at', `${monthEnd}T00:00:00`)
+      : Promise.resolve({ data: [] }),
   ])
+
+  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? [], monthPaidInvoices ?? []) : 0
+  const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
 
   return (
     <DashboardClient
       orgId={orgId}
       userId={user.id}
-      isAdmin={isAdminRole(role)}
+      isAdmin={isAdmin}
+      monthRevenueCents={monthRevenueCents}
+      mrrCents={mrrCents}
+      currency={org?.settings?.currency ?? 'usd'}
       initialClients={clients ?? []}
       initialTasks={tasks ?? []}
       initialRecurring={recurring ?? []}
