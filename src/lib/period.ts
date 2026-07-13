@@ -125,3 +125,25 @@ export function billingCycleElapsedFraction(billingDay: number, today: string = 
   const elapsedDays = Math.round((now.getTime() - cycleStart.getTime()) / 86400000) + 1
   return Math.min(1, Math.max(0, elapsedDays / cycleLengthDays))
 }
+
+/** Every renewal date (clamped per clampedBillingDate) that falls within [rangeStart, rangeEnd)
+ * - rangeEnd exclusive, both YYYY-MM-DD. A week only ever contains at most one, but a wide custom
+ * range can span several, so this returns a list rather than a boolean. Used to recognize a
+ * retainer's full value as revenue on the actual day it renews, instead of smoothing it - for
+ * any period narrower than a full calendar month, "half a retainer" isn't a real event that
+ * happened, but the full renewal on its billing day is. */
+export function billingDatesInRange(billingDay: number, rangeStart: string, rangeEnd: string): string[] {
+  const dates: string[] = []
+  let [y, m] = rangeStart.split('-').map(Number)
+  const [endY, endM] = rangeEnd.split('-').map(Number)
+  while (y < endY || (y === endY && m <= endM)) {
+    const key = todayKey(clampedBillingDate(y, m, billingDay))
+    if (key >= rangeStart && key < rangeEnd) dates.push(key)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+  return dates
+}

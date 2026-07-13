@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, currencySymbol, type Currency } from '@/lib/agency'
-import { monthElapsedFraction, billingCycleElapsedFraction, addDays } from '@/lib/period'
+import { monthElapsedFraction, billingCycleElapsedFraction, billingDatesInRange, addDays } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
@@ -302,14 +302,14 @@ export default function ReportsClient({
   }
 
   // A single week is never a full billing cycle, so - matching the Revenue page's isFullMonth
-  // rule - retainer clients only contribute *actual* revenue here if they had an invoice paid
-  // that week (used for the Revenue $ bar chart); no fictional weekly slice of the retainer.
+  // rule - a retainer only contributes *actual* revenue here on the day it renews (an invoice
+  // paid that week overrides it, if one exists); no fictional even slice of the retainer.
   // But "effective rate" answers a different question (was this account worth the time this
-  // week?), and that needs *some* revenue proxy to divide by - a retainer client with real
-  // logged hours but zero weekly "revenue" would otherwise read as a terrible rate every single
-  // week, even in a month where the full-month view shows them comfortably above target. So
-  // rateRevenueCents spreads the monthly retainer evenly across that month's weeks, used only
-  // for the effective-rate line - never surfaced as an actual $ figure.
+  // week?), and that needs *some* revenue proxy to divide by every week, not just the renewal
+  // week - a retainer client with real logged hours but a $0 non-renewal week would otherwise
+  // read as a terrible rate, even in a month where the full-month view shows them comfortably
+  // above target. So rateRevenueCents keeps spreading the monthly retainer evenly across that
+  // month's weeks, used only for the effective-rate line - never surfaced as an actual $ figure.
   function profitabilityForWeek(weekStart: string) {
     const weekEnd = addDays(weekStart, 7)
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
@@ -326,11 +326,23 @@ export default function ReportsClient({
         const hourlyEstimateCents = Math.round(
           (clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0),
         )
-        const revenueCents = isHourly ? paidCents || hourlyEstimateCents : paidCents
+        const billingLumpCents = isHourly ? 0 : billingDatesInRange(c.billing_day || 1, weekStart, weekEnd).length * (c.retainer_cents || 0)
+        const revenueCents = isHourly ? paidCents || hourlyEstimateCents : paidCents || billingLumpCents
         const rateRevenueCents = isHourly ? revenueCents : paidCents || Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
         const effectiveRateCents = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        return { client: c, isHourly, hours, revenueCents, rateRevenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: !paidCents, isPartialMonth: false }
+        return {
+          client: c,
+          isHourly,
+          hours,
+          revenueCents,
+          rateRevenueCents,
+          effectiveRateCents,
+          rateDeltaCents,
+          isEstimatedRevenue: !paidCents,
+          isPartialMonth: false,
+          billedThisRange: billingLumpCents > 0,
+        }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
   }
@@ -733,6 +745,11 @@ export default function ReportsClient({
             <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
               Revenue <InfoTooltip content="Total revenue across all clients in each period" />
             </div>
+            {trendGranularity === 'week' && (
+              <div className="text-xs text-sage mb-2">
+                A retainer shows up in full on the week it renews, not spread evenly - other weeks only show billables and hourly work.
+              </div>
+            )}
             {trendBuckets.every((b) => b.totalRevenueCents === 0) ? (
               <div className="text-sm text-sage py-3">No revenue yet in this range.</div>
             ) : (
@@ -756,7 +773,9 @@ export default function ReportsClient({
               </div>
             )}
             {trendGranularity === 'week' && (
-              <div className="text-xs text-sage mb-2">Retainer revenue isn&apos;t prorated to a single week - only billables and hourly work show up here.</div>
+              <div className="text-xs text-sage mb-2">
+                Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in.
+              </div>
             )}
             {trendBuckets.every((b) => !b.hasData) ? (
               <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>

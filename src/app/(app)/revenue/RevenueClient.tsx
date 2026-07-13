@@ -21,7 +21,7 @@ import {
   todayKey,
   type Currency,
 } from '@/lib/agency'
-import { isFullCalendarMonth, billingCycleElapsedFraction, type PeriodValue } from '@/lib/period'
+import { isFullCalendarMonth, billingCycleElapsedFraction, billingDatesInRange, periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import DatePicker from '@/components/ui/DatePicker'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -104,6 +104,7 @@ export default function RevenueClient({
     setCharges(initialCharges)
   }, [initialCharges])
   const isFullMonth = isFullCalendarMonth(period)
+  const { start: rangeStart, end: rangeEnd } = useMemo(() => periodBounds(period), [period])
 
   // The pill itself is driven by this local, optimistically-updated copy so it slides
   // instantly on click - the actual revenue figures below stay tied to the real `period` prop
@@ -161,6 +162,17 @@ export default function RevenueClient({
   }, [charges])
 
   const clientRows = useMemo(() => {
+    // Days between rangeStart (inclusive) and rangeEnd (exclusive) - used only to smooth the
+    // retainer for the *rate* calc below, never shown as a $ figure.
+    const rangeDays = (() => {
+      if (!rangeStart || !rangeEnd) return 0
+      const [sy, sm, sd] = rangeStart.split('-').map(Number)
+      const [ey, em, ed] = rangeEnd.split('-').map(Number)
+      return Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd)) / 86400000)
+    })()
+    const rangeMonthDays = rangeStart ? new Date(Number(rangeStart.slice(0, 4)), Number(rangeStart.slice(5, 7)), 0).getDate() : 30
+    const smoothedRetainerFraction = rangeMonthDays > 0 ? rangeDays / rangeMonthDays : 0
+
     return clients
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
@@ -169,24 +181,43 @@ export default function RevenueClient({
         // figure, so only a full calendar month period can honestly include one; a week or
         // custom range only counts what was actually billed/logged in it
         const hourlyRevenue = isHourly ? Math.round(((billableHoursByClient.get(c.id) || 0) / 3600) * (c.hourly_rate_cents || 0)) : 0
-        // A retainer is a full-cycle figure, but if the selected period is the still-in-progress
-        // current month, attributing all of it yet gives a misleadingly high revenue-per-hour-
-        // logged-so-far - prorate by how far this client's own billing cycle has gotten instead
-        // of assuming everyone renews on the 1st.
+        // A retainer is a full-cycle figure. For a full calendar month, attribute the whole thing
+        // once the cycle's complete, or prorate by how far this client's own billing cycle has
+        // gotten if the current month is still in progress (not assuming everyone renews on the
+        // 1st). For anything narrower (a week, a custom range), a partial slice isn't a real event
+        // - so instead recognize the full retainer on whichever day(s) in that range are actually
+        // this client's renewal date, and nothing otherwise.
         const retainerFraction = period.period === 'this_month' ? billingCycleElapsedFraction(c.billing_day || 1) : 1
-        const retainerRevenue = !isHourly && isFullMonth ? Math.round((c.retainer_cents || 0) * retainerFraction) : 0
+        const billingDatesThisRange = !isHourly && !isFullMonth && rangeStart && rangeEnd ? billingDatesInRange(c.billing_day || 1, rangeStart, rangeEnd) : []
+        const retainerRevenue = isHourly
+          ? 0
+          : isFullMonth
+            ? Math.round((c.retainer_cents || 0) * retainerFraction)
+            : billingDatesThisRange.length * (c.retainer_cents || 0)
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
+        // The $ figure above is deliberately spiky (full retainer lands on its billing day, $0
+        // otherwise) - accurate for "how much money actually showed up", but divided by hours it
+        // would make a retainer client's rate swing from ~$0/hr to enormous depending on whether
+        // the billing date happens to fall inside the selected range. The rate needs a steadier
+        // proxy, so outside a full month it spreads the retainer evenly across the range instead
+        // of lump-summing it - same fix Reports already applies to its weekly effective-rate line.
+        const rateRetainerRevenue = isHourly
+          ? 0
+          : isFullMonth
+            ? retainerRevenue
+            : Math.round((c.retainer_cents || 0) * smoothedRetainerFraction)
+        const rateRevenueCents = rateRetainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
-        const rate = effectiveRate(totalRevenue, hours)
+        const rate = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
-        return { client: c, isHourly, chargesTotal, totalRevenue, seconds, hours, rate, rateDeltaCents }
+        return { client: c, isHourly, chargesTotal, totalRevenue, rateRevenueCents, seconds, hours, rate, rateDeltaCents, billedThisRange: billingDatesThisRange.length > 0 }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period])
+  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd])
 
   const memberRows = useMemo(() => {
     return members
@@ -240,7 +271,11 @@ export default function RevenueClient({
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
     const seconds = clientRows.reduce((s, r) => s + r.seconds, 0)
     const hours = seconds / 3600
-    const rate = effectiveRate(revenue, hours)
+    // Blended rate uses the smoothed rateRevenueCents (see clientRows), not the spiky totalRevenue
+    // - otherwise the org-wide rate would swing wildly depending on how many clients happen to bill
+    // inside the selected week.
+    const rateRevenue = clientRows.reduce((s, r) => s + r.rateRevenueCents, 0)
+    const rate = effectiveRate(rateRevenue, hours)
     return { revenue, hours, rate, rateDeltaCents: rate !== null && targetRateCents > 0 ? rate - targetRateCents : null }
   }, [clientRows, targetRateCents])
 
@@ -307,7 +342,9 @@ export default function RevenueClient({
         className="mb-4"
       />
       {!isFullMonth && (
-        <div className="text-xs text-sage/70 mb-5">Retainer only counted for full-month periods - showing billables + hours actually logged in this range.</div>
+        <div className="text-xs text-sage/70 mb-5">
+          Retainer clients show revenue here only on the day they renew - showing billables + hours actually logged in this range otherwise.
+        </div>
       )}
       {isFullMonth && period.period === 'this_month' && (
         <div className="text-xs text-sage/70 mb-5">
@@ -380,14 +417,17 @@ export default function RevenueClient({
       {clientRows.length === 0 ? (
         <div className="text-sm text-sage py-4 mb-6">No revenue or time logged this period.</div>
       ) : (
-        <div className="rounded-lg border border-ink/10 divide-y divide-ink/10 mb-6">
+        <div className="space-y-2 mb-6">
           {clientRows.map((r) => {
             const clientCharges = chargesByClient.get(r.client.id) || []
             const expanded = expandedClientId === r.client.id
             return (
-              <div key={r.client.id} className="hover:bg-sand/40 transition-colors">
+              <div
+                key={r.client.id}
+                className={`rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow ${expanded ? 'ring-1 ring-ink/10' : ''}`}
+              >
                 <button
-                  className="flex flex-wrap w-full items-center justify-between gap-y-1 text-sm text-left px-3 py-2.5"
+                  className="group flex flex-wrap w-full items-center justify-between gap-y-1 text-sm text-left px-4 py-3"
                   onClick={() => setExpandedClientId(expanded ? null : r.client.id)}
                 >
                   <span className="flex-1 min-w-[140px]">
@@ -397,6 +437,14 @@ export default function RevenueClient({
                     ) : r.client.retainer_cents ? (
                       <span className="text-sage ml-2 text-xs">{fmtMoney(r.client.retainer_cents)}/mo retainer</span>
                     ) : null}
+                    {r.billedThisRange && (
+                      <span
+                        className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 align-middle"
+                        title="Retainer renews in this period - full amount recognized on that day"
+                      >
+                        Billed this period
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
@@ -409,15 +457,19 @@ export default function RevenueClient({
                     )}
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                     <span
-                      className={`text-sage/60 text-xs shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
-                      title={expanded ? 'Hide billables' : 'Add billables'}
+                      className={`shrink-0 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
+                        expanded ? 'bg-ink text-white rotate-180' : 'bg-sand text-sage group-hover:bg-clay/20 group-hover:text-ink'
+                      }`}
+                      title={expanded ? 'Hide billing details' : 'View billing details'}
                     >
-                      ▾
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </span>
                   </span>
                 </button>
                 {expanded && (
-                  <div className="mx-3 mb-3 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
+                  <div className="mx-4 mb-4 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
                     {clientCharges.length > 0 && (
                       <div className="space-y-1">
                         {clientCharges.map((c) => (
