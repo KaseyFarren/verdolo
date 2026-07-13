@@ -16,7 +16,6 @@ import {
   formatDate,
   getInitials,
   getStage,
-  isRateComparisonMeaningful,
   memberName,
   mrrCentsTotal,
   todayKey,
@@ -178,10 +177,11 @@ export default function RevenueClient({
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
+        const billableSeconds = billableHoursByClient.get(c.id) || 0
         // hourly revenue scales with any period length, unlike a retainer - which is a monthly
         // figure, so only a full calendar month period can honestly include one; a week or
         // custom range only counts what was actually billed/logged in it
-        const hourlyRevenue = isHourly ? Math.round(((billableHoursByClient.get(c.id) || 0) / 3600) * (c.hourly_rate_cents || 0)) : 0
+        const hourlyRevenue = isHourly ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
         // A retainer is a full-cycle figure. For a full calendar month, attribute the whole thing
         // once the cycle's complete, or prorate by how far this client's own billing cycle has
         // gotten if the current month is still in progress (not assuming everyone renews on the
@@ -223,6 +223,7 @@ export default function RevenueClient({
           rateRevenueCents,
           seconds,
           hours,
+          billableHours: billableSeconds / 3600,
           rate,
           rateDeltaCents,
           billedThisRange: billingDatesThisRange.length > 0,
@@ -474,14 +475,17 @@ export default function RevenueClient({
                     )}
                   </span>
                   <span className="flex items-center gap-4 shrink-0">
-                    <span className="text-sage w-14 text-right">{formatHours(r.seconds)}h</span>
-                    {isRateComparisonMeaningful(r.client) ? (
-                      <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
-                        {r.rate ? `${currencySign}${centsToDollars(r.rate)}/hr` : '-'}
-                      </span>
-                    ) : (
-                      <span className="text-sage w-16 text-right">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr</span>
-                    )}
+                    <span className="text-sage w-14 text-right inline-flex items-center justify-end gap-1">
+                      {formatHours(r.seconds)}h
+                      {r.isHourly && Math.abs(r.hours - r.billableHours) > 0.05 && (
+                        <InfoTooltip
+                          content={`${formatHours(r.seconds)}h logged, but only ${r.billableHours.toFixed(1)}h marked billable - revenue is calculated from billable hours only.`}
+                        />
+                      )}
+                    </span>
+                    <span className={`w-16 text-right ${r.rateDeltaCents !== null && r.rateDeltaCents < 0 ? 'text-red-600' : 'text-sage'}`}>
+                      {r.rate ? `${currencySign}${centsToDollars(r.rate)}/hr` : '-'}
+                    </span>
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                     <span
                       className={`shrink-0 h-7 w-7 rounded-full flex items-center justify-center transition-all ${

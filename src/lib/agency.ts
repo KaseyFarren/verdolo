@@ -131,15 +131,6 @@ export function stripBillingInfo<T extends { retainer_cents?: number | null; hou
   return clients.map((c) => ({ ...c, retainer_cents: null, hourly_rate_cents: null }))
 }
 
-// An hourly client's effective rate (revenue ÷ hours) is definitionally their contracted
-// hourly_rate_cents, since revenue itself is computed as hours × rate - so a "vs target" delta
-// is tautological for them, unlike for a retainer client where it's a real efficiency signal.
-// Single flag so Revenue, Reports, and the scope-creep AI note all agree on when that
-// comparison means something.
-export function isRateComparisonMeaningful(client: { billing_mode?: string | null }) {
-  return client.billing_mode !== 'hourly'
-}
-
 export function centsToDollars(cents?: number | null) {
   return Math.round((cents ?? 0) / 100)
 }
