@@ -58,6 +58,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'That file is not a valid PNG, JPG, WebP or GIF image' }, { status: 400 })
   }
 
+  console.log('[avatar-debug] resized.length', resized.length, 'head', resized.subarray(0, 16).toString('hex'))
+
   const admin = createAdminClient()
   // Folder is the authenticated user's id - not anything the client sent. Output is always
   // re-encoded to webp, so the stored extension no longer depends on what was uploaded.
