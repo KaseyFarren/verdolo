@@ -58,13 +58,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'That file is not a valid PNG, JPG, WebP or GIF image' }, { status: 400 })
   }
 
-  console.log('[avatar-debug] resized.length', resized.length, 'head', resized.subarray(0, 16).toString('hex'))
-
   const admin = createAdminClient()
   // Folder is the authenticated user's id - not anything the client sent. Output is always
   // re-encoded to webp, so the stored extension no longer depends on what was uploaded.
   const path = `${user.id}/avatar.webp`
-  const { error: upErr } = await admin.storage.from('avatars').upload(path, resized, { upsert: true, contentType: 'image/webp' })
+  // Wrap in a Blob rather than handing storage-js the raw Buffer directly: under the bundled
+  // Vercel runtime a raw Buffer here got silently mangled in transit (bytes round-tripped through
+  // a lossy UTF-8 decode/re-encode, bloating and corrupting the file) even though the identical
+  // buffer/library upload byte-for-byte correctly in an unbundled local Node script.
+  const blob = new Blob([new Uint8Array(resized)], { type: 'image/webp' })
+  const { error: upErr } = await admin.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/webp' })
   if (upErr) return apiError('Could not upload your picture', 500, upErr)
 
   const { data: pub } = admin.storage.from('avatars').getPublicUrl(path)
