@@ -52,10 +52,15 @@
   --shadow-xl: 0 30px 60px rgba(26, 26, 23, 0.14);
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
 }
 
 h1,

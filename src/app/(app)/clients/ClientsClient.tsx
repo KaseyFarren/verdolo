@@ -420,7 +420,9 @@ export default function ClientsClient({
               {canEdit && (
                 <div className="flex gap-1.5 shrink-0 items-center">
                   <button
-                    className={`text-xs rounded-lg px-2.5 py-1.5 font-medium text-white shadow-sm ${isChurned ? 'bg-green' : 'bg-red-600'}`}
+                    className={`text-xs rounded-lg px-2.5 py-1.5 font-medium border shadow-sm transition-colors ${
+                      isChurned ? 'border-green/40 text-green hover:bg-green/10' : 'border-red-600/30 text-red-600 hover:bg-red-600/10'
+                    }`}
                     onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
                   >
                     {isChurned ? '▶ Activate' : '⏸ Pause'}
@@ -730,18 +732,24 @@ function ClientForm({
         onChange={(e) => setForm((f) => ({ ...f, business: e.target.value }))}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-        <CustomSelect
-          value={(form.platform as string) || ''}
-          onChange={(v) => setForm((f) => ({ ...f, platform: v }))}
-          placeholder="Platform…"
-          options={PLATFORMS.map((p) => ({ value: p, label: p }))}
-        />
-        <input
-          className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-          placeholder="Service"
-          value={(form.service as string) || ''}
-          onChange={(e) => setForm((f) => ({ ...f, service: e.target.value }))}
-        />
+        <div>
+          <label className="block text-xs text-sage mb-1">Communication channel</label>
+          <CustomSelect
+            value={(form.platform as string) || ''}
+            onChange={(v) => setForm((f) => ({ ...f, platform: v }))}
+            placeholder="How you talk to them…"
+            options={PLATFORMS.map((p) => ({ value: p, label: p }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-sage mb-1">Service / plan</label>
+          <input
+            className="w-full rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            placeholder="e.g. SEO retainer"
+            value={(form.service as string) || ''}
+            onChange={(e) => setForm((f) => ({ ...f, service: e.target.value }))}
+          />
+        </div>
       </div>
       <label className="block text-xs text-sage mb-1">Contact email</label>
       <input
@@ -760,30 +768,7 @@ function ClientForm({
       />
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">AI check-in config</div>
-      <label className="block text-xs text-sage mb-1">Daily message context</label>
-      <textarea
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
-        value={(form.notes as string) || ''}
-        onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-      />
-      <label className="block text-xs text-sage mb-1">Message tone</label>
-      <div className="flex gap-1.5 mb-3 flex-wrap">
-        {TONES.map((t) => (
-          <button
-            key={t}
-            onClick={() => setForm((f) => ({ ...f, tone: t }))}
-            className={`px-3 py-1 rounded text-xs border ${form.tone === t ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <label className="block text-xs text-sage mb-1">Talking points</label>
-      <textarea
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
-        value={(form.talking_points as string) || ''}
-        onChange={(e) => setForm((f) => ({ ...f, talking_points: e.target.value }))}
-      />
+      <div className="text-xs text-sage/70 mb-3 -mt-1">Feeds the AI-drafted check-in messages on your Dashboard.</div>
       <label className="block text-xs text-sage mb-1">Check-in cadence</label>
       <div className="mb-4">
         <CustomSelect
@@ -798,6 +783,32 @@ function ClientForm({
           ]}
         />
       </div>
+      <label className="block text-xs text-sage mb-1">Message tone</label>
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {TONES.map((t) => (
+          <button
+            key={t}
+            onClick={() => setForm((f) => ({ ...f, tone: t }))}
+            className={`px-3 py-1 rounded text-xs border ${form.tone === t ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      <label className="block text-xs text-sage mb-1">Background context</label>
+      <div className="text-xs text-sage/70 mb-1">General background the AI should know about this client - history, quirks, how they like to be talked to.</div>
+      <textarea
+        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        value={(form.notes as string) || ''}
+        onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+      />
+      <label className="block text-xs text-sage mb-1">Talking points</label>
+      <div className="text-xs text-sage/70 mb-1">Specific things to make sure get mentioned (optional) - stays set until you clear it.</div>
+      <textarea
+        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        value={(form.talking_points as string) || ''}
+        onChange={(e) => setForm((f) => ({ ...f, talking_points: e.target.value }))}
+      />
 
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">Pipeline &amp; billing</div>
       <label className="block text-xs text-sage mb-1">Pipeline stage</label>
