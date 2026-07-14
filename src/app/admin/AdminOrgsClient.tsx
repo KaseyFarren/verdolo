@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import Button from '@/components/ui/Button'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 export type AdminOrgRow = {
   id: string
@@ -16,6 +19,8 @@ export type AdminOrgRow = {
   createdAt: string
 }
 
+export type OrphanedUser = { id: string; email: string }
+
 type SortKey = 'name' | 'subscriptionStatus' | 'seatsPurchased' | 'trialEndsAt' | 'currentPeriodEnd' | 'createdAt'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -28,6 +33,18 @@ const STATUS_STYLES: Record<string, string> = {
 function formatDate(value: string | null) {
   if (!value) return '-'
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+// Days-left readout for trialing orgs - the raw trial_ends_at date alone doesn't answer "is
+// this about to expire" at a glance, which is the thing admins actually want to scan for.
+function trialStatus(subscriptionStatus: string | null, trialEndsAt: string | null): { label: string; className: string } | null {
+  if (subscriptionStatus !== 'trialing') return null
+  if (!trialEndsAt) return { label: 'No end date', className: 'text-sage' }
+  const days = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86_400_000)
+  if (days < 0) return { label: 'Expired', className: 'text-red-700 font-medium' }
+  if (days === 0) return { label: 'Ends today', className: 'text-amber-700 font-medium' }
+  if (days <= 3) return { label: `${days}d left`, className: 'text-amber-700 font-medium' }
+  return { label: `${days}d left`, className: 'text-ink' }
 }
 
 function Th({
@@ -54,10 +71,33 @@ function Th({
   )
 }
 
-export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
+export default function AdminOrgsClient({ orgs, orphanedUsers }: { orgs: AdminOrgRow[]; orphanedUsers: OrphanedUser[] }) {
+  const confirm = useConfirm()
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [users, setUsers] = useState(orphanedUsers)
+  const [deletingUser, setDeletingUser] = useState<string | null>(null)
+
+  async function deleteOrphanedUser(user: OrphanedUser) {
+    const confirmed = await confirm({
+      title: `Delete ${user.email}?`,
+      message: 'This account never finished setting up an org. Deleting it frees up the email for a fresh signup. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      danger: true,
+    })
+    if (!confirmed) return
+    setDeletingUser(user.id)
+    const res = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' })
+    setDeletingUser(null)
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: null }))
+      toast.error(error ?? 'Could not delete account')
+      return
+    }
+    setUsers((prev) => prev.filter((u) => u.id !== user.id))
+    toast.success('Account deleted')
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -140,7 +180,19 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
                 <td className="px-3 py-2 text-sage">
                   {org.activeMemberCount}/{org.seatsPurchased}
                 </td>
-                <td className="px-3 py-2 text-sage">{formatDate(org.trialEndsAt)}</td>
+                <td className="px-3 py-2 text-sage">
+                  {(() => {
+                    const trial = trialStatus(org.subscriptionStatus, org.trialEndsAt)
+                    return trial ? (
+                      <div>
+                        <div className={trial.className}>{trial.label}</div>
+                        <div className="text-xs text-sage/70">{formatDate(org.trialEndsAt)}</div>
+                      </div>
+                    ) : (
+                      '-'
+                    )
+                  })()}
+                </td>
                 <td className="px-3 py-2 text-sage">{formatDate(org.currentPeriodEnd)}</td>
                 <td className="px-3 py-2 text-sage">{formatDate(org.createdAt)}</td>
               </tr>
@@ -155,6 +207,32 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
           </tbody>
         </table>
       </div>
+
+      {users.length > 0 && (
+        <div className="mt-6">
+          <div className="mb-2">
+            <div className="text-sm font-medium text-ink">Orphaned accounts</div>
+            <div className="text-xs text-sage">
+              Signed up but never finished creating an org - not part of any account above, and their email can&apos;t be reused until deleted.
+            </div>
+          </div>
+          <div className="rounded-lg border border-ink/10 bg-white divide-y divide-ink/5">
+            {users.map((u) => (
+              <div key={u.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                <span>{u.email}</span>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => deleteOrphanedUser(u)}
+                  disabled={deletingUser !== null}
+                >
+                  {deletingUser === u.id ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

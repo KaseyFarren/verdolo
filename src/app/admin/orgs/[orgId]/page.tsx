@@ -1,23 +1,26 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserEmailMap } from '@/lib/adminUsers'
 import OrgDetailClient from './OrgDetailClient'
 
 export default async function AdminOrgDetailPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params
   const admin = createAdminClient()
 
-  const [{ data: org }, { data: members }] = await Promise.all([
+  const [{ data: org }, { data: members }, emailMap] = await Promise.all([
     admin.from('orgs').select('*').eq('id', orgId).maybeSingle(),
     admin
       .from('org_members')
       .select('id, user_id, role, status, invited_email, joined_at, created_at')
       .eq('org_id', orgId)
       .order('created_at', { ascending: true }),
+    getUserEmailMap(admin),
   ])
 
   if (!org) notFound()
 
   const activeMemberCount = (members ?? []).filter((m) => m.status === 'active').length
+  const membersWithEmail = (members ?? []).map((m) => ({ ...m, email: emailMap.get(m.user_id) ?? m.invited_email }))
 
-  return <OrgDetailClient org={org} members={members ?? []} activeMemberCount={activeMemberCount} />
+  return <OrgDetailClient org={org} members={membersWithEmail} activeMemberCount={activeMemberCount} />
 }

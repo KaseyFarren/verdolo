@@ -25,6 +25,7 @@ type Member = {
   role: string
   status: string
   invited_email: string | null
+  email?: string | null
   joined_at: string | null
   created_at: string
 }
@@ -101,6 +102,26 @@ export default function OrgDetailClient({
     }
   }
 
+  async function deleteAccount() {
+    const confirmed = await confirm({
+      title: `Delete ${org.name}?`,
+      message: `This permanently deletes the org and everything in it - clients, tasks, time entries, messages, revenue history - and deletes the login for all ${members.length} member${members.length === 1 ? '' : 's'}. This cannot be undone.`,
+      confirmLabel: 'Delete account',
+      danger: true,
+    })
+    if (!confirmed) return
+    setLoading('delete')
+    const res = await fetch(`/api/admin/orgs/${org.id}`, { method: 'DELETE' })
+    setLoading(null)
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: null }))
+      toast.error(error ?? 'Could not delete account')
+      return
+    }
+    toast.success(`${org.name} deleted`)
+    router.push('/admin')
+  }
+
   async function cancelSubscription(immediate: boolean) {
     const confirmed = await confirm({
       title: immediate ? 'Cancel immediately?' : 'Cancel at period end?',
@@ -126,7 +147,7 @@ export default function OrgDetailClient({
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="font-heading font-bold text-lg">{org.name}</h1>
+          <h1 className="font-heading font-bold text-lg flex-1">{org.name}</h1>
           <span
             className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
               STATUS_STYLES[org.subscription_status ?? ''] ?? 'bg-ink/10 text-sage'
@@ -137,6 +158,9 @@ export default function OrgDetailClient({
           {org.plan_type === 'lifetime' && (
             <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">Lifetime</span>
           )}
+          <Button size="sm" variant="danger" onClick={deleteAccount} disabled={loading !== null}>
+            {loading === 'delete' ? 'Deleting…' : 'Delete account'}
+          </Button>
         </div>
         <div className="text-xs text-sage mt-1">
           {org.id} · created {formatDate(org.created_at)}
@@ -256,7 +280,7 @@ export default function OrgDetailClient({
           <tbody>
             {members.map((m) => (
               <tr key={m.id} className="border-b border-ink/5 last:border-0">
-                <td className="px-2 py-2">{m.invited_email ?? '-'}</td>
+                <td className="px-2 py-2">{m.email ?? m.invited_email ?? '-'}</td>
                 <td className="px-2 py-2 text-sage">{m.role}</td>
                 <td className="px-2 py-2 text-sage">{m.status}</td>
                 <td className="px-2 py-2 text-sage">{formatDate(m.joined_at)}</td>
