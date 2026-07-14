@@ -320,7 +320,7 @@ export default function BillingClient({
 
       {checkoutSecret && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="relative w-full max-w-lg rounded-lg bg-white p-2 shadow-xl">
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-white p-2 shadow-xl">
             <button
               className="absolute right-3 top-3 z-10 text-sm text-sage hover:text-ink"
               onClick={() => setCheckoutSecret(null)}
