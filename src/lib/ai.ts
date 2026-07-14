@@ -112,6 +112,14 @@ export function buildScopeCreepPrompt(params: {
   currencySign?: string
   fullRetainerCents?: number
   retainerCoversTarget?: boolean
+  daysRemaining?: number
+  hoursBudgetAtTarget?: number
+  hoursRemainingBudget?: number
+  projectedFullMonthHours?: number
+  projectedOverageHours?: number
+  projectedOverageCents?: number
+  clientCtx?: ClientCtx
+  brandVoice?: string | null
 }) {
   const sign = params.currencySign ?? '$'
   const revenue = (params.revenueCents / 100).toFixed(0)
@@ -120,15 +128,29 @@ export function buildScopeCreepPrompt(params: {
   // revenueCents/hours are both matched to the same elapsed portion of the month, so
   // effectiveRateCents is a genuine current-pace signal - if hours keep coming in at this rate,
   // the full month lands at roughly the same rate, not a better one. Whether a retainer raise is
-  // warranted is answered deterministically server-side (retainerCoversTarget) rather than left
-  // for the model to work out itself, since dividing the full retainer by only the hours logged
-  // so far silently assumes hours stop accruing for the rest of the month - a wrong assumption
-  // that produces a falsely reassuring "projected" rate.
+  // warranted, and how far off the current pace is, are both answered deterministically
+  // server-side rather than left for the model to work out itself, since dividing the full
+  // retainer by only the hours logged so far silently assumes hours stop accruing for the rest
+  // of the month - a wrong assumption that produces a falsely reassuring "projected" rate.
   const retainerLine =
     params.isEstimatedRevenue && params.fullRetainerCents
       ? ` The client's full monthly retainer is ${sign}${(params.fullRetainerCents / 100).toFixed(0)} - the revenue figure above is only the portion elapsed so far this month. ${params.retainerCoversTarget ? 'That full retainer already covers what target rate would require for the hours logged so far, so a retainer increase is not warranted right now - the concern is hours pace, not contract value.' : 'Even the full retainer falls short of what target rate would require for the hours logged so far, so a retainer increase is a legitimate option.'} If hours keep being logged at the current pace for the rest of the month, the effective rate will land around the same ${sign}${effectiveRate}/hr shown above, not a better one - the rate is not simply "catching up" as the month progresses.`
       : ''
+  const projectionLine =
+    params.hoursBudgetAtTarget !== undefined && params.projectedFullMonthHours !== undefined
+      ? ` The retainer supports about ${params.hoursBudgetAtTarget.toFixed(1)}h this month at target rate. At the current daily pace, hours are on track to reach about ${params.projectedFullMonthHours.toFixed(1)}h by the end of ${params.periodLabel}, with ${params.daysRemaining} day(s) left. ${(params.hoursRemainingBudget ?? 0) > 0 ? `That leaves about ${(params.hoursRemainingBudget ?? 0).toFixed(1)}h of budget remaining this month before hours exceed what the retainer supports.` : `Hours logged already exceed that budget by about ${Math.abs(params.hoursRemainingBudget ?? 0).toFixed(1)}h.`} If this pace continues for the rest of the month, the account is on track to run about ${(params.projectedOverageHours ?? 0).toFixed(1)}h over that budget, worth roughly ${sign}${((params.projectedOverageCents ?? 0) / 100).toFixed(0)} of time beyond what the retainer covers.`
+      : ''
+  const clientMessageSection = params.clientCtx
+    ? `
+
+Also write a short, ready-to-send message TO THE CLIENT proposing a capacity/scope conversation. Match this client's established tone and context: ${ctxLine(params.clientCtx)}. ${voiceLine(params.brandVoice)}Keep it collaborative and non-accusatory, framed as making sure they get the most out of the current plan - not a complaint about them. Do not mention internal target rates, £/hr figures, or margin - only hours and scope. 3-5 sentences, ready to send as-is.
+
+Return ONLY valid JSON, no markdown:
+{"note": "2-3 sentences for the account owner, internal only", "clientMessage": "the client-facing message described above"}`
+    : `
+
+Respond with 1-2 short sentences only, no headers.`
   return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate - the account is consuming more time than its revenue supports at that target.
-Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate, prorated to date)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.${retainerLine}
-In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (cap hours, have a scope conversation, or raise the retainer - only raise the retainer if told above that the current one falls short). Do not independently recompute a projected or "full month" rate by dividing the full retainer by the hours logged so far - use only the rate figures given above. Be direct, no fluff, no headers. Do not use em dashes.`
+Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate, prorated to date)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.${retainerLine}${projectionLine}
+Tell the account owner what's going on using the numbers above and suggest one concrete next step (cap hours, have a scope conversation, or raise the retainer - only raise the retainer if told above that the current one falls short). Do not independently recompute a projected or "full month" rate yourself - use only the figures given above. Be direct, no fluff. Do not use em dashes.${clientMessageSection}`
 }

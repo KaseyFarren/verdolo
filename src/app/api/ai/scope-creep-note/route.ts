@@ -26,8 +26,15 @@ export async function POST(request: Request) {
   const targetRateCents = ((membership.orgs as any)?.settings?.hourly_cost_cents as number | undefined) || 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currencySign = currencySymbol((membership.orgs as any)?.settings?.currency)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const brandVoice = (membership.orgs as any)?.settings?.brand_voice as string | undefined
 
-  const { data: client } = await supabase.from('clients').select('id, name, retainer_cents, billing_mode').eq('id', clientId).eq('org_id', orgId).single()
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id, name, retainer_cents, billing_mode, business, platform, service, notes, tone, talking_points, last_contacted')
+    .eq('id', clientId)
+    .eq('org_id', orgId)
+    .single()
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
   // "using more hours than revenue justifies at target rate" doesn't apply to hourly clients -
   // more hours means proportionally more revenue by definition, no scope-creep risk in the
@@ -97,6 +104,19 @@ export async function POST(request: Request) {
   const requiredRevenueForHoursCents = Math.round(hours * targetRateCents)
   const retainerCoversTarget = (client.retainer_cents || 0) >= requiredRevenueForHoursCents
 
+  // Same "don't let the model do mismatched-window math" principle as effectiveRateCents above:
+  // how many hours the retainer can absorb at target rate, how many it's projected to actually
+  // hit by month end at the current daily pace, and the gap between them are all deterministic
+  // and handed to the model as facts rather than arithmetic it has to get right itself.
+  const dayOfMonth = Number(today.slice(8, 10))
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const daysRemaining = Math.max(0, daysInMonth - dayOfMonth)
+  const hoursBudgetAtTarget = targetRateCents > 0 ? (client.retainer_cents || 0) / targetRateCents : 0
+  const projectedFullMonthHours = retainerFraction > 0 ? hours / retainerFraction : hours
+  const hoursRemainingBudget = hoursBudgetAtTarget - hours
+  const projectedOverageHours = Math.max(0, projectedFullMonthHours - hoursBudgetAtTarget)
+  const projectedOverageCents = Math.round(projectedOverageHours * targetRateCents)
+
   try {
     const prompt = buildScopeCreepPrompt({
       clientName: client.name,
@@ -109,9 +129,28 @@ export async function POST(request: Request) {
       currencySign,
       fullRetainerCents: client.retainer_cents || 0,
       retainerCoversTarget,
+      daysRemaining,
+      hoursBudgetAtTarget,
+      hoursRemainingBudget,
+      projectedFullMonthHours,
+      projectedOverageHours,
+      projectedOverageCents,
+      clientCtx: {
+        name: client.name,
+        business: client.business,
+        platform: client.platform,
+        service: client.service,
+        notes: client.notes,
+        tone: client.tone,
+        talking_points: client.talking_points,
+        last_contacted: client.last_contacted,
+      },
+      brandVoice,
     })
-    const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
-    return NextResponse.json({ note: extractText(result) })
+    const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+    const txt = extractText(result).replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(txt) as { note: string; clientMessage: string }
+    return NextResponse.json({ note: parsed.note, clientMessage: parsed.clientMessage })
   } catch {
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
   }

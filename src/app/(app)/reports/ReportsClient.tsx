@@ -129,8 +129,9 @@ export default function ReportsClient({
   const [recap, setRecap] = useState<string | null>(reports.find((r) => r.period_type === 'week' && r.period_start === weekAnchor)?.content ?? null)
   const [loadingRecap, setLoadingRecap] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [scopeNotes, setScopeNotes] = useState<Record<string, string>>({})
+  const [scopeNotes, setScopeNotes] = useState<Record<string, { note: string; clientMessage: string }>>({})
   const [loadingNote, setLoadingNote] = useState<string | null>(null)
+  const [copiedScopeMsgId, setCopiedScopeMsgId] = useState<string | null>(null)
 
   const [backfillType, setBackfillType] = useState<'week' | 'month'>('week')
   const [backfillDate, setBackfillDate] = useState(todayKey())
@@ -204,10 +205,22 @@ export default function ReportsClient({
         body: JSON.stringify({ orgId, clientId, periodStart: pMonth, today: todayKey() }),
       })
       const body = await res.json()
-      if (res.ok) setScopeNotes((prev) => ({ ...prev, [clientId]: body.note }))
+      if (res.ok) setScopeNotes((prev) => ({ ...prev, [clientId]: { note: body.note, clientMessage: body.clientMessage } }))
       else toast.error(body.error || 'Failed to generate note')
     } finally {
       setLoadingNote(null)
+    }
+  }
+
+  async function copyScopeMessage(clientId: string) {
+    const message = scopeNotes[clientId]?.clientMessage
+    if (!message) return
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopiedScopeMsgId(clientId)
+      setTimeout(() => setCopiedScopeMsgId(null), 2000)
+    } catch {
+      toast.error('Could not copy to clipboard - copy the message manually below')
     }
   }
 
@@ -854,7 +867,20 @@ export default function ReportsClient({
                     {isBelowTarget && (
                       <div className="mt-2">
                         {scopeNotes[r.client.id] ? (
-                          <div className="text-xs text-ink bg-red-50/60 rounded-lg p-2">{scopeNotes[r.client.id]}</div>
+                          <div className="space-y-2">
+                            <div className="text-xs text-ink bg-red-50/60 rounded-lg p-2">{scopeNotes[r.client.id].note}</div>
+                            {scopeNotes[r.client.id].clientMessage && (
+                              <div className="text-xs bg-sage/10 rounded-lg p-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-semibold text-sage uppercase tracking-wide text-[10px]">Suggested message to client</span>
+                                  <button className="text-sage hover:text-ink underline" onClick={() => copyScopeMessage(r.client.id)}>
+                                    {copiedScopeMsgId === r.client.id ? '✓ Copied' : 'Copy'}
+                                  </button>
+                                </div>
+                                <div className="text-ink whitespace-pre-wrap">{scopeNotes[r.client.id].clientMessage}</div>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <button
                             className="text-xs text-sage hover:text-ink underline disabled:opacity-50"
