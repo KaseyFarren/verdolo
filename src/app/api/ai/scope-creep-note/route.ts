@@ -97,6 +97,7 @@ export async function POST(request: Request) {
       isEstimatedRevenue: true,
       periodLabel,
       currencySign,
+      fullRetainerCents: client.retainer_cents || 0,
     })
     const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ note: extractText(result) })

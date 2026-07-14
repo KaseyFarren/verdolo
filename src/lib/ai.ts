@@ -110,12 +110,21 @@ export function buildScopeCreepPrompt(params: {
   isEstimatedRevenue: boolean
   periodLabel: string
   currencySign?: string
+  fullRetainerCents?: number
 }) {
   const sign = params.currencySign ?? '$'
   const revenue = (params.revenueCents / 100).toFixed(0)
   const effectiveRate = (params.effectiveRateCents / 100).toFixed(0)
   const targetRate = (params.targetRateCents / 100).toFixed(0)
+  // revenueCents is the retainer prorated to today, not the full monthly retainer - if the
+  // AI only sees the prorated figure it'll "solve" the rate gap by proposing a retainer that's
+  // actually below what the client already pays, which reads as a nonsensical recommendation.
+  // Giving it the real full retainer lets it check that before suggesting an increase.
+  const retainerLine =
+    params.isEstimatedRevenue && params.fullRetainerCents
+      ? ` The client's actual full monthly retainer is ${sign}${(params.fullRetainerCents / 100).toFixed(0)} - the revenue figure above is only the portion elapsed so far this month, not the full contract value.`
+      : ''
   return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate - the account is consuming more time than its revenue supports at that target.
-Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.
-In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Be direct, no fluff, no headers. Do not use em dashes.`
+Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate, prorated to date)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.${retainerLine}
+In 1-2 short sentences, tell the account owner what's going on and suggest one concrete next step (e.g. raise the retainer, cap hours, or have a scope conversation). Only suggest raising the retainer if the required amount would actually exceed what the client currently pays - otherwise suggest capping hours or a scope conversation instead. Be direct, no fluff, no headers. Do not use em dashes.`
 }
