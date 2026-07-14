@@ -86,6 +86,16 @@ export async function POST(request: Request) {
   const retainerFraction = monthElapsedFraction(monthKey, today)
   const revenueCents = Math.round((client.retainer_cents || 0) * retainerFraction)
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
+  // revenueCents and hours are already matched to the same elapsed window (both cover only
+  // the days so far this month), so effectiveRateCents is a fair current-pace signal - if hours
+  // keep coming in at this rate, the full month lands at roughly the same rate, not a better one.
+  // Whether a retainer raise is warranted is a separate question we answer deterministically here
+  // (comparing the full retainer against what target rate would require for hours logged so far)
+  // rather than leaving the LLM to divide the full retainer by partial-month hours itself, which
+  // silently assumes hours stop accruing for the rest of the month and produces a falsely
+  // reassuring "realized rate" that doesn't describe what's actually happening.
+  const requiredRevenueForHoursCents = Math.round(hours * targetRateCents)
+  const retainerCoversTarget = (client.retainer_cents || 0) >= requiredRevenueForHoursCents
 
   try {
     const prompt = buildScopeCreepPrompt({
@@ -98,6 +108,7 @@ export async function POST(request: Request) {
       periodLabel,
       currencySign,
       fullRetainerCents: client.retainer_cents || 0,
+      retainerCoversTarget,
     })
     const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ note: extractText(result) })
