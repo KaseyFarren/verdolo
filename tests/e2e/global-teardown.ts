@@ -14,6 +14,16 @@ export default async function globalTeardown() {
   const supabase = createClient(url, key)
   const like = `${QA_PREFIX}%`
 
+  // Deleting a QA client orphans (rather than removes) any auto-generated tasks the org's
+  // default template already created for it, since tasks.client_id is "on delete set null" -
+  // those tasks never carry the QA_PREFIX (their title is a fixed "Daily check-in"), so the
+  // title-based tasks sweep below can't catch them. Delete client-scoped tasks first, mirroring
+  // the app-level deleteClient() fix, so teardown can't regress that same bug at the infra level.
+  const { data: qaClients } = await supabase.from('clients').select('id').like('name', like)
+  if (qaClients?.length) {
+    await supabase.from('tasks').delete().in('client_id', qaClients.map((c) => c.id))
+  }
+
   // clients cascade-delete their notes/charges/files/proposals; tasks/time_entries only get
   // client_id nulled (not cascaded), so those are swept independently by title/description.
   const results = await Promise.all([
