@@ -78,13 +78,22 @@ export function buildRecapPrompt(params: {
   periodType: 'week' | 'month'
   periodStart: string
   periodEnd: string
+  today: string
   clientSummaries: string[]
   brandVoice?: string | null
 }) {
   const periodLabel = params.periodType === 'week' ? 'Week' : 'Month'
+  // periodEnd is exclusive and can land in the future (e.g. a week generated on Tuesday still
+  // spans Monday-Sunday) - the data below only reflects activity through `today`, so the AI
+  // needs to know that to avoid describing a still-in-progress period as complete.
+  const isInProgress = params.today >= params.periodStart && params.today < params.periodEnd
+  const progressLine = isInProgress
+    ? `Today is ${params.today}. This ${params.periodType} isn't over yet - the activity below only covers ${params.periodStart} through today, not the full ${params.periodType}. Write the recap as progress "so far", not as a completed-period summary.`
+    : `This ${params.periodType} is complete - the activity below covers the full period.`
   return `You are an agency operations assistant. Write a concise ${params.periodType}ly recap (3-5 sentences) for the agency covering overall performance, who got attention, and who needs attention. Be direct and actionable. No headers. Do not use em dashes.
 ${voiceLine(params.brandVoice)}
 ${periodLabel}: ${params.periodStart}–${params.periodEnd}
+${progressLine}
 ${params.clientSummaries.join('\n')}`
 }
 
