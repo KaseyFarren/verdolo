@@ -14,6 +14,7 @@ import TrendLineChart from '@/components/charts/TrendLineChart'
 import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
+import Avatar from '@/components/ui/Avatar'
 
 type Client = { id: string; name: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
@@ -240,20 +241,24 @@ export default function ReportsClient({
         const clientEntries = entries.filter((e) => e.client_id === c.id)
         const totalSeconds = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
 
-        const byAssignee = new Map<string, { label: string; count: number }>()
+        const byAssignee = new Map<string, { label: string; member: Member | null; count: number }>()
         for (const t of clientTasks) {
           const key = t.assigned_to || 'unassigned'
-          const label = t.assigned_to ? memberName(members.find((m) => m.user_id === t.assigned_to)) : 'Unassigned'
+          const member = t.assigned_to ? members.find((m) => m.user_id === t.assigned_to) ?? null : null
+          const label = member ? memberName(member) : 'Unassigned'
           const existing = byAssignee.get(key)
           if (existing) existing.count += 1
-          else byAssignee.set(key, { label, count: 1 })
+          else byAssignee.set(key, { label, member, count: 1 })
         }
 
-        const byLogger = new Map<string, { label: string; seconds: number }>()
+        const byLogger = new Map<string, { label: string; member: Member | null; seconds: number }>()
         for (const e of clientEntries) {
           const existing = byLogger.get(e.user_id)
           if (existing) existing.seconds += e.duration_seconds || 0
-          else byLogger.set(e.user_id, { label: memberName(members.find((m) => m.user_id === e.user_id)), seconds: e.duration_seconds || 0 })
+          else {
+            const member = members.find((m) => m.user_id === e.user_id) ?? null
+            byLogger.set(e.user_id, { label: memberName(member), member, seconds: e.duration_seconds || 0 })
+          }
         }
 
         return {
@@ -454,28 +459,29 @@ export default function ReportsClient({
         <div className="text-sm text-sage mt-1">Client activity, profitability, team capacity, and the weekly recap library.</div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-sand/60 rounded-full p-1 w-fit">
-        {NAV.map((item) => (
-          <button
-            key={item.value}
-            onClick={() => setView(item.value)}
-            className={`relative rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-              view === item.value ? 'font-medium text-ink' : 'text-sage hover:text-ink'
-            }`}
-          >
-            {view === item.value && (
-              <motion.div
-                layoutId="reports-nav-active"
-                className="absolute inset-0 rounded-full bg-white"
-                style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-              />
-            )}
-            <span className="relative">{item.label}</span>
-          </button>
-        ))}
-      </div>
-
+      <div className="flex flex-col md:flex-row gap-6">
+        <nav className="flex flex-wrap md:flex-col gap-1 md:w-40 shrink-0 mb-4 md:mb-0">
+          {NAV.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setView(item.value)}
+              className={`relative rounded-full px-3 py-2 text-sm whitespace-nowrap text-left transition-colors ${
+                view === item.value ? 'font-medium text-ink' : 'text-sage hover:text-ink hover:bg-sand'
+              }`}
+            >
+              {view === item.value && (
+                <motion.div
+                  layoutId="reports-nav-active"
+                  className="absolute inset-0 rounded-full bg-white"
+                  style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className="relative">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="flex-1 min-w-0">
       {view === 'overview' && (
         <>
           <div className="mb-6">
@@ -515,48 +521,70 @@ export default function ReportsClient({
             {clientReports.length === 0 ? (
               <div className="text-sm text-sage py-3">No task or time activity in this range.</div>
             ) : (
-              <div className="space-y-3">
-                {clientReports.map((r) => (
-                  <div key={r.client.id} className="rounded-2xl bg-white shadow-md p-5">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="text-sm font-semibold text-ink">{r.client.name}</div>
-                      <div className="flex gap-3 text-xs text-sage">
-                        <span>
-                          {r.taskCount} task{r.taskCount !== 1 ? 's' : ''} done
-                        </span>
-                        <span>{formatDuration(r.totalSeconds)}</span>
+              <div className="@container">
+                <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-4">
+                  {clientReports.map((r) => (
+                    <div key={r.client.id} className="rounded-2xl bg-white border border-ink/8 p-5">
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="text-sm font-semibold text-ink">{r.client.name}</div>
+                        <div className="flex gap-2">
+                          <span className="rounded-full bg-sand/60 text-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">
+                            {r.taskCount} task{r.taskCount !== 1 ? 's' : ''}
+                          </span>
+                          <span className="rounded-full bg-sand/60 text-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">
+                            {formatDuration(r.totalSeconds)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-2">Tasks by who</div>
+                          {r.byAssignee.length === 0 ? (
+                            <div className="text-xs text-sage">-</div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {r.byAssignee.map((a) => (
+                                <div key={a.label} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {a.member ? (
+                                      <Avatar member={a.member} size={18} />
+                                    ) : (
+                                      <div className="h-[18px] w-[18px] rounded-full bg-sand shrink-0" />
+                                    )}
+                                    <span className="text-ink truncate">{a.label}</span>
+                                  </div>
+                                  <span className="text-sage shrink-0 ml-2">{a.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-2">Time by who</div>
+                          {r.byLogger.length === 0 ? (
+                            <div className="text-xs text-sage">-</div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {r.byLogger.map((l) => (
+                                <div key={l.label} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {l.member ? (
+                                      <Avatar member={l.member} size={18} />
+                                    ) : (
+                                      <div className="h-[18px] w-[18px] rounded-full bg-sand shrink-0" />
+                                    )}
+                                    <span className="text-ink truncate">{l.label}</span>
+                                  </div>
+                                  <span className="text-sage shrink-0 ml-2">{formatDuration(l.seconds)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-1">Tasks by who</div>
-                        {r.byAssignee.length === 0 ? (
-                          <div className="text-xs text-sage">-</div>
-                        ) : (
-                          r.byAssignee.map((a) => (
-                            <div key={a.label} className="flex justify-between text-xs py-0.5">
-                              <span className="text-ink">{a.label}</span>
-                              <span className="text-sage">{a.count}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-1">Time by who</div>
-                        {r.byLogger.length === 0 ? (
-                          <div className="text-xs text-sage">-</div>
-                        ) : (
-                          r.byLogger.map((l) => (
-                            <div key={l.label} className="flex justify-between text-xs py-0.5">
-                              <span className="text-ink">{l.label}</span>
-                              <span className="text-sage">{formatDuration(l.seconds)}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -972,6 +1000,8 @@ export default function ReportsClient({
           )}
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }
