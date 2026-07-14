@@ -25,6 +25,10 @@ export default async function globalTeardown() {
     supabase.from('time_entries').delete().like('note', like),
     supabase.from('client_notes').delete().like('text', like),
     supabase.from('messages').delete().like('body', like),
+    supabase.from('client_charges').delete().like('description', like),
+    // real seeded members get a QA title written during the Team edit test - clear it back out
+    // rather than delete (deleting a real teammate row would be destructive)
+    supabase.from('org_members').update({ title: null }).like('title', like),
   ])
 
   const failed = results.filter((r) => r.error)
