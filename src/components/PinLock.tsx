@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import Button from '@/components/ui/Button'
+import { LockIcon } from '@/components/ui/icons'
 
 // Lightweight per-device app-lock - like a phone lock screen, not a real auth replacement.
 // Supabase login is what actually protects the data; this just deters a shoulder-surf or
@@ -139,7 +140,7 @@ export function PinLockProvider({ children }: { children: React.ReactNode }) {
               animate={{ scale: 1, opacity: 1 }}
               className="w-full max-w-xs text-center"
             >
-              <div className="text-3xl mb-3">🔒</div>
+              <div className="flex justify-center mb-3"><LockIcon size={32} /></div>
               <div className="text-sm text-cream/70 mb-4">Enter your PIN to continue</div>
               <input
                 autoFocus

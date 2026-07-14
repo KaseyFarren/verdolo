@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { stepsForRole, tourReplayKey, tourStepKey, type Role, type TourStep } from '@/lib/tour'
+import { XIcon } from '@/components/ui/icons'
 
 const PAD = 14 // gap between the card and page content
 const HOLE = 6 // padding around the spotlight cutout
@@ -220,8 +221,8 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
         style={{ position: 'fixed', left: cardPos.left, top: cardPos.top, width: CARD_W, zIndex: 100001 }}
         className="rounded-2xl bg-cream border border-ink/10 shadow-lg p-5"
       >
-        <button aria-label="Close tour" onClick={finish} className="absolute top-3 right-3 text-sage hover:text-ink text-sm leading-none">
-          ✕
+        <button aria-label="Close tour" onClick={finish} className="absolute top-3 right-3 text-sage hover:text-ink leading-none">
+          <XIcon size={14} />
         </button>
         <div className="font-heading font-bold text-ink text-base pr-6">
           {step.title} <span className="text-sage font-normal text-sm">({stepIndex + 1}/{steps.length})</span>

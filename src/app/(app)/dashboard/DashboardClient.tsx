@@ -9,7 +9,7 @@ import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import Button from '@/components/ui/Button'
 import IconButton from '@/components/ui/IconButton'
-import { PauseIcon, PencilIcon, PlayIcon } from '@/components/ui/icons'
+import { CheckIcon, ClockIcon, PauseIcon, PencilIcon, PlayIcon, RefreshIcon, SparkleIcon, TrophyIcon } from '@/components/ui/icons'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
@@ -452,13 +452,17 @@ export default function DashboardClient({
               <div className="text-sm font-medium text-ink/60 mb-2">This week</div>
               {topHoursLabel && (
                 <div className="flex justify-between items-start gap-2 py-1 text-sm">
-                  <span className="text-ink min-w-0 pr-2">🏆 {topHoursLabel} logged the most hours</span>
+                  <span className="text-ink min-w-0 pr-2 inline-flex items-center gap-1.5">
+                    <TrophyIcon size={14} className="shrink-0" /> {topHoursLabel} logged the most hours
+                  </span>
                   <span className="font-medium text-ink shrink-0">{formatHoursMins(topHours!.total)}</span>
                 </div>
               )}
               {topTasksLabel && (
                 <div className="flex justify-between items-start gap-2 py-1 text-sm">
-                  <span className="text-ink min-w-0 pr-2">✅ {topTasksLabel} completed the most tasks</span>
+                  <span className="text-ink min-w-0 pr-2 inline-flex items-center gap-1.5">
+                    <CheckIcon size={14} className="shrink-0" /> {topTasksLabel} completed the most tasks
+                  </span>
                   <span className="font-medium text-ink shrink-0">{topTasks!.total}</span>
                 </div>
               )}
@@ -742,8 +746,8 @@ export default function DashboardClient({
               {msgTasksDone}/{activeClients.length} sent
             </span>
             {showMessages && hasApiKey && (
-              <Button variant="secondary" size="sm" className="text-sage hover:text-ink" onClick={generateAll} disabled={loadingAll}>
-                {loadingAll ? 'Writing…' : '✨ Generate all'}
+              <Button variant="secondary" size="sm" className="text-sage hover:text-ink inline-flex items-center gap-1" onClick={generateAll} disabled={loadingAll}>
+                {loadingAll ? 'Writing…' : <><SparkleIcon size={13} /> Generate all</>}
               </Button>
             )}
           </div>
@@ -765,13 +769,15 @@ export default function DashboardClient({
                 </div>
                 {sent && (
                   <div className="flex items-center gap-2 text-xs shrink-0">
-                    <span className="text-green font-semibold">✓ Sent</span>
+                    <span className="text-green font-semibold inline-flex items-center gap-1">
+                      <CheckIcon size={12} /> Sent
+                    </span>
                     <button className="text-sage hover:text-ink hover:underline" onClick={() => undoSent(c)}>
                       Undo
                     </button>
                     {!c.awaiting_reply && (
                       <button title="Mark awaiting reply" className="text-amber-700 hover:text-amber-800" onClick={() => markAwaitingReply(c)}>
-                        ⏳
+                        <ClockIcon size={13} />
                       </button>
                     )}
                   </div>
@@ -781,7 +787,9 @@ export default function DashboardClient({
                   the day after you send (when sent flips back to false) you can still mark "Got reply". */}
               {c.awaiting_reply && (
                 <div className={`flex items-center justify-between bg-amber-100/70 border border-amber-300 rounded-lg px-2.5 py-1.5 ${sent ? 'mt-1' : 'mb-2'}`}>
-                  <span className="text-xs text-amber-800">⏳ Awaiting reply</span>
+                  <span className="text-xs text-amber-800 inline-flex items-center gap-1">
+                    <ClockIcon size={12} /> Awaiting reply
+                  </span>
                   <button className="text-xs text-green font-medium" onClick={() => clearAwaitingReply(c)}>
                     Got reply
                   </button>
@@ -809,12 +817,12 @@ export default function DashboardClient({
                     />
                   )}
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="md" className="text-xs text-sage hover:text-ink" onClick={() => generateOne(c.id)} disabled={isGen || !hasApiKey}>
-                      {isGen ? 'Writing…' : draftMessages[c.id] !== undefined ? '↺' : '✨ Generate'}
+                    <Button variant="secondary" size="md" className="text-xs text-sage hover:text-ink inline-flex items-center gap-1" onClick={() => generateOne(c.id)} disabled={isGen || !hasApiKey}>
+                      {isGen ? 'Writing…' : draftMessages[c.id] !== undefined ? <RefreshIcon size={13} /> : <><SparkleIcon size={13} /> Generate</>}
                     </Button>
                     {draftMessages[c.id] !== undefined && (
-                      <Button variant="primary" size="md" className="flex-1 text-xs" onClick={() => markSent(c)}>
-                        {copiedId === c.id ? '✓ Copied' : 'Copy & mark sent'}
+                      <Button variant="primary" size="md" className="flex-1 text-xs inline-flex items-center justify-center gap-1" onClick={() => markSent(c)}>
+                        {copiedId === c.id ? <><CheckIcon size={12} /> Copied</> : 'Copy & mark sent'}
                       </Button>
                     )}
                   </div>
@@ -850,15 +858,27 @@ function ProgressRing({ done, total, size = 60 }: { done: number; total: number;
           strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 0.4s ease' }}
         />
-        <text
-          x="50%"
-          y="50%"
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{ transform: 'rotate(90deg)', transformOrigin: 'center', fill: allComplete ? '#1f3320' : '#1a1a17', fontSize: size * 0.2, fontWeight: 700 }}
-        >
-          {allComplete ? '✓' : `${done}/${total}`}
-        </text>
+        {allComplete ? (
+          <polyline
+            points={`${size * 0.36} ${size * 0.52} ${size * 0.46} ${size * 0.62} ${size * 0.64} ${size * 0.4}`}
+            fill="none"
+            stroke="#1f3320"
+            strokeWidth={size * 0.06}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ transform: 'rotate(90deg)', transformOrigin: 'center' }}
+          />
+        ) : (
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{ transform: 'rotate(90deg)', transformOrigin: 'center', fill: '#1a1a17', fontSize: size * 0.2, fontWeight: 700 }}
+          >
+            {`${done}/${total}`}
+          </text>
+        )}
       </svg>
     </div>
   )
@@ -940,7 +960,7 @@ function SimpleTaskRow({
           t.done ? 'bg-accent border-accent' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
         }`}
       >
-        {t.done && <span className="text-[10px] text-white">✓</span>}
+        {t.done && <CheckIcon size={10} className="text-white" />}
       </button>
       <div className="flex-1 min-w-0">
         <div className={`text-sm ${t.done ? 'line-through text-sage' : 'text-ink'}`}>

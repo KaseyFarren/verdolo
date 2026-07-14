@@ -10,18 +10,32 @@ import { PinLockProvider, usePinLock } from '@/components/PinLock'
 import QuickCapture from '@/components/QuickCapture'
 import TourProvider from '@/components/TourProvider'
 import NotificationSound from '@/components/NotificationSound'
+import {
+  BarChartIcon,
+  CheckSquareIcon,
+  ClockIcon,
+  DollarSignIcon,
+  FileIcon,
+  HomeIcon,
+  LockIcon,
+  MenuIcon,
+  MessageCircleIcon,
+  SettingsIcon,
+  UsersGroupIcon,
+  UsersIcon,
+} from '@/components/ui/icons'
 
 const NAV = [
-  { href: '/dashboard', icon: '🏠', label: 'Dashboard', tour: 'nav-dashboard' },
-  { href: '/tasks', icon: '✅', label: 'Tasks' },
-  { href: '/clients', icon: '👥', label: 'Clients', tour: 'nav-clients' },
-  { href: '/proposals', icon: '📄', label: 'Proposals', tour: 'nav-proposals' },
-  { href: '/time', icon: '⏱️', label: 'Time', tour: 'nav-time' },
-  { href: '/messages', icon: '💬', label: 'Messages' },
-  { href: '/reports', icon: '📊', label: 'Reports', adminOnly: true },
-  { href: '/team', icon: '🧑‍🤝‍🧑', label: 'Team', adminOnly: true },
-  { href: '/revenue', icon: '💰', label: 'Revenue', ownerOnly: true },
-  { href: '/settings', icon: '⚙️', label: 'Settings', tour: 'nav-settings' },
+  { href: '/dashboard', icon: HomeIcon, label: 'Dashboard', tour: 'nav-dashboard' },
+  { href: '/tasks', icon: CheckSquareIcon, label: 'Tasks' },
+  { href: '/clients', icon: UsersIcon, label: 'Clients', tour: 'nav-clients' },
+  { href: '/proposals', icon: FileIcon, label: 'Proposals', tour: 'nav-proposals' },
+  { href: '/time', icon: ClockIcon, label: 'Time', tour: 'nav-time' },
+  { href: '/messages', icon: MessageCircleIcon, label: 'Messages' },
+  { href: '/reports', icon: BarChartIcon, label: 'Reports', adminOnly: true },
+  { href: '/team', icon: UsersGroupIcon, label: 'Team', adminOnly: true },
+  { href: '/revenue', icon: DollarSignIcon, label: 'Revenue', ownerOnly: true },
+  { href: '/settings', icon: SettingsIcon, label: 'Settings', tour: 'nav-settings' },
 ]
 
 export default function AppShell({
@@ -68,10 +82,10 @@ export default function AppShell({
             <button
               id="mobile-nav-toggle"
               onClick={() => setMobileOpen(true)}
-              className="text-xl leading-none"
+              className="leading-none"
               aria-label="Open menu"
             >
-              ☰
+              <MenuIcon size={22} />
             </button>
             <div className="font-heading font-bold text-sm">{orgName}</div>
             <div className="w-6" />
@@ -123,7 +137,7 @@ export default function AppShell({
                         transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                       />
                     )}
-                    <span className="relative">{item.icon}</span>
+                    <item.icon size={17} className="relative shrink-0" />
                     <span className="relative">{item.label}</span>
                   </Link>
                 )
@@ -168,8 +182,8 @@ function LockButton() {
   const { hasPin, lock } = usePinLock()
   if (!hasPin) return null
   return (
-    <button onClick={lock} title="Lock now" className="text-xs text-cream/70 hover:text-white transition-colors">
-      🔒 Lock
+    <button onClick={lock} title="Lock now" className="flex items-center gap-1 text-xs text-cream/70 hover:text-white transition-colors">
+      <LockIcon size={12} /> Lock
     </button>
   )
 }

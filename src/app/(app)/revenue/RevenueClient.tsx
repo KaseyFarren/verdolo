@@ -23,6 +23,7 @@ import {
 } from '@/lib/agency'
 import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
+import { XIcon } from '@/components/ui/icons'
 import DatePicker from '@/components/ui/DatePicker'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
@@ -588,7 +589,7 @@ export default function RevenueClient({
                                 className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-red-600"
                                 onClick={() => deleteCharge(c)}
                               >
-                                ✕
+                                <XIcon size={12} />
                               </button>
                             </div>
                           </div>

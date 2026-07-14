@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Row, Section, Toggle } from '@/components/settings/SettingsUI'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 import CustomSelect from '@/components/ui/CustomSelect'
+import { CheckIcon } from '@/components/ui/icons'
 import { CURRENCIES, currencySymbol, type Currency } from '@/lib/agency'
 
 type Settings = {
@@ -113,7 +114,7 @@ export default function GeneralClient({
       <Row dataTour="rate-row" title="Target hourly rate" subtitle="What you want to realize per hour - compared against effective rate in Reports → Profitability and Revenue">
         <div className="flex items-center gap-1">
           <span className="text-xs w-14 text-right shrink-0">
-            {rateStatus === 'saving' ? <span className="text-sage">Saving…</span> : rateStatus === 'saved' ? <span className="text-green">Saved ✓</span> : null}
+            {rateStatus === 'saving' ? <span className="text-sage">Saving…</span> : rateStatus === 'saved' ? <span className="text-green inline-flex items-center gap-1">Saved <CheckIcon size={11} /></span> : null}
           </span>
           <span className="text-sm text-sage">{currencySymbol(currency)}</span>
           <input

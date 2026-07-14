@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section } from '@/components/settings/SettingsUI'
 import { AVATAR_COLORS, getInitials } from '@/lib/agency'
+import { CheckIcon } from '@/components/ui/icons'
 import { startTourReplay, tourReplayKey, tourStepKey } from '@/lib/tour'
 
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
@@ -72,7 +73,7 @@ export default function ProfileClient({
   }
 
   // Save as the user types (debounced) as well as on blur, so they get a clear "Saved" without
-  // having to click off the field first - and see "Saving…/Saved ✓" the whole time.
+  // having to click off the field first - and see "Saving…/Saved" the whole time.
   async function saveDisplayName(value = displayName) {
     setNameStatus('saving')
     await supabase.from('org_members').update({ display_name: value.trim() || null }).eq('org_id', orgId).eq('user_id', userId)
@@ -212,7 +213,7 @@ export default function ProfileClient({
             onBlur={() => saveDisplayName()}
           />
           <span className="text-xs w-14 shrink-0">
-            {nameStatus === 'saving' ? <span className="text-sage">Saving…</span> : nameStatus === 'saved' ? <span className="text-green">Saved ✓</span> : null}
+            {nameStatus === 'saving' ? <span className="text-sage">Saving…</span> : nameStatus === 'saved' ? <span className="text-green inline-flex items-center gap-1">Saved <CheckIcon size={11} /></span> : null}
           </span>
         </div>
       </Row>

@@ -7,7 +7,7 @@ import MultiSelect from '@/components/ui/MultiSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import Avatar from '@/components/ui/Avatar'
 import IconButton from '@/components/ui/IconButton'
-import { AlertTriangleIcon, MoonIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
+import { AlertTriangleIcon, CheckIcon, MoonIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, priorityColor, todayKey } from '@/lib/agency'
 import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
@@ -122,7 +122,7 @@ export default function TaskRow({
             t.done ? 'bg-green border-green' : isTimerRunning ? 'border-green ring-2 ring-green/30' : 'border-ink/25'
           } ${hasOpenSubtasks && !t.done ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {t.done && <span className="text-[10px] text-white">✓</span>}
+          {t.done && <CheckIcon size={10} className="text-white" />}
         </button>
 
         {!t.done &&

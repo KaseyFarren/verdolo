@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import Button from '@/components/ui/Button'
-import { UploadCloudIcon, XIcon, TrashIcon } from '@/components/ui/icons'
+import { CheckIcon, UploadCloudIcon, XIcon, TrashIcon } from '@/components/ui/icons'
 import { PRIORITY, todayKey } from '@/lib/agency'
 
 type Client = { id: string; name: string }
@@ -260,7 +260,7 @@ export default function ImportTasksModal({
                         onClick={() => updateDraft(i, { include: !d.include })}
                         className={`mt-1.5 h-4 w-4 rounded-[4px] border flex items-center justify-center shrink-0 ${d.include ? 'bg-green border-green' : 'border-ink/25'}`}
                       >
-                        {d.include && <span className="text-[10px] text-white">✓</span>}
+                        {d.include && <CheckIcon size={10} className="text-white" />}
                       </button>
                       <div className="flex-1 min-w-0">
                         <input

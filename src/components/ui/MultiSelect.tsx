@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SelectOption } from './CustomSelect'
+import { CheckIcon } from './icons'
 
 export default function MultiSelect({
   value,
@@ -91,7 +92,7 @@ export default function MultiSelect({
                     checked ? 'bg-accent border-accent' : 'border-ink/25'
                   }`}
                 >
-                  {checked && <span className="text-[9px] text-white">✓</span>}
+                  {checked && <CheckIcon size={9} className="text-white" />}
                 </span>
                 <span className="truncate">{o.label}</span>
               </button>

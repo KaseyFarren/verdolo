@@ -11,6 +11,7 @@ import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import Tooltip from '@/components/ui/Tooltip'
+import { CheckIcon, ClockIcon, MessageCircleIcon, PauseIcon, PencilIcon, PlayIcon, XIcon } from '@/components/ui/icons'
 import { periodBounds, type PeriodValue } from '@/lib/period'
 import {
   AVATAR_COLORS,
@@ -405,7 +406,11 @@ export default function ClientsClient({
                       </span>
                     </Tooltip>
                   )}
-                  {selected.awaiting_reply && <span className="text-xs text-amber-700 font-medium">⏳ Awaiting reply</span>}
+                  {selected.awaiting_reply && (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 font-medium">
+                      <ClockIcon size={12} /> Awaiting reply
+                    </span>
+                  )}
                   {selected.primary_contact_id && (
                     <span className="text-xs text-sage bg-ink/5 rounded-full px-2 py-0.5">Owner: {memberName(memberById(selected.primary_contact_id))}</span>
                   )}
@@ -450,12 +455,12 @@ export default function ClientsClient({
               {canEdit && (
                 <div className="flex gap-1.5 shrink-0 items-center">
                   <button
-                    className={`text-xs rounded-lg px-2.5 py-1.5 font-medium border shadow-sm transition-colors ${
+                    className={`text-xs rounded-lg px-2.5 py-1.5 font-medium border shadow-sm transition-colors inline-flex items-center gap-1 ${
                       isChurned ? 'border-green/40 text-green hover:bg-green/10' : 'border-red-600/30 text-red-600 hover:bg-red-600/10'
                     }`}
                     onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
                   >
-                    {isChurned ? '▶ Activate' : '⏸ Pause'}
+                    {isChurned ? <><PlayIcon size={11} /> Activate</> : <><PauseIcon size={11} /> Pause</>}
                   </button>
                   <button
                     className="text-xs rounded-lg px-2.5 py-1.5 font-medium text-white shadow-sm bg-accent"
@@ -489,7 +494,7 @@ export default function ClientsClient({
                     onClick={() => deleteClient(selected.id)}
                     title="Delete client"
                   >
-                    ✕
+                    <XIcon size={13} />
                   </button>
                 </div>
               )}
@@ -560,8 +565,8 @@ export default function ClientsClient({
               {timeline.map((item, idx) => (
                 <div key={idx} className="flex gap-3 pb-4">
                   <div className="flex flex-col items-center shrink-0">
-                    <div className="h-7 w-7 rounded-full bg-white border border-ink/10 flex items-center justify-center text-sm">
-                      {item.type === 'note' ? '📝' : item.type === 'message' ? '💬' : '✓'}
+                    <div className="h-7 w-7 rounded-full bg-white border border-ink/10 flex items-center justify-center text-sage">
+                      {item.type === 'note' ? <PencilIcon size={13} /> : item.type === 'message' ? <MessageCircleIcon size={13} /> : <CheckIcon size={13} />}
                     </div>
                     {idx < timeline.length - 1 && <div className="w-px flex-1 bg-ink/5 mt-1" />}
                   </div>
@@ -574,8 +579,8 @@ export default function ClientsClient({
                             {formatNoteTime(item.data.created_at)}
                             {item.data.author_id && ` · ${memberName(memberById(item.data.author_id))}`}
                           </span>
-                          <button className="text-xs text-red-600" onClick={() => deleteNote(item.data.id)}>
-                            ✕
+                          <button className="text-red-600" onClick={() => deleteNote(item.data.id)}>
+                            <XIcon size={11} />
                           </button>
                         </div>
                       </div>
@@ -591,8 +596,8 @@ export default function ClientsClient({
                     )}
                     {item.type === 'task' && (
                       <div>
-                        <div className="text-sm text-sage">
-                          <span className="text-green mr-1">✓</span>
+                        <div className="text-sm text-sage flex items-center gap-1">
+                          <CheckIcon size={12} className="text-green" />
                           {item.data.title}
                         </div>
                         <div className="text-xs text-sage mt-0.5">

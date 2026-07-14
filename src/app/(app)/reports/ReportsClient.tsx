@@ -26,6 +26,7 @@ import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 import Tooltip from '@/components/ui/Tooltip'
+import { AlertTriangleIcon, CheckIcon, ClockIcon, RefreshIcon, SparkleIcon } from '@/components/ui/icons'
 import Avatar from '@/components/ui/Avatar'
 
 type Client = {
@@ -522,19 +523,25 @@ export default function ReportsClient({
               <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
                 <div className="flex justify-between items-center mb-2">
                   <div className="text-xs font-semibold text-sage">Week of {formatDate(weekAnchor)}</div>
-                  <button className="text-xs text-sage hover:text-ink" onClick={generateRecap} disabled={loadingRecap}>
-                    ↺ Regenerate
+                  <button className="text-xs text-sage hover:text-ink inline-flex items-center gap-1" onClick={generateRecap} disabled={loadingRecap}>
+                    <RefreshIcon size={12} /> Regenerate
                   </button>
                 </div>
                 <div className="text-sm leading-relaxed text-ink">{loadingRecap ? 'Generating…' : recap}</div>
               </div>
             ) : (
               <button
-                className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50"
+                className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                 onClick={generateRecap}
                 disabled={loadingRecap || !hasApiKey}
               >
-                {loadingRecap ? '⏳ Generating recap…' : hasApiKey ? '✨ Generate weekly recap' : 'AI features aren’t configured on this deployment'}
+                {loadingRecap ? (
+                  <><ClockIcon size={13} /> Generating recap…</>
+                ) : hasApiKey ? (
+                  <><SparkleIcon size={13} /> Generate weekly recap</>
+                ) : (
+                  'AI features aren’t configured on this deployment'
+                )}
               </button>
             )}
           </div>
@@ -912,7 +919,11 @@ export default function ReportsClient({
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold text-ink">{r.client.name}</div>
-                        {isBelowTarget && <span className="text-xs rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold">⚠ Scope creep</span>}
+                        {isBelowTarget && (
+                          <span className="text-xs rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold inline-flex items-center gap-1">
+                            <AlertTriangleIcon size={12} /> Scope creep
+                          </span>
+                        )}
                       </div>
                       <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
                         {r.isHourly
@@ -942,8 +953,8 @@ export default function ReportsClient({
                               <div className="text-xs bg-sage/10 rounded-lg p-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-semibold text-sage tracking-wide text-[10px]">Suggested message to client</span>
-                                  <button className="text-sage hover:text-ink underline" onClick={() => copyScopeMessage(r.client.id)}>
-                                    {copiedScopeMsgId === r.client.id ? '✓ Copied' : 'Copy'}
+                                  <button className="text-sage hover:text-ink underline inline-flex items-center gap-1" onClick={() => copyScopeMessage(r.client.id)}>
+                                    {copiedScopeMsgId === r.client.id ? <><CheckIcon size={11} /> Copied</> : 'Copy'}
                                   </button>
                                 </div>
                                 <div className="text-ink whitespace-pre-wrap">{scopeNotes[r.client.id].clientMessage}</div>
@@ -952,12 +963,12 @@ export default function ReportsClient({
                           </div>
                         ) : (
                           <button
-                            className="text-xs text-sage hover:text-ink underline disabled:opacity-50"
+                            className="text-xs text-sage hover:text-ink underline disabled:opacity-50 inline-flex items-center gap-1"
                             onClick={() => explainScopeCreep(r.client.id)}
                             disabled={loadingNote === r.client.id || !hasApiKey}
                             title={hasApiKey ? undefined : 'AI features aren’t configured on this deployment'}
                           >
-                            {loadingNote === r.client.id ? 'Thinking…' : hasApiKey ? '✨ Explain with AI' : 'AI unavailable'}
+                            {loadingNote === r.client.id ? 'Thinking…' : hasApiKey ? <><SparkleIcon size={12} /> Explain with AI</> : 'AI unavailable'}
                           </button>
                         )}
                       </div>

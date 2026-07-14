@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials, memberName } from '@/lib/agency'
-import { FileIcon, ImageFileIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIcon } from '@/components/ui/icons'
+import { FileIcon, ImageFileIcon, MessageCircleIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIcon } from '@/components/ui/icons'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -703,7 +703,7 @@ export default function MessagesClient({
               activeIsTeam ? 'bg-accent text-white font-medium' : 'text-ink hover:bg-sand'
             }`}
           >
-            <span>💬</span>
+            <MessageCircleIcon size={15} />
             <span className="flex-1">Team</span>
             {!activeIsTeam && hasUnreadMention(teamThreadId) && (
               <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
@@ -747,7 +747,7 @@ export default function MessagesClient({
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1">
             {loading && <div className="text-sm text-sage">Loading…</div>}
             {!loading && messages.length === 0 && (
-              <div className="text-sm text-sage">No messages yet. Say hi 👋</div>
+              <div className="text-sm text-sage">No messages yet. Say hi!</div>
             )}
             {!loading && activeThreadId && hasMoreOlderByThread[activeThreadId] && (
               <button

@@ -11,6 +11,7 @@ import {
   useElements,
   useStripe,
 } from '@stripe/react-stripe-js'
+import { XIcon } from '@/components/ui/icons'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -325,7 +326,7 @@ export default function BillingClient({
               onClick={() => setCheckoutSecret(null)}
               aria-label="Close checkout"
             >
-              ✕
+              <XIcon size={15} />
             </button>
             <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
               <EmbeddedCheckout />
@@ -342,7 +343,7 @@ export default function BillingClient({
               onClick={closeBillingPanel}
               aria-label="Close"
             >
-              ✕
+              <XIcon size={15} />
             </button>
             <h2 className="text-xs font-semibold tracking-wide text-sage mb-4">Manage billing</h2>
 
