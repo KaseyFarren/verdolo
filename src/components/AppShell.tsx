@@ -147,7 +147,7 @@ export default function AppShell({
             <motion.div
               key={pathname}
               data-app-content
-              className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${pathname === '/tasks' ? 'max-w-6xl' : 'max-w-3xl'}`}
+              className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${pathname === '/tasks' || pathname === '/dashboard' ? 'max-w-6xl' : 'max-w-3xl'}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}

@@ -204,7 +204,6 @@ export default function DashboardClient({
     stage,
     count: clients.filter((c) => getStage(c) === stage).length,
   })).filter((s) => s.count > 0)
-  const atRiskCount = clients.filter((c) => getStage(c) === 'At Risk').length
 
   const currencySign = currencySymbol(currency)
   function fmtMoney(cents: number) {
@@ -421,6 +420,105 @@ export default function DashboardClient({
 
   const msgTasksDone = activeClients.filter((c) => isSentToday(c.id)).length
 
+  const rawStatBlocks: ({ key: string; node: React.ReactNode } | null)[] = [
+    {
+      key: 'team',
+      node: (
+        <>
+          <div className="text-sm font-medium text-ink/60 mb-2">{isAdmin ? 'Team today' : 'My time today'}</div>
+          {teamToday.length === 0 ? (
+            <div className="text-sm text-sage">No time logged yet today.</div>
+          ) : (
+            teamToday.map((r) => (
+              <div key={r.key} className="flex justify-between items-center py-1 text-sm">
+                <span className="text-ink truncate pr-2">{r.label}</span>
+                <span className="font-medium text-ink shrink-0">{formatHoursMins(r.seconds)}</span>
+              </div>
+            ))
+          )}
+        </>
+      ),
+    },
+    isAdmin && (topHoursLabel || topTasksLabel)
+      ? {
+          key: 'week',
+          node: (
+            <>
+              <div className="text-sm font-medium text-ink/60 mb-2">This week</div>
+              {topHoursLabel && (
+                <div className="flex justify-between items-start gap-2 py-1 text-sm">
+                  <span className="text-ink min-w-0 pr-2">🏆 {topHoursLabel} logged the most hours</span>
+                  <span className="font-medium text-ink shrink-0">{formatHoursMins(topHours!.total)}</span>
+                </div>
+              )}
+              {topTasksLabel && (
+                <div className="flex justify-between items-start gap-2 py-1 text-sm">
+                  <span className="text-ink min-w-0 pr-2">✅ {topTasksLabel} completed the most tasks</span>
+                  <span className="font-medium text-ink shrink-0">{topTasks!.total}</span>
+                </div>
+              )}
+            </>
+          ),
+        }
+      : null,
+    isAdmin
+      ? {
+          key: 'revenue',
+          node: (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-ink/60">Revenue</div>
+                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
+                  See more →
+                </Link>
+              </div>
+              <div className="flex gap-6">
+                <div>
+                  <div className="text-xs text-sage mb-0.5">This month</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(monthRevenueCents)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-sage mb-0.5">MRR</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
+                </div>
+              </div>
+            </>
+          ),
+        }
+      : null,
+    {
+      key: 'health',
+      node: (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium text-ink/60">Client health</div>
+            <Link href="/clients" className="text-xs text-sage hover:text-ink">
+              See more →
+            </Link>
+          </div>
+          {clientHealth.length === 0 ? (
+            <div className="text-sm text-sage">No clients yet.</div>
+          ) : (
+            <div className="flex flex-col">
+              {clientHealth.map((s) => (
+                <div key={s.stage} className="flex justify-between items-center py-1 text-sm">
+                  <span className="flex items-center gap-2 text-ink">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: stageColor(s.stage) }} />
+                    {stageLabel(s.stage)}
+                  </span>
+                  <span className="font-medium" style={{ color: stageColor(s.stage) }}>
+                    {s.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ),
+    },
+  ]
+  const statBlocks = rawStatBlocks.filter((block): block is { key: string; node: React.ReactNode } => block !== null)
+
   return (
     <div>
       <div className="flex justify-between items-start mb-5">
@@ -454,28 +552,25 @@ export default function DashboardClient({
         ))}
       </div>
 
-      {expiringContracts.length > 0 && (
-        <div className="rounded-xl bg-amber-100/70 border border-amber-300 px-3 py-2 mb-4 text-sm text-amber-800">
-          <strong>Contracts expiring soon:</strong> {expiringContracts.map((c) => `${c.name} (${formatDate(c.contract_ends)})`).join(', ')}
+      {(expiringContracts.length > 0 || (dashIsToday && isAdmin)) && (
+        <div className="flex flex-col gap-1 mb-2 text-sm">
+          {expiringContracts.length > 0 && (
+            <span className="text-amber-700">
+              Contract{expiringContracts.length !== 1 ? 's' : ''} expiring soon: {expiringContracts.map((c) => `${c.name} (${formatDate(c.contract_ends)})`).join(', ')}
+            </span>
+          )}
+          {dashIsToday && isAdmin && (
+            <Link href="/reports" className="text-sage hover:text-ink w-fit">
+              {hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'} →
+            </Link>
+          )}
         </div>
       )}
 
-      {dashIsToday && isAdmin && (
-        <div className="mb-6 pt-6 border-t border-ink/10">
-          <Link
-            href="/reports"
-            className="flex items-center justify-between rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm text-sage shadow-md hover:text-ink"
-          >
-            <span>{hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'}</span>
-            <span>→</span>
-          </Link>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-6 items-start pt-6 border-t border-ink/10">
-        <div className="rounded-2xl bg-white shadow-md p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-6 items-start pt-6 border-t border-ink/10">
+        <div className="rounded-2xl bg-white border border-ink/8 p-5">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage">{dashLabel}&apos;s tasks</div>
+            <div className="text-sm font-medium text-ink/60">{dashLabel}&apos;s tasks</div>
             <button
               className="text-xs text-sage hover:text-ink"
               onClick={() => {
@@ -540,7 +635,7 @@ export default function DashboardClient({
           </AnimatePresence>
           {dashPendingUnassigned.length > 0 && (
             <>
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+              <div className="text-xs font-medium text-sage/70 mt-3 mb-1">Unassigned</div>
               <AnimatePresence initial={false}>
                 {dashPendingUnassigned.map((t) => (
                   <SimpleTaskRow
@@ -571,7 +666,7 @@ export default function DashboardClient({
           )}
           {dashCompleted.length > 0 && (
             <>
-              <div className="text-xs text-green font-semibold uppercase mt-4 mb-2">Completed</div>
+              <div className="text-xs font-medium text-green/70 mt-4 mb-2">Completed</div>
               {dashCompleted.map((t) => (
                 <SimpleTaskRow
                   key={t.id}
@@ -601,91 +696,22 @@ export default function DashboardClient({
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl bg-white shadow-md p-5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">{isAdmin ? 'Team today' : 'My time today'}</div>
-            {teamToday.length === 0 ? (
-              <div className="text-sm text-sage">No time logged yet today.</div>
-            ) : (
-              teamToday.map((r) => (
-                <div key={r.key} className="flex justify-between items-center py-1.5 text-sm border-b border-ink/5 last:border-0">
-                  <span className="text-ink truncate pr-2">{r.label}</span>
-                  <span className="font-medium text-ink shrink-0">{formatHoursMins(r.seconds)}</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {isAdmin && (topHoursLabel || topTasksLabel) && (
-            <div className="rounded-2xl bg-white shadow-md p-5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">This week</div>
-              {topHoursLabel && (
-                <div className="flex justify-between items-start gap-2 py-1 text-sm">
-                  <span className="text-ink min-w-0 pr-2">🏆 {topHoursLabel} logged the most hours</span>
-                  <span className="font-medium text-ink shrink-0">{formatHoursMins(topHours!.total)}</span>
-                </div>
-              )}
-              {topTasksLabel && (
-                <div className="flex justify-between items-start gap-2 py-1 text-sm">
-                  <span className="text-ink min-w-0 pr-2">✅ {topTasksLabel} completed the most tasks</span>
-                  <span className="font-medium text-ink shrink-0">{topTasks!.total}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isAdmin && (
-            <div className="rounded-2xl bg-white shadow-md p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-sage">Revenue · this month</div>
-                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
-                  See more →
-                </Link>
-              </div>
-              <div className="flex gap-6">
-                <div>
-                  <div className="text-xs text-sage mb-0.5">Revenue</div>
-                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(monthRevenueCents)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-sage mb-0.5">MRR</div>
-                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-2xl bg-white shadow-md p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Client health</div>
-              <Link href="/clients" className="text-xs text-sage hover:text-ink">
-                See more →
-              </Link>
-            </div>
-            {clientHealth.length === 0 ? (
-              <div className="text-sm text-sage">No clients yet.</div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {clientHealth.map((s) => (
-                  <div
-                    key={s.stage}
-                    className="rounded-lg px-2.5 py-1.5 text-xs"
-                    style={{ background: `${stageColor(s.stage)}14`, color: stageColor(s.stage) }}
-                  >
-                    <span className="font-semibold">{s.count}</span> {stageLabel(s.stage)}
+          <div className="@container">
+            <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+              {statBlocks.map((block, i) => {
+                const isOddOut = statBlocks.length % 2 === 1 && i === statBlocks.length - 1
+                return (
+                  <div key={block.key} className={`rounded-2xl bg-white border border-ink/8 p-5 ${isOddOut ? '@lg:col-span-2' : ''}`}>
+                    {block.node}
                   </div>
-                ))}
-              </div>
-            )}
-            {atRiskCount > 0 && (
-              <div className="mt-2 text-xs text-red-600">
-                ⚠ {atRiskCount} client{atRiskCount !== 1 ? 's' : ''} at risk
-              </div>
-            )}
+                )
+              })}
+            </div>
           </div>
 
-          <div className="rounded-2xl bg-white shadow-md p-5 flex flex-col flex-1 min-h-[220px]">
+          <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col min-h-[160px]">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Quick notes</div>
+              <div className="text-sm font-medium text-ink/60">Quick notes</div>
               <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
             </div>
             <textarea
@@ -700,7 +726,7 @@ export default function DashboardClient({
 
       <div className="mt-8 pt-6 border-t border-ink/10">
         <div className="flex flex-wrap justify-between items-center gap-y-1 mb-2">
-          <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sage hover:text-ink" onClick={() => setShowMessages((v) => !v)}>
+          <button className="flex items-center gap-1.5 text-sm font-medium text-ink/60 hover:text-ink" onClick={() => setShowMessages((v) => !v)}>
             <span className="text-xs">{showMessages ? '▾' : '▸'}</span> Client messages
           </button>
           <div className="flex items-center gap-3">
@@ -719,7 +745,7 @@ export default function DashboardClient({
           const sent = isSentToday(c.id)
           const isGen = loadingOne === c.id
           return (
-            <div key={c.id} className={`rounded-2xl p-3 mb-2 ${sent ? 'bg-green/5 border border-green/20' : 'bg-white shadow-md'}`}>
+            <div key={c.id} className={`rounded-2xl p-3 mb-2 ${sent ? 'bg-green/5 border border-green/20' : 'bg-white border border-ink/8'}`}>
               <div className={`flex items-center gap-3 ${sent ? '' : 'mb-2.5'}`}>
                 <Avatar name={c.name} index={i} />
                 <div className="flex-1 min-w-0">
