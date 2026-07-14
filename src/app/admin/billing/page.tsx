@@ -24,15 +24,36 @@ function keyMode(key: string | undefined): { mode: 'live' | 'test' | 'unknown'; 
   return { mode: 'unknown', label: 'unrecognised prefix' }
 }
 
+// Graduated/tiered prices (e.g. "$29 flat for the first 3 seats, then $17/seat") have no
+// top-level unit_amount - the actual amounts live in the tiers array, which only comes back
+// if it's expanded on the retrieve call below.
+function formatTiers(tiers: Stripe.Price.Tier[], cur: string, recurring: string): string {
+  return tiers
+    .map((t) => {
+      const flat = t.flat_amount != null ? `${cur} ${(t.flat_amount / 100).toFixed(2)} flat` : null
+      const perUnit = t.unit_amount ? `${cur} ${(t.unit_amount / 100).toFixed(2)}${recurring}/seat` : null
+      const range = t.up_to != null ? `up to ${t.up_to}` : 'beyond that'
+      return `${range}: ${[flat, perUnit].filter(Boolean).join(' + ')}`
+    })
+    .join(', ')
+}
+
 function money(price: Stripe.Price): string {
-  const amount = price.unit_amount != null ? (price.unit_amount / 100).toFixed(2) : '?'
   const cur = (price.currency ?? '').toUpperCase()
-  const recurring = price.recurring ? ` / ${price.recurring.interval}` : ' (one-time)'
+  const recurring = price.recurring ? `/${price.recurring.interval}` : ' one-time'
   const productName =
     price.product && typeof price.product === 'object' && 'name' in price.product
       ? (price.product as Stripe.Product).name
       : null
-  return `${cur} ${amount}${recurring}${productName ? ` - ${productName}` : ''}`
+
+  const amount =
+    price.billing_scheme === 'tiered' && price.tiers?.length
+      ? formatTiers(price.tiers, cur, recurring)
+      : price.unit_amount != null
+        ? `${cur} ${(price.unit_amount / 100).toFixed(2)}${recurring}`
+        : `${cur} amount unknown (billing_scheme: ${price.billing_scheme})`
+
+  return `${amount}${productName ? ` - ${productName}` : ''}`
 }
 
 async function checkPrice(
@@ -42,7 +63,7 @@ async function checkPrice(
   if (!id) return { status: 'bad', detail: 'env var not set' }
   if (!stripe) return { status: 'warn', detail: `${id} - cannot verify (no secret key)` }
   try {
-    const price = await stripe.prices.retrieve(id, { expand: ['product'] })
+    const price = await stripe.prices.retrieve(id, { expand: ['product', 'tiers'] })
     if (!price.active) return { status: 'warn', detail: `${id} resolves but is ARCHIVED - ${money(price)}` }
     return { status: 'ok', detail: `${id} - ${money(price)}` }
   } catch (e) {
