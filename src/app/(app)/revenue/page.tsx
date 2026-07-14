@@ -32,7 +32,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       .order('charged_on', { ascending: false }),
     supabase
       .from('time_entries')
-      .select('user_id, client_id, duration_seconds, started_at, billable')
+      .select('id, user_id, client_id, duration_seconds, started_at, billable')
       .eq('org_id', orgId)
       .gte('started_at', rangeStart)
       .lt('started_at', rangeEnd),

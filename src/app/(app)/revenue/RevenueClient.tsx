@@ -37,7 +37,7 @@ type Client = {
   status: string | null
 }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
-type Entry = { user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
+type Entry = { id: string; user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
 type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string; title?: string | null }
 
 function Avatar({ member, index }: { member: Member; index: number }) {
@@ -103,8 +103,82 @@ export default function RevenueClient({
   useEffect(() => {
     setCharges(initialCharges)
   }, [initialCharges])
+  // clients/entries are mirrored into local state (same reasoning as charges above) so realtime
+  // updates from other pages/teammates - a new time entry, a retainer change - can patch them in
+  // without waiting for a manual refresh.
+  const [clientsState, setClientsState] = useState<Client[]>(clients)
+  useEffect(() => {
+    setClientsState(clients)
+  }, [clients])
+  const [entriesState, setEntriesState] = useState<Entry[]>(entries)
+  useEffect(() => {
+    setEntriesState(entries)
+  }, [entries])
   const isFullMonth = isFullCalendarMonth(period)
   const { start: rangeStart, end: rangeEnd } = useMemo(() => periodBounds(period), [period])
+
+  // Live-sync revenue inputs so this page never needs a manual refresh: a retainer/billing-mode
+  // edit on Clients, a new/edited/deleted time entry on Time, or a charge added from another
+  // session all flow straight into the figures above. time_entries/client_charges inserts are
+  // filtered client-side to the selected period's range since Postgres Changes filters only
+  // support equality, not range comparisons.
+  useEffect(() => {
+    const inRange = (dateOrTimestamp: string) => (!rangeStart || dateOrTimestamp >= rangeStart) && (!rangeEnd || dateOrTimestamp < rangeEnd)
+
+    const channel = supabase
+      .channel(`revenue-org-${orgId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Client
+        setClientsState((prev) => (prev.some((c) => c.id === incoming.id) ? prev : [...prev, incoming]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Client
+        setClientsState((prev) => prev.map((c) => (c.id === incoming.id ? incoming : c)))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setClientsState((prev) => prev.filter((c) => c.id !== old.id))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'time_entries', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Entry
+        if (!inRange(incoming.started_at)) return
+        setEntriesState((prev) => (prev.some((e) => e.id === incoming.id) ? prev : [...prev, incoming]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'time_entries', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Entry
+        setEntriesState((prev) => {
+          const exists = prev.some((e) => e.id === incoming.id)
+          if (!inRange(incoming.started_at)) return exists ? prev.filter((e) => e.id !== incoming.id) : prev
+          return exists ? prev.map((e) => (e.id === incoming.id ? incoming : e)) : [...prev, incoming]
+        })
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'time_entries', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setEntriesState((prev) => prev.filter((e) => e.id !== old.id))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'client_charges', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Charge
+        if (!inRange(incoming.charged_on)) return
+        setCharges((prev) => (prev.some((c) => c.id === incoming.id) ? prev : [incoming, ...prev]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'client_charges', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Charge
+        setCharges((prev) => {
+          const exists = prev.some((c) => c.id === incoming.id)
+          if (!inRange(incoming.charged_on)) return exists ? prev.filter((c) => c.id !== incoming.id) : prev
+          return exists ? prev.map((c) => (c.id === incoming.id ? incoming : c)) : [incoming, ...prev]
+        })
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'client_charges', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setCharges((prev) => prev.filter((c) => c.id !== old.id))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId, supabase, rangeStart, rangeEnd])
 
   // The pill itself is driven by this local, optimistically-updated copy so it slides
   // instantly on click - the actual revenue figures below stay tied to the real `period` prop
@@ -133,23 +207,23 @@ export default function RevenueClient({
 
   const hoursByClient = useMemo(() => {
     const map = new Map<string, number>()
-    for (const e of entries) {
+    for (const e of entriesState) {
       if (!e.client_id || !e.duration_seconds) continue
       map.set(e.client_id, (map.get(e.client_id) || 0) + e.duration_seconds)
     }
     return map
-  }, [entries])
+  }, [entriesState])
 
   // Only billable hours are ever actually invoiced for an hourly client - matches the cron's
   // and the manual invoice flow's "unbilled hours" query exactly.
   const billableHoursByClient = useMemo(() => {
     const map = new Map<string, number>()
-    for (const e of entries) {
+    for (const e of entriesState) {
       if (!e.client_id || !e.duration_seconds || !e.billable) continue
       map.set(e.client_id, (map.get(e.client_id) || 0) + e.duration_seconds)
     }
     return map
-  }, [entries])
+  }, [entriesState])
 
   const chargesByClient = useMemo(() => {
     const map = new Map<string, Charge[]>()
@@ -173,7 +247,7 @@ export default function RevenueClient({
     const rangeMonthDays = rangeStart ? new Date(Number(rangeStart.slice(0, 4)), Number(rangeStart.slice(5, 7)), 0).getDate() : 30
     const smoothedRetainerFraction = rangeMonthDays > 0 ? rangeDays / rangeMonthDays : 0
 
-    return clients
+    return clientsState
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
@@ -234,7 +308,7 @@ export default function RevenueClient({
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clients, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd])
+  }, [clientsState, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd])
 
   const memberRows = useMemo(() => {
     return members
@@ -242,7 +316,7 @@ export default function RevenueClient({
         let seconds = 0
         let revenue = 0
         for (const row of clientRows) {
-          const memberSeconds = entries
+          const memberSeconds = entriesState
             .filter((e) => e.user_id === m.user_id && e.client_id === row.client.id)
             .reduce((s, e) => s + (e.duration_seconds || 0), 0)
           seconds += memberSeconds
@@ -252,7 +326,7 @@ export default function RevenueClient({
       })
       .filter((r) => r.seconds > 0 || tasks.some((t) => t.assigned_to === r.member.user_id))
       .sort((a, b) => b.revenue - a.revenue)
-  }, [members, clientRows, entries, tasks])
+  }, [members, clientRows, entriesState, tasks])
 
   const maxMemberSeconds = Math.max(1, ...memberRows.map((r) => r.seconds))
   const maxMemberRevenue = Math.max(1, ...memberRows.map((r) => r.revenue))
@@ -298,14 +372,14 @@ export default function RevenueClient({
 
   // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period -
   // a retainer is "at risk" regardless of which week you happen to be looking at.
-  const mrrCents = useMemo(() => mrrCentsTotal(clients), [clients])
-  const atRiskClients = useMemo(() => clients.filter((c) => getStage(c) === 'At Risk'), [clients])
+  const mrrCents = useMemo(() => mrrCentsTotal(clientsState), [clientsState])
+  const atRiskClients = useMemo(() => clientsState.filter((c) => getStage(c) === 'At Risk'), [clientsState])
   const atRiskCents = useMemo(() => atRiskClients.reduce((s, c) => s + (c.retainer_cents || 0), 0), [atRiskClients])
   const utilization = useMemo(() => {
-    const totalSeconds = entries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
-    const billableSeconds = entries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    const totalSeconds = entriesState.reduce((s, e) => s + (e.duration_seconds || 0), 0)
+    const billableSeconds = entriesState.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0)
     return totalSeconds > 0 ? (billableSeconds / totalSeconds) * 100 : null
-  }, [entries])
+  }, [entriesState])
   const topClientPct = totals.revenue > 0 && clientRows.length > 0 ? (clientRows[0].totalRevenue / totals.revenue) * 100 : null
 
   async function addCharge(clientId: string) {

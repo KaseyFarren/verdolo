@@ -74,6 +74,30 @@ export default function ProposalsClient({
     setClientList(clients)
   }, [clients])
 
+  // Live-sync proposals created/edited/deleted by teammates so this page never needs a manual
+  // refresh - own optimistic changes echo back here too, same pattern as Tasks/Clients.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`proposals-org-${orgId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'proposals', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Proposal
+        setProposals((prev) => (prev.some((p) => p.id === incoming.id) ? prev : [...prev, incoming]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proposals', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Proposal
+        setProposals((prev) => prev.map((p) => (p.id === incoming.id ? incoming : p)))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'proposals', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setProposals((prev) => prev.filter((p) => p.id !== old.id))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId, supabase])
+
   function clientName(id: string) {
     return clientList.find((c) => c.id === id)?.name ?? 'Unknown client'
   }
