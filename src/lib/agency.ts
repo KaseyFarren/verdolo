@@ -5,7 +5,6 @@ export const STAGES = ['Lead', 'Trial', 'Active', 'At Risk', 'Churned'] as const
 export const AVATAR_COLORS = ['#1f3320', '#dd6b2c', '#e98a4f', '#5d6b5c', '#8a6a3c', '#6b8a6e']
 
 export type Stage = (typeof STAGES)[number]
-export type Priority = (typeof PRIORITY)[number]
 
 export function stageColor(stage: string) {
   if (stage === 'Lead') return '#c9973c'
@@ -76,25 +75,12 @@ export function formatDate(iso?: string | null) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-export function formatTime(t?: string | null) {
-  if (!t) return ''
-  const [h, m] = t.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`
-}
-
 export function getInitials(name = '') {
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
 }
 
 export function memberName(member?: { display_name?: string | null; invited_email?: string | null } | null) {
   return member?.display_name || member?.invited_email || '-'
-}
-
-export function greeting(d = new Date()) {
-  const h = d.getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
 }
 
 const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
@@ -161,10 +147,6 @@ export const CURRENCIES: { value: Currency; label: string; symbol: string }[] = 
  * this is a display/label preference only, not FX conversion; stored cents are never rescaled. */
 export function currencySymbol(currency?: string | null): string {
   return CURRENCIES.find((c) => c.value === currency)?.symbol ?? '$'
-}
-
-export function formatMoney(cents?: number | null, currency?: string | null) {
-  return `${currencySymbol(currency)}${centsToDollars(cents).toLocaleString()}`
 }
 
 export function isWeekend(iso: string) {
