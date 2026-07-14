@@ -713,7 +713,7 @@ export default function MessagesClient({
             )}
           </button>
 
-          <div className="px-3 pt-3 pb-1 text-xs font-medium text-sage uppercase tracking-wide">Direct messages</div>
+          <div className="px-3 pt-3 pb-1 text-xs font-medium text-sage tracking-wide">Direct messages</div>
           {contacts.length === 0 && <div className="px-3 py-2 text-xs text-sage">No other teammates yet</div>}
           {contacts.map((c) => {
             const active = !activeIsTeam && activeContactId === c.user_id

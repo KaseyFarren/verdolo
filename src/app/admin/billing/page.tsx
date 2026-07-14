@@ -182,7 +182,7 @@ export default async function AdminBillingPage() {
       </div>
 
       <div className="rounded-xl border border-ink/10 bg-white p-5">
-        <h2 className="mb-1 font-heading text-sm font-bold uppercase tracking-wide text-ink/50">Checks</h2>
+        <h2 className="mb-1 font-heading text-sm font-bold tracking-wide text-ink/50">Checks</h2>
         <div className="divide-y divide-ink/5">
           <Row status={accountStatus} title="Stripe account" detail={accountDetail} />
           <Row

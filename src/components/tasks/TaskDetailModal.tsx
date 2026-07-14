@@ -63,7 +63,7 @@ export default function TaskDetailModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage">Task details</div>
+            <div className="text-xs font-semibold tracking-wide text-sage">Task details</div>
             <button onClick={onClose} className="text-sage hover:text-ink">
               <XIcon size={16} />
             </button>
@@ -79,24 +79,24 @@ export default function TaskDetailModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Client</div>
+              <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Client</div>
               <CustomSelect value={clientId} onChange={setClientId} options={[{ value: '', label: 'No client' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Assigned to</div>
+              <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Assigned to</div>
               <MultiSelect value={assigneeIds} onChange={setAssigneeIds} options={members.map((m) => ({ value: m.user_id, label: memberName(m) }))} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Due date</div>
+              <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Due date</div>
               <DatePicker value={dueDate} onChange={setDueDate} allowClear={false} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Priority</div>
+              <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Priority</div>
               <CustomSelect value={priority} onChange={setPriority} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
             </div>
           </div>
 
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-sage/70 mb-1">Notes</div>
+          <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Notes</div>
           <textarea
             className="w-full rounded-[8px] border border-ink/10 bg-white px-3 py-2 text-sm mb-3 min-h-[90px]"
             placeholder="Add notes…"

@@ -88,7 +88,7 @@ export default function CustomSelect({
           ))}
           {groups.map((g) => (
             <div key={g.label}>
-              <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-sage">{g.label}</div>
+              <div className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-sage">{g.label}</div>
               {g.options.map((o) => (
                 <button
                   key={o.value}

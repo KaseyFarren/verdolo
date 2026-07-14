@@ -96,7 +96,7 @@ export default function ClientFiles({
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage">Files</div>
+        <div className="text-xs font-semibold tracking-wide text-sage">Files</div>
         {canEdit && (
           <label className="text-xs text-accent font-medium cursor-pointer">
             {uploading ? 'Uploading…' : '+ Upload'}

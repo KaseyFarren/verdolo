@@ -923,7 +923,7 @@ export default function TasksClient({
                       <AnimatePresence initial={false}>{mine.map((t) => renderTaskRow(t))}</AnimatePresence>
                       {unassigned.length > 0 && (
                         <>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
+                          <div className="text-xs font-semibold tracking-wide text-sage/70 mt-3 mb-1">Unassigned</div>
                           <AnimatePresence initial={false}>{unassigned.map((t) => renderTaskRow(t))}</AnimatePresence>
                         </>
                       )}

@@ -84,7 +84,7 @@ export default function QuickCapture({ orgId, userId }: { orgId: string; userId:
               transition={{ duration: 0.15 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Quick add task</div>
+              <div className="text-xs font-semibold tracking-wide text-sage mb-2">Quick add task</div>
               <input
                 autoFocus
                 className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-accent"

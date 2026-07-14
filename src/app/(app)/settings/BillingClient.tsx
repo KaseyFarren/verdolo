@@ -232,7 +232,7 @@ export default function BillingClient({
   if (role !== 'owner') {
     return (
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Billing</div>
+        <div className="text-xs font-semibold tracking-wide text-sage mb-2">Billing</div>
         {trialExpired || subscriptionStatus === 'canceled' ? (
           <div className="rounded-lg border border-amber-300 bg-amber-100/70 p-4 text-sm text-amber-700">
             This organization&apos;s trial has ended and there&apos;s no active subscription. Ask your org owner to
@@ -252,7 +252,7 @@ export default function BillingClient({
 
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Billing</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2">Billing</div>
 
       <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
         {subscriptionStatus === 'trialing' && !trialExpired && (
@@ -296,7 +296,7 @@ export default function BillingClient({
 
       {hasStripeCustomer && subscriptionStatus !== 'canceled' && (
         <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Seats</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Seats</div>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -344,14 +344,14 @@ export default function BillingClient({
             >
               ✕
             </button>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-sage mb-4">Manage billing</h2>
+            <h2 className="text-xs font-semibold tracking-wide text-sage mb-4">Manage billing</h2>
 
             {invoices === null ? (
               <p className="text-sm text-sage">Loading…</p>
             ) : (
               <div className="flex flex-col gap-6">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Payment method</div>
+                  <div className="text-xs font-semibold tracking-wide text-sage mb-2">Payment method</div>
                   {paymentSecret ? (
                     <Elements stripe={stripePromise} options={{ clientSecret: paymentSecret }}>
                       <UpdatePaymentMethodForm
@@ -372,7 +372,7 @@ export default function BillingClient({
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Invoices</div>
+                  <div className="text-xs font-semibold tracking-wide text-sage mb-2">Invoices</div>
                   {invoices.length === 0 ? (
                     <p className="text-sm text-sage">No invoices yet.</p>
                   ) : (
@@ -417,7 +417,7 @@ export default function BillingClient({
 
                 {planType !== 'lifetime' && (
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Subscription</div>
+                    <div className="text-xs font-semibold tracking-wide text-sage mb-2">Subscription</div>
                     {cancelAtPeriodEnd ? (
                       <div className="flex items-center justify-between gap-3 rounded border border-amber-300 bg-amber-100/70 p-3 text-sm text-amber-700">
                         <span>Cancels at the end of the billing period.</span>

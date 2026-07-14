@@ -1,7 +1,7 @@
 export function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">{label}</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2">{label}</div>
       <div className="rounded-lg border border-ink/10 bg-white p-4">{children}</div>
     </div>
   )

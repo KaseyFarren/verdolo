@@ -46,7 +46,7 @@ function Th({
   const active = sortKey === sortableKey
   return (
     <th
-      className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-3 py-2 cursor-pointer select-none"
+      className="text-left text-xs font-semibold tracking-wide text-sage px-3 py-2 cursor-pointer select-none"
       onClick={() => onSort(sortableKey)}
     >
       {label} {active ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -103,8 +103,8 @@ export default function AdminOrgsClient({ orgs }: { orgs: AdminOrgRow[] }) {
           <thead>
             <tr className="border-b border-ink/10">
               <Th label="Org" sortableKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-3 py-2">Owner</th>
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-3 py-2">Plan</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-3 py-2">Owner</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-3 py-2">Plan</th>
               <Th label="Status" sortableKey="subscriptionStatus" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <Th label="Seats" sortableKey="seatsPurchased" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <Th label="Trial ends" sortableKey="trialEndsAt" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />

@@ -22,7 +22,7 @@ export const ROW_GRID_COLS =
 
 export function TaskListHeader() {
   return (
-    <div className={`grid ${ROW_GRID_COLS} gap-2 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold uppercase tracking-wide text-sage/70`}>
+    <div className={`grid ${ROW_GRID_COLS} gap-2 items-center pb-1.5 mb-1 border-b border-ink/10 text-[10px] font-semibold tracking-wide text-sage/70`}>
       <div />
       <div />
       <div>Title</div>

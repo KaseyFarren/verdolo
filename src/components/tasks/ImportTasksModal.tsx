@@ -188,7 +188,7 @@ export default function ImportTasksModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage">Import tasks from doc</div>
+            <div className="text-xs font-semibold tracking-wide text-sage">Import tasks from doc</div>
             <button onClick={onClose} className="text-sage hover:text-ink">
               <XIcon size={16} />
             </button>

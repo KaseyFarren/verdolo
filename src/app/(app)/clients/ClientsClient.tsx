@@ -498,7 +498,7 @@ export default function ClientsClient({
         )}
 
         <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Quick note</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-3">Quick note</div>
           <textarea
             className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
             placeholder="Jot anything down…"
@@ -518,7 +518,7 @@ export default function ClientsClient({
 
         <div className="rounded-lg border border-ink/10 bg-white p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage">Activity</div>
+            <div className="text-xs font-semibold tracking-wide text-sage">Activity</div>
             <div className="flex gap-2 text-xs text-sage">
               <span>{clientNotes.length} note{clientNotes.length === 1 ? '' : 's'}</span>
               <span>·</span>
@@ -747,7 +747,7 @@ function ClientForm({
     <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
       <div className="text-sm font-semibold mb-4">{title}</div>
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Basics</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2">Basics</div>
       <label className="block text-xs text-sage mb-1">Name *</label>
       <input
         className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
@@ -797,7 +797,7 @@ function ClientForm({
         onChange={(e) => setForm((f) => ({ ...f, contact_domain: e.target.value }))}
       />
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">AI check-in config</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">AI check-in config</div>
       <div className="text-xs text-sage/70 mb-3 -mt-1">Feeds the AI-drafted check-in messages on your Dashboard.</div>
       <label className="block text-xs text-sage mb-1">Check-in cadence</label>
       <div className="mb-4">
@@ -840,7 +840,7 @@ function ClientForm({
         onChange={(e) => setForm((f) => ({ ...f, talking_points: e.target.value }))}
       />
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">Pipeline &amp; billing</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2 pt-3 border-t border-ink/5">Pipeline &amp; billing</div>
       <label className="block text-xs text-sage mb-1">Pipeline stage</label>
       <div className="flex gap-1.5 mb-3 flex-wrap">
         {STAGES.map((st) => (

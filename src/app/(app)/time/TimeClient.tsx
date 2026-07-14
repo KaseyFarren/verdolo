@@ -686,7 +686,7 @@ export default function TimeClient({
           </div>
         ) : (
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Start a timer</div>
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">Start a timer</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
               <CustomSelect
                 value={timerClientId}
@@ -721,7 +721,7 @@ export default function TimeClient({
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage">Log time manually</div>
+        <div className="text-xs font-semibold tracking-wide text-sage">Log time manually</div>
         <button className="text-xs text-sage" onClick={() => setShowManual((v) => !v)}>
           {showManual ? 'Cancel' : '+ Add'}
         </button>
@@ -771,7 +771,7 @@ export default function TimeClient({
       )}
 
       <div className="mb-6">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Filter</div>
+        <div className="text-xs font-semibold tracking-wide text-sage mb-2">Filter</div>
         <PeriodSelector layoutId="time-period-active" value={localFilters.period} onChange={(next) => pushFilters({ period: next })} className="mb-3" />
         <div className="flex flex-wrap gap-2">
           <CustomSelect
@@ -802,7 +802,7 @@ export default function TimeClient({
 
       {totalByClient.length > 0 && (
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by client</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Time by client</div>
           <div className="rounded-lg border border-ink/10 divide-y divide-ink/10">
             {totalByClient.map((r) => (
               <div key={r.client.id} className="flex items-center justify-between px-3 py-2 text-sm">
@@ -816,7 +816,7 @@ export default function TimeClient({
 
       {isAdmin && totalByMember.length > 0 && (
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Time by teammate</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Time by teammate</div>
           <div className="space-y-3">
             {totalByMember.map((r, i) => (
               <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
@@ -854,7 +854,7 @@ export default function TimeClient({
       )}
 
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage">Entries</div>
+        <div className="text-xs font-semibold tracking-wide text-sage">Entries</div>
         <div className="flex items-center gap-3">
           {isAdmin && entries.some((e) => !e.client_id) && (
             <button
@@ -909,7 +909,7 @@ export default function TimeClient({
                   className="w-full flex items-center justify-between py-1.5 text-left"
                   onClick={() => toggleMonth(mg.month)}
                 >
-                  <span className="text-xs font-semibold uppercase tracking-wide text-sage">
+                  <span className="text-xs font-semibold tracking-wide text-sage">
                     {expanded ? '▾' : '▸'} {mg.label}
                   </span>
                   <span className="text-xs text-sage">{formatHours(mg.totalSeconds)}h</span>

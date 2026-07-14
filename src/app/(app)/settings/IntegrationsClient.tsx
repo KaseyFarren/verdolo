@@ -44,7 +44,7 @@ export default function IntegrationsClient({
         )}
       </Section>
 
-      <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Integrations</div>
+      <div className="text-xs font-semibold tracking-wide text-sage mb-2">Integrations</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {COMING_SOON.map((p) => (
           <div key={p.key} className="rounded-2xl bg-white shadow-md p-5 flex items-center gap-3">

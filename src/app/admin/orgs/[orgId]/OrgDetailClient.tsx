@@ -157,7 +157,7 @@ export default function OrgDetailClient({
       </div>
 
       <div className="rounded-lg border border-ink/10 bg-white p-4">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Subscription</div>
+        <div className="text-xs font-semibold tracking-wide text-sage mb-3">Subscription</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-4">
           <div>
             <div className="text-xs text-sage">Trial ends</div>
@@ -241,15 +241,15 @@ export default function OrgDetailClient({
       </div>
 
       <div className="rounded-lg border border-ink/10 bg-white p-4">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Members</div>
+        <div className="text-xs font-semibold tracking-wide text-sage mb-3">Members</div>
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink/10">
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-2 py-2">Email</th>
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-2 py-2">Role</th>
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-2 py-2">Status</th>
-              <th className="text-left text-xs font-semibold uppercase tracking-wide text-sage px-2 py-2">Joined</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-2 py-2">Email</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-2 py-2">Role</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-2 py-2">Status</th>
+              <th className="text-left text-xs font-semibold tracking-wide text-sage px-2 py-2">Joined</th>
               <th className="px-2 py-2" />
             </tr>
           </thead>

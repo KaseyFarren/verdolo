@@ -517,11 +517,11 @@ export default function ReportsClient({
           </div>
 
           <div className="mb-8" data-tour="reports-recap">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Weekly overall recap</div>
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">Weekly overall recap</div>
             {recap ? (
               <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <div className="text-xs font-semibold uppercase text-sage">Week of {formatDate(weekAnchor)}</div>
+                  <div className="text-xs font-semibold text-sage">Week of {formatDate(weekAnchor)}</div>
                   <button className="text-xs text-sage hover:text-ink" onClick={generateRecap} disabled={loadingRecap}>
                     ↺ Regenerate
                   </button>
@@ -540,7 +540,7 @@ export default function ReportsClient({
           </div>
 
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">By client · {RANGE_LABELS[range]}</div>
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">By client · {RANGE_LABELS[range]}</div>
             {clientReports.length === 0 ? (
               <div className="text-sm text-sage py-3">No task or time activity in this range.</div>
             ) : (
@@ -578,7 +578,7 @@ export default function ReportsClient({
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-2">Tasks by who</div>
+                          <div className="text-xs font-semibold tracking-wide text-sage/70 mb-2">Tasks by who</div>
                           {r.byAssignee.length === 0 ? (
                             <div className="text-xs text-sage">-</div>
                           ) : (
@@ -600,7 +600,7 @@ export default function ReportsClient({
                           )}
                         </div>
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-sage/70 mb-2">Time by who</div>
+                          <div className="text-xs font-semibold tracking-wide text-sage/70 mb-2">Time by who</div>
                           {r.byLogger.length === 0 ? (
                             <div className="text-xs text-sage">-</div>
                           ) : (
@@ -632,7 +632,7 @@ export default function ReportsClient({
 
           <div>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage">Report library</div>
+              <div className="text-xs font-semibold tracking-wide text-sage">Report library</div>
               <div className="flex items-center gap-2">
                 {reports.length > 0 && (
                   <CustomSelect
@@ -816,7 +816,7 @@ export default function ReportsClient({
           </div>
 
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">
               Revenue <InfoTooltip content="Total revenue across all clients in each period" />
             </div>
             {trendGranularity === 'week' && (
@@ -838,7 +838,7 @@ export default function ReportsClient({
           </div>
 
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">
               Effective rate <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
             </div>
             {trendGranularity === 'month' && pMonth === todayKey().slice(0, 7) && (
@@ -880,7 +880,7 @@ export default function ReportsClient({
 
           {targetRateCents > 0 && profitability.some((r) => r.rateDeltaCents !== null) && (
             <div className="mb-8">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">
+              <div className="text-xs font-semibold tracking-wide text-sage mb-2">
                 Effective rate by client · {monthLabel(`${pMonth}-01`)}{' '}
                 <InfoTooltip content="Each client's revenue divided by hours logged, compared to your target hourly rate" />
               </div>
@@ -900,7 +900,7 @@ export default function ReportsClient({
             </div>
           )}
 
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Client detail · {monthLabel(`${pMonth}-01`)}</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Client detail · {monthLabel(`${pMonth}-01`)}</div>
           {profitability.length === 0 ? (
             <div className="text-sm text-sage py-3">No revenue or logged time in {monthLabel(`${pMonth}-01`)} yet.</div>
           ) : (
@@ -941,7 +941,7 @@ export default function ReportsClient({
                             {scopeNotes[r.client.id].clientMessage && (
                               <div className="text-xs bg-sage/10 rounded-lg p-2">
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className="font-semibold text-sage uppercase tracking-wide text-[10px]">Suggested message to client</span>
+                                  <span className="font-semibold text-sage tracking-wide text-[10px]">Suggested message to client</span>
                                   <button className="text-sage hover:text-ink underline" onClick={() => copyScopeMessage(r.client.id)}>
                                     {copiedScopeMsgId === r.client.id ? '✓ Copied' : 'Copy'}
                                   </button>
@@ -974,7 +974,7 @@ export default function ReportsClient({
         <div>
           {capacity.some((r) => r.targetHours !== null && r.targetHours > 0) && (
             <div className="mb-8">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Hours vs. target · this week</div>
+              <div className="text-xs font-semibold tracking-wide text-sage mb-2">Hours vs. target · this week</div>
               <div className="rounded-2xl bg-white shadow-md p-5">
                 <DivergingBarChart
                   items={capacity
@@ -997,7 +997,7 @@ export default function ReportsClient({
             </div>
           )}
 
-          <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Open workload · this week</div>
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Open workload · this week</div>
           {capacity.length === 0 ? (
             <div className="text-sm text-sage py-3">No team members yet.</div>
           ) : (

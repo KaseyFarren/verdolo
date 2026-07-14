@@ -42,6 +42,7 @@ export default function RootLayout({
           theme="light"
           position="bottom-right"
           toastOptions={{
+            duration: 1000,
             style: {
               background: '#f7f1ea',
               border: '1px solid rgba(26,26,23,0.1)',
