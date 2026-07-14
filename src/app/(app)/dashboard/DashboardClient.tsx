@@ -281,17 +281,24 @@ export default function DashboardClient({
   }
 
   async function updateTask(id: string, fields: Record<string, unknown>) {
+    // TaskEditForm's client/assignee selects use '' for "none" (CustomSelect has no concept of
+    // null), but client_id/assigned_to are uuid columns - sending '' straight through fails with
+    // "invalid input syntax for type uuid" on save, whether or not that's the field you touched.
+    const normalized = { ...fields }
+    if (normalized.client_id === '') normalized.client_id = null
+    if (normalized.assigned_to === '') normalized.assigned_to = null
+
     // Optimistic: apply the edit and close the editor before the round-trip; roll back on failure.
     let prevTask: Task | undefined
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t
         prevTask = t
-        return { ...t, ...fields } as Task
+        return { ...t, ...normalized } as Task
       }),
     )
     setEditingTaskId(null)
-    const { data, error } = await supabase.from('tasks').update(fields).eq('id', id).select().single()
+    const { data, error } = await supabase.from('tasks').update(normalized).eq('id', id).select().single()
     if (error) {
       if (prevTask) setTasks((prev) => prev.map((t) => (t.id === id ? (prevTask as Task) : t)))
       toast.error('Could not save that change')
