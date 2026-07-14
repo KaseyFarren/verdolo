@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError } from '@/lib/apiError'
@@ -22,7 +23,7 @@ function sniffImageType(buf: Buffer): 'image/png' | 'image/jpeg' | 'image/webp' 
 
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
-const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' }
+const AVATAR_SIZE = 512
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -43,10 +44,25 @@ export async function POST(request: Request) {
   const sniffed = sniffImageType(buffer)
   if (!sniffed) return NextResponse.json({ error: 'That file is not a valid PNG, JPG, WebP or GIF image' }, { status: 400 })
 
+  // Decode and re-encode through sharp rather than storing the uploaded bytes verbatim. This
+  // strips EXIF/metadata and discards anything appended after the image data (polyglot files),
+  // since only the decoded pixels survive. It also doubles as a stronger validity check than the
+  // magic-byte sniff above - sharp throws on anything that isn't a genuinely decodable image.
+  let resized: Buffer
+  try {
+    resized = await sharp(buffer)
+      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover' })
+      .webp({ quality: 82 })
+      .toBuffer()
+  } catch {
+    return NextResponse.json({ error: 'That file is not a valid PNG, JPG, WebP or GIF image' }, { status: 400 })
+  }
+
   const admin = createAdminClient()
-  // Folder is the authenticated user's id - not anything the client sent.
-  const path = `${user.id}/avatar.${EXT[sniffed]}`
-  const { error: upErr } = await admin.storage.from('avatars').upload(path, buffer, { upsert: true, contentType: sniffed })
+  // Folder is the authenticated user's id - not anything the client sent. Output is always
+  // re-encoded to webp, so the stored extension no longer depends on what was uploaded.
+  const path = `${user.id}/avatar.webp`
+  const { error: upErr } = await admin.storage.from('avatars').upload(path, resized, { upsert: true, contentType: 'image/webp' })
   if (upErr) return apiError('Could not upload your picture', 500, upErr)
 
   const { data: pub } = admin.storage.from('avatars').getPublicUrl(path)
