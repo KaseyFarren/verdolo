@@ -10,6 +10,7 @@ import { PinLockProvider, usePinLock } from '@/components/PinLock'
 import QuickCapture from '@/components/QuickCapture'
 import TourProvider from '@/components/TourProvider'
 import NotificationSound from '@/components/NotificationSound'
+import BugReportModal from '@/components/BugReportModal'
 import {
   BarChartIcon,
   CheckSquareIcon,
@@ -150,6 +151,9 @@ export default function AppShell({
                   Log out
                 </button>
                 <LockButton />
+              </div>
+              <div className="mt-2">
+                <BugReportModal />
               </div>
               <div className="mt-2 flex gap-2 text-xs text-cream/40">
                 <Link href="/terms" className="hover:text-cream/70">Terms</Link>

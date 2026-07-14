@@ -26,6 +26,9 @@ export default function AdminShell({ userEmail, children }: { userEmail: string;
             <Link href="/admin/billing" className="text-xs text-cream/70 hover:text-white transition-colors">
               Billing
             </Link>
+            <Link href="/admin/bug-reports" className="text-xs text-cream/70 hover:text-white transition-colors">
+              Bug reports
+            </Link>
             <Link href="/dashboard" className="text-xs text-cream/70 hover:text-white transition-colors">
               ← Back to app
             </Link>
