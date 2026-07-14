@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials, memberName } from '@/lib/agency'
@@ -94,6 +94,168 @@ function patchMessage(
   if (!list) return byThread
   return { ...byThread, [threadId]: list.map((m) => (m.id === messageId ? update(m) : m)) }
 }
+
+// Splits a message body on any mentioned member's "@Name" (longest names first, so "Sam" can't
+// shadow a match inside "Sam Osei") plus a literal "@all" token, and wraps matches in a
+// highlighted span.
+function renderBody(m: Message, memberMap: Map<string, Member>, userId: string) {
+  if (!m.mentioned_user_ids?.length) return m.body
+  const names = [...new Set(m.mentioned_user_ids.map((id) => memberName(memberMap.get(id))).filter((n) => n && n !== '-'))].sort(
+    (a, b) => b.length - a.length
+  )
+  const hasAllToken = /(?:^|\s)@all\b/.test(m.body)
+  const alternatives = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  if (hasAllToken) alternatives.unshift(ALL_MENTION_NAME)
+  if (alternatives.length === 0) return m.body
+  const pattern = new RegExp(`@(${alternatives.join('|')})\\b`, 'g')
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(m.body))) {
+    if (match.index > lastIndex) parts.push(m.body.slice(lastIndex, match.index))
+    parts.push(
+      <span key={match.index} className={`font-semibold ${m.sender_id === userId ? 'text-white' : 'text-accent'}`}>
+        @{match[1]}
+      </span>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  parts.push(m.body.slice(lastIndex))
+  return parts
+}
+
+// Memoized so a reaction/mention update to ONE message doesn't force every other loaded message
+// in the thread to re-render and recompute its reaction grouping + mention highlighting - state
+// updates (send/react/realtime) only ever replace the object reference for the message that
+// actually changed (see patchMessage above), so React.memo's default shallow prop comparison is
+// enough to skip the rest.
+const MessageBubble = memo(function MessageBubble({
+  m,
+  own,
+  avatarUrl,
+  senderName,
+  showDateSeparator,
+  userId,
+  memberMap,
+  onToggleReaction,
+  onOpenAttachment,
+}: {
+  m: Message
+  own: boolean
+  avatarUrl: string | null
+  senderName: string
+  showDateSeparator: boolean
+  userId: string
+  memberMap: Map<string, Member>
+  onToggleReaction: (m: Message, emoji: string) => void
+  onOpenAttachment: (m: Message) => void
+}) {
+  const reactionGroups = useMemo(() => {
+    const groups = new Map<string, Reaction[]>()
+    for (const r of m.reactions) groups.set(r.emoji, [...(groups.get(r.emoji) ?? []), r])
+    return groups
+  }, [m.reactions])
+
+  const bodyNodes = useMemo(() => renderBody(m, memberMap, userId), [m, memberMap, userId])
+
+  return (
+    <div>
+      {showDateSeparator && (
+        <div className="flex items-center justify-center my-3">
+          <span className="text-xs text-sage bg-sand rounded-full px-3 py-1">{dateLabel(m.created_at)}</span>
+        </div>
+      )}
+      <div className={`group flex gap-2 py-1.5 ${own ? 'justify-end' : 'justify-start'}`}>
+        {!own &&
+          (avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover shrink-0 self-end" />
+          ) : (
+            <span className="h-6 w-6 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0 self-end">
+              {getInitials(senderName)}
+            </span>
+          ))}
+        <div className={`max-w-[75%] ${own ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
+          <span className="text-xs text-sage px-1">{senderName}</span>
+          <div className="relative">
+            <div
+              className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+                own ? 'bg-accent text-white' : 'bg-sand text-ink'
+              }`}
+            >
+              {m.body && <div>{bodyNodes}</div>}
+              {m.attachment_path &&
+                (m.attachment_type?.startsWith('image/') ? (
+                  m.attachment_signed_url ? (
+                    <img
+                      src={m.attachment_signed_url}
+                      alt={m.attachment_name ?? ''}
+                      className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-2' : ''}`}
+                      onClick={() => onOpenAttachment(m)}
+                    />
+                  ) : (
+                    <div className={`text-xs opacity-70 ${m.body ? 'mt-2' : ''}`}>Loading image…</div>
+                  )
+                ) : (
+                  <button
+                    onClick={() => onOpenAttachment(m)}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
+                      own ? 'bg-white/15 hover:bg-white/25' : 'bg-white hover:shadow-sm'
+                    } ${m.body ? 'mt-2' : ''}`}
+                  >
+                    <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
+                    <span className="flex flex-col leading-tight">
+                      <span className="text-xs font-medium truncate max-w-[140px]">{m.attachment_name}</span>
+                      <span className={`text-[10px] ${own ? 'opacity-70' : 'text-sage'}`}>{formatFileSize(m.attachment_size_bytes)}</span>
+                    </span>
+                  </button>
+                ))}
+            </div>
+
+            <div
+              className={`absolute top-0 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-full px-1.5 py-1 z-10 ${
+                own ? 'right-full mr-1' : 'left-full ml-1'
+              }`}
+            >
+              {QUICK_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => onToggleReaction(m, emoji)}
+                  className="text-sm leading-none hover:scale-125 transition-transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {reactionGroups.size > 0 && (
+            <div className="flex flex-wrap gap-1 px-1">
+              {[...reactionGroups.entries()].map(([emoji, reacts]) => {
+                const mine = reacts.some((r) => r.user_id === userId)
+                return (
+                  <button
+                    key={emoji}
+                    onClick={() => onToggleReaction(m, emoji)}
+                    className={`text-xs rounded-full px-1.5 py-0.5 border flex items-center gap-1 ${
+                      mine ? 'bg-accent/10 border-accent text-accent' : 'bg-sand border-transparent text-ink'
+                    }`}
+                  >
+                    <span>{emoji}</span>
+                    <span>{reacts.length}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <span className="text-[10px] text-sage px-1">
+            {new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+})
 
 export default function MessagesClient({
   orgId,
@@ -419,41 +581,49 @@ export default function MessagesClient({
     markRead(activeThreadId)
   }
 
-  async function toggleReaction(message: Message, emoji: string) {
-    if (!activeThreadId) return
-    const mine = message.reactions.find((r) => r.emoji === emoji && r.user_id === userId)
-    if (mine) {
-      setMessagesByThread((prev) =>
-        patchMessage(prev, activeThreadId, message.id, (m) => ({ ...m, reactions: m.reactions.filter((r) => r.id !== mine.id) }))
-      )
-      await supabase.from('message_reactions').delete().eq('id', mine.id)
-    } else {
-      const { data, error } = await supabase
-        .from('message_reactions')
-        .insert({ message_id: message.id, thread_id: activeThreadId, org_id: orgId, user_id: userId, emoji })
-        .select()
-        .single()
-      if (!error && data) {
+  // useCallback'd (stable identity across renders) so MessageBubble - memoized below - doesn't
+  // re-render every message row just because its parent re-rendered for an unrelated reason.
+  const toggleReaction = useCallback(
+    async (message: Message, emoji: string) => {
+      if (!activeThreadId) return
+      const mine = message.reactions.find((r) => r.emoji === emoji && r.user_id === userId)
+      if (mine) {
         setMessagesByThread((prev) =>
-          patchMessage(prev, activeThreadId, message.id, (m) =>
-            m.reactions.some((r) => r.id === data.id) ? m : { ...m, reactions: [...m.reactions, { id: data.id, emoji: data.emoji, user_id: data.user_id }] }
-          )
+          patchMessage(prev, activeThreadId, message.id, (m) => ({ ...m, reactions: m.reactions.filter((r) => r.id !== mine.id) }))
         )
-      } else if (error) {
-        toast.error('Could not add reaction')
+        await supabase.from('message_reactions').delete().eq('id', mine.id)
+      } else {
+        const { data, error } = await supabase
+          .from('message_reactions')
+          .insert({ message_id: message.id, thread_id: activeThreadId, org_id: orgId, user_id: userId, emoji })
+          .select()
+          .single()
+        if (!error && data) {
+          setMessagesByThread((prev) =>
+            patchMessage(prev, activeThreadId, message.id, (m) =>
+              m.reactions.some((r) => r.id === data.id) ? m : { ...m, reactions: [...m.reactions, { id: data.id, emoji: data.emoji, user_id: data.user_id }] }
+            )
+          )
+        } else if (error) {
+          toast.error('Could not add reaction')
+        }
       }
-    }
-  }
+    },
+    [activeThreadId, userId, supabase, orgId]
+  )
 
-  async function openAttachment(m: Message) {
-    if (!m.attachment_path) return
-    const { data, error } = await supabase.storage.from('message-attachments').createSignedUrl(m.attachment_path, 60)
-    if (error || !data) {
-      toast.error('Could not open file')
-      return
-    }
-    window.open(data.signedUrl, '_blank')
-  }
+  const openAttachment = useCallback(
+    async (m: Message) => {
+      if (!m.attachment_path) return
+      const { data, error } = await supabase.storage.from('message-attachments').createSignedUrl(m.attachment_path, 60)
+      if (error || !data) {
+        toast.error('Could not open file')
+        return
+      }
+      window.open(data.signedUrl, '_blank')
+    },
+    [supabase]
+  )
 
   function senderLabel(senderId: string) {
     if (senderId === userId) return 'You'
@@ -469,34 +639,6 @@ export default function MessagesClient({
     setMentionCandidates((prev) => [...prev, option])
   }
 
-  // Splits a message body on any mentioned member's "@Name" (longest names first, so "Sam" can't
-  // shadow a match inside "Sam Osei") plus a literal "@all" token, and wraps matches in a
-  // highlighted span.
-  function renderBody(m: Message) {
-    if (!m.mentioned_user_ids?.length) return m.body
-    const names = [...new Set(m.mentioned_user_ids.map((id) => memberName(memberMap.get(id))).filter((n) => n && n !== '-'))].sort(
-      (a, b) => b.length - a.length
-    )
-    const hasAllToken = /(?:^|\s)@all\b/.test(m.body)
-    const alternatives = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    if (hasAllToken) alternatives.unshift(ALL_MENTION_NAME)
-    if (alternatives.length === 0) return m.body
-    const pattern = new RegExp(`@(${alternatives.join('|')})\\b`, 'g')
-    const parts: React.ReactNode[] = []
-    let lastIndex = 0
-    let match: RegExpExecArray | null
-    while ((match = pattern.exec(m.body))) {
-      if (match.index > lastIndex) parts.push(m.body.slice(lastIndex, match.index))
-      parts.push(
-        <span key={match.index} className={`font-semibold ${m.sender_id === userId ? 'text-white' : 'text-accent'}`}>
-          @{match[1]}
-        </span>
-      )
-      lastIndex = match.index + match[0].length
-    }
-    parts.push(m.body.slice(lastIndex))
-    return parts
-  }
 
   const activeIsTeam = activeThreadId === teamThreadId
   const messages = (activeThreadId && messagesByThread[activeThreadId]) || []
@@ -584,113 +726,20 @@ export default function MessagesClient({
                 {loadingOlder ? 'Loading…' : 'Load older messages'}
               </button>
             )}
-            {messages.map((m, i) => {
-              const own = m.sender_id === userId
-              const avatar = senderAvatar(m.sender_id)
-              const showDateSeparator = i === 0 || !sameDay(messages[i - 1].created_at, m.created_at)
-              const reactionGroups = new Map<string, Reaction[]>()
-              for (const r of m.reactions) {
-                reactionGroups.set(r.emoji, [...(reactionGroups.get(r.emoji) ?? []), r])
-              }
-
-              return (
-                <div key={m.id}>
-                  {showDateSeparator && (
-                    <div className="flex items-center justify-center my-3">
-                      <span className="text-xs text-sage bg-sand rounded-full px-3 py-1">{dateLabel(m.created_at)}</span>
-                    </div>
-                  )}
-                  <div className={`group flex gap-2 py-1.5 ${own ? 'justify-end' : 'justify-start'}`}>
-                    {!own &&
-                      (avatar ? (
-                        <img src={avatar} alt="" className="h-6 w-6 rounded-full object-cover shrink-0 self-end" />
-                      ) : (
-                        <span className="h-6 w-6 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0 self-end">
-                          {getInitials(senderLabel(m.sender_id))}
-                        </span>
-                      ))}
-                    <div className={`max-w-[75%] ${own ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
-                      <span className="text-xs text-sage px-1">{senderLabel(m.sender_id)}</span>
-                      <div className="relative">
-                        <div
-                          className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                            own ? 'bg-accent text-white' : 'bg-sand text-ink'
-                          }`}
-                        >
-                          {m.body && <div>{renderBody(m)}</div>}
-                          {m.attachment_path &&
-                            (m.attachment_type?.startsWith('image/') ? (
-                              m.attachment_signed_url ? (
-                                <img
-                                  src={m.attachment_signed_url}
-                                  alt={m.attachment_name ?? ''}
-                                  className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-2' : ''}`}
-                                  onClick={() => openAttachment(m)}
-                                />
-                              ) : (
-                                <div className={`text-xs opacity-70 ${m.body ? 'mt-2' : ''}`}>Loading image…</div>
-                              )
-                            ) : (
-                              <button
-                                onClick={() => openAttachment(m)}
-                                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
-                                  own ? 'bg-white/15 hover:bg-white/25' : 'bg-white hover:shadow-sm'
-                                } ${m.body ? 'mt-2' : ''}`}
-                              >
-                                <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
-                                <span className="flex flex-col leading-tight">
-                                  <span className="text-xs font-medium truncate max-w-[140px]">{m.attachment_name}</span>
-                                  <span className={`text-[10px] ${own ? 'opacity-70' : 'text-sage'}`}>{formatFileSize(m.attachment_size_bytes)}</span>
-                                </span>
-                              </button>
-                            ))}
-                        </div>
-
-                        <div
-                          className={`absolute top-0 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-full px-1.5 py-1 z-10 ${
-                            own ? 'right-full mr-1' : 'left-full ml-1'
-                          }`}
-                        >
-                          {QUICK_EMOJIS.map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={() => toggleReaction(m, emoji)}
-                              className="text-sm leading-none hover:scale-125 transition-transform"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {reactionGroups.size > 0 && (
-                        <div className="flex flex-wrap gap-1 px-1">
-                          {[...reactionGroups.entries()].map(([emoji, reacts]) => {
-                            const mine = reacts.some((r) => r.user_id === userId)
-                            return (
-                              <button
-                                key={emoji}
-                                onClick={() => toggleReaction(m, emoji)}
-                                className={`text-xs rounded-full px-1.5 py-0.5 border flex items-center gap-1 ${
-                                  mine ? 'bg-accent/10 border-accent text-accent' : 'bg-sand border-transparent text-ink'
-                                }`}
-                              >
-                                <span>{emoji}</span>
-                                <span>{reacts.length}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      <span className="text-[10px] text-sage px-1">
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+            {messages.map((m, i) => (
+              <MessageBubble
+                key={m.id}
+                m={m}
+                own={m.sender_id === userId}
+                avatarUrl={senderAvatar(m.sender_id)}
+                senderName={senderLabel(m.sender_id)}
+                showDateSeparator={i === 0 || !sameDay(messages[i - 1].created_at, m.created_at)}
+                userId={userId}
+                memberMap={memberMap}
+                onToggleReaction={toggleReaction}
+                onOpenAttachment={openAttachment}
+              />
+            ))}
           </div>
 
           {pendingFile && (
