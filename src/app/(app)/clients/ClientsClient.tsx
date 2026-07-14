@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
+import Tooltip from '@/components/ui/Tooltip'
 import { periodBounds, type PeriodValue } from '@/lib/period'
 import {
   AVATAR_COLORS,
@@ -63,6 +64,9 @@ type CompletedTask = { id: string; client_id: string | null; title: string; comp
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string; generated_by: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
+
+const STAGE_TOOLTIP = 'Pipeline stage - where this client sits in your funnel. Set manually, doesn’t change on its own.'
+const HEALTH_TOOLTIP = 'Contact health - how overdue this client is for a check-in, based on last contact vs. their cadence. Independent of pipeline stage.'
 
 const emptyForm = {
   name: '',
@@ -352,20 +356,31 @@ export default function ClientsClient({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="font-bold text-lg">{selected.name}</div>
-                  <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: sColor, background: `${sColor}22` }}>
-                    {stageLabel(stage)}
-                  </span>
-                  {!isChurned && (
-                    <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: dotColor, background: `${dotColor}22` }}>
-                      {HEALTH_LABEL[health]}
+                  <Tooltip content={STAGE_TOOLTIP}>
+                    <span
+                      className="text-xs font-semibold rounded-full px-2 py-0.5"
+                      style={{ color: sColor, background: `${sColor}22` }}
+                    >
+                      {stageLabel(stage)}
                     </span>
+                  </Tooltip>
+                  {!isChurned && (
+                    <Tooltip content={HEALTH_TOOLTIP}>
+                      <span
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold rounded border px-2 py-0.5"
+                        style={{ color: dotColor, borderColor: `${dotColor}55` }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+                        {HEALTH_LABEL[health]}
+                      </span>
+                    </Tooltip>
                   )}
                   {selected.awaiting_reply && <span className="text-xs text-amber-700 font-medium">⏳ Awaiting reply</span>}
                   {selected.primary_contact_id && (
                     <span className="text-xs text-sage bg-ink/5 rounded-full px-2 py-0.5">Owner: {memberName(memberById(selected.primary_contact_id))}</span>
                   )}
                 </div>
-                <div className="text-sm text-sage mt-1 flex gap-2 flex-wrap items-center">
+                <div className="text-sm text-sage mt-2 flex gap-2 flex-wrap items-center">
                   {selected.business && <span>{selected.business}</span>}
                   {selected.platform && <span className="bg-ink/5 rounded px-1.5">{selected.platform}</span>}
                   {selected.service && <span>{selected.service}</span>}
@@ -629,16 +644,24 @@ export default function ClientsClient({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="font-medium text-sm">{c.name}</div>
-                <span className="text-xs font-semibold" style={{ color: stageColor(stage) }}>
-                  {stageLabel(stage)}
-                </span>
-                {stage !== 'Churned' && (
-                  <span className="text-xs font-semibold" style={{ color: dotColor }}>
-                    {HEALTH_LABEL[health]}
+                <Tooltip content={STAGE_TOOLTIP}>
+                  <span
+                    className="text-xs font-semibold rounded-full px-1.5 py-0.5"
+                    style={{ color: stageColor(stage), background: `${stageColor(stage)}18` }}
+                  >
+                    {stageLabel(stage)}
                   </span>
+                </Tooltip>
+                {stage !== 'Churned' && (
+                  <Tooltip content={HEALTH_TOOLTIP}>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: dotColor }}>
+                      <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+                      {HEALTH_LABEL[health]}
+                    </span>
+                  </Tooltip>
                 )}
               </div>
-              <div className="text-xs text-sage mt-0.5 flex gap-2 flex-wrap">
+              <div className="text-xs text-sage mt-1.5 flex gap-2 flex-wrap">
                 {c.business && <span>{c.business}</span>}
                 {c.platform && <span className="bg-ink/5 rounded px-1.5">{c.platform}</span>}
                 {c.last_contacted && <span>Last: {formatDate(c.last_contacted)}</span>}

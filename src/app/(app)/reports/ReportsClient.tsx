@@ -25,6 +25,7 @@ import TrendLineChart from '@/components/charts/TrendLineChart'
 import DivergingBarChart from '@/components/charts/DivergingBarChart'
 import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
+import Tooltip from '@/components/ui/Tooltip'
 import Avatar from '@/components/ui/Avatar'
 
 type Client = {
@@ -555,9 +556,11 @@ export default function ReportsClient({
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-semibold text-ink">{r.client.name}</span>
-                              <span className="text-xs font-semibold" style={{ color: HEALTH_COLOR[health] }}>
-                                {HEALTH_LABEL[health]}
-                              </span>
+                              <Tooltip content="Contact health - how overdue this client is for a check-in, based on last contact vs. their cadence.">
+                                <span className="text-xs font-semibold" style={{ color: HEALTH_COLOR[health] }}>
+                                  {HEALTH_LABEL[health]}
+                                </span>
+                              </Tooltip>
                             </div>
                             <div className="text-xs text-sage mt-0.5">
                               {r.client.last_contacted ? `Last contacted ${formatDate(r.client.last_contacted)}` : 'Never contacted'}

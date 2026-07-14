@@ -13,6 +13,7 @@ import { PauseIcon, PencilIcon, PlayIcon } from '@/components/ui/icons'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
+import InfoTooltip from '@/components/ui/InfoTooltip'
 import {
   AVATAR_COLORS,
   centsToDollars,
@@ -495,7 +496,10 @@ export default function DashboardClient({
       node: (
         <>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-ink/60">Client health</div>
+            <div className="text-sm font-medium text-ink/60 flex items-center">
+              Client health
+              <InfoTooltip content="How overdue each client is for a check-in, based on last contact vs. their cadence - separate from pipeline stage (Lead/Trial/Active/etc.)." />
+            </div>
             <Link href="/clients" className="text-xs text-sage hover:text-ink">
               See more →
             </Link>
