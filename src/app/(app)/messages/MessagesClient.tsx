@@ -477,6 +477,38 @@ export default function MessagesClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, supabase])
 
+  // dmThreads (contact -> thread id) is computed once server-side from the participant rows
+  // that exist at page load - if a teammate DMs you for the very first time while this page is
+  // open, get_or_create_dm_thread() creates your participant row, but nothing pushes that
+  // mapping to this client, so the new thread's messages/unread dot silently have nowhere to
+  // attach in the sidebar until reload. Listen for that participant row landing and backfill it.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`dm-participants-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'message_thread_participants', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          const row = payload.new as { thread_id: string; user_id: string }
+          if (row.thread_id === teamThreadId) return
+          const { data: other } = await supabase
+            .from('message_thread_participants')
+            .select('user_id')
+            .eq('thread_id', row.thread_id)
+            .neq('user_id', userId)
+            .maybeSingle()
+          if (other) {
+            setDmThreads((prev) => (prev[other.user_id] ? prev : { ...prev, [other.user_id]: row.thread_id }))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId, teamThreadId, supabase])
+
   useEffect(() => {
     if (isLoadingOlderRef.current) return
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })

@@ -131,6 +131,32 @@ export default function ClientsClient({
   }, [initialNotes])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Live-sync clients created/edited/deleted by teammates so this page never needs a manual
+  // refresh. Own optimistic changes echo back here too (Postgres Changes fires for the sender
+  // as well) - INSERT dedupes by id, UPDATE/DELETE are idempotent against already-applied state.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`clients-org-${orgId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Client
+        setClients((prev) => (prev.some((c) => c.id === incoming.id) ? prev : [...prev, incoming]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Client
+        setClients((prev) => prev.map((c) => (c.id === incoming.id ? incoming : c)))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'clients', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setClients((prev) => prev.filter((c) => c.id !== old.id))
+        setSelectedId((prev) => (prev === old.id ? null : prev))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId, supabase])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState<Record<string, unknown>>(emptyForm)
   const [editing, setEditing] = useState(false)
