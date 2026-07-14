@@ -36,10 +36,10 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // seat cap only applies once billing is live (active/past_due) - trials (local or Stripe)
-  // stay unlimited so a team can fully evaluate the product before paying for seats
+  // Trials include seats_purchased (3 by default - owner + 2, see create_org) so a team can
+  // invite teammates to evaluate it, but still cap at that count same as a paid plan would.
   const { data: org } = await admin.from('orgs').select('subscription_status, seats_purchased').eq('id', orgId).single()
-  if (org && (org.subscription_status === 'active' || org.subscription_status === 'past_due')) {
+  if (org && (org.subscription_status === 'active' || org.subscription_status === 'past_due' || org.subscription_status === 'trialing')) {
     const { count: activeCount } = await admin
       .from('org_members')
       .select('id', { count: 'exact', head: true })
@@ -47,7 +47,12 @@ export async function POST(request: Request) {
       .eq('status', 'active')
     if ((activeCount || 0) >= org.seats_purchased) {
       return NextResponse.json(
-        { error: `You've used all ${org.seats_purchased} seat(s) on your plan. Add more seats in Billing to invite another teammate.` },
+        {
+          error:
+            org.subscription_status === 'trialing'
+              ? `You've used all ${org.seats_purchased} seat(s) included in your trial. Upgrade in Billing to add more teammates.`
+              : `You've used all ${org.seats_purchased} seat(s) on your plan. Add more seats in Billing to invite another teammate.`,
+        },
         { status: 403 }
       )
     }
