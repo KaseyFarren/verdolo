@@ -1,5 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { qaName } from './helpers/qa-data'
+
+const admin = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
 
 function clientRow(page: Page, name: string) {
   return page.locator('div.cursor-pointer').filter({ hasText: name })
@@ -86,6 +89,33 @@ test.describe('Clients CRUD (admin+owner) @owner', () => {
     await expect(clientRow(page, name)).toHaveCount(0, { timeout: 10_000 })
     await page.reload()
     await expect(clientRow(page, name)).toHaveCount(0)
+  })
+
+  test('deleting a client actually deletes its tasks, not just orphans them', async ({ page }) => {
+    // regression test for a bug found 2026-07-14: deleteClient() deleted the client first, which
+    // (via tasks.client_id's "on delete set null" FK) nulled client_id on all its tasks before
+    // the app's own follow-up `tasks.delete().eq('client_id', id)` could match them - so every
+    // client deletion silently left its tasks behind as orphaned "no client" tasks instead of
+    // removing them, despite the confirm dialog promising "This will also remove their tasks."
+    const name = qaName('delete-with-task')
+    await createClient(page, name)
+
+    const { data: client } = await admin.from('clients').select('id').eq('name', name).single()
+    const taskTitle = qaName('orphan-check')
+    const { data: org } = await admin.from('clients').select('org_id').eq('id', client!.id).single()
+    await admin.from('tasks').insert({ org_id: org!.org_id, client_id: client!.id, title: taskTitle, due_date: new Date().toISOString().slice(0, 10), done: false })
+
+    await clientRow(page, name).click()
+    await page.getByTitle('Delete client').click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).click() // confirm dialog
+    await expect(clientRow(page, name)).toHaveCount(0, { timeout: 10_000 })
+
+    // the row disappears optimistically before the actual delete round-trip resolves - poll
+    // rather than check once immediately, so this doesn't race the real async delete
+    await expect(async () => {
+      const { data: survivingTasks } = await admin.from('tasks').select('id').eq('title', taskTitle)
+      expect(survivingTasks ?? []).toEqual([])
+    }).toPass({ timeout: 5_000 })
   })
 })
 

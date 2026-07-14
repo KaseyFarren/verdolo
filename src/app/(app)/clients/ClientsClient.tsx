@@ -235,13 +235,17 @@ export default function ClientsClient({
       return prev.filter((c) => c.id !== id)
     })
     setSelectedId(null)
+    // tasks.client_id is "on delete set null" against clients, so deleting the client first
+    // would null it out on every one of their tasks before this could match them (same ordering
+    // hazard fixed for deleteRecurring/deleteDefault in TasksClient.tsx) - delete the tasks
+    // first, while client_id is still intact, then the client.
+    await supabase.from('tasks').delete().eq('client_id', id)
     const { error } = await supabase.from('clients').delete().eq('id', id)
     if (error) {
       setClients(snapshot)
       toast.error('Could not delete that client')
       return
     }
-    await supabase.from('tasks').delete().eq('client_id', id)
     toast.success(`${name} deleted`)
   }
 
