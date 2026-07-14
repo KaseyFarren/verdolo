@@ -83,7 +83,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { data: weekTimeEntries },
     { data: monthTimeEntries },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day').eq('org_id', orgId).order('name'),
+    supabase
+      .from('clients')
+      .select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status, last_contacted, cadence_days')
+      .eq('org_id', orgId)
+      .order('name'),
     supabase
       .from('tasks')
       .select('id, client_id, assigned_to, title, completed_at')

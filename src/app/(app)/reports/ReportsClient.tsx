@@ -4,7 +4,19 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
-import { formatDate, todayKey, getWeekAnchor, memberName, effectiveRate, currencySymbol, type Currency } from '@/lib/agency'
+import {
+  formatDate,
+  todayKey,
+  getWeekAnchor,
+  getStage,
+  stageLabel,
+  stageColor,
+  getHealthScore,
+  memberName,
+  effectiveRate,
+  currencySymbol,
+  type Currency,
+} from '@/lib/agency'
 import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
@@ -16,7 +28,18 @@ import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 import Avatar from '@/components/ui/Avatar'
 
-type Client = { id: string; name: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }
+type Client = {
+  id: string
+  name: string
+  retainer_cents: number | null
+  billing_mode: string | null
+  hourly_rate_cents: number | null
+  billing_day: number | null
+  stage: string | null
+  status: string | null
+  last_contacted: string | null
+  cadence_days: number | null
+}
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
 type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: number | null }
@@ -523,11 +546,30 @@ export default function ReportsClient({
             ) : (
               <div className="@container">
                 <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-4">
-                  {clientReports.map((r) => (
+                  {clientReports.map((r) => {
+                    const stage = getStage(r.client)
+                    const isChurned = stage === 'Churned'
+                    const health = isChurned ? 'churned' : getHealthScore(r.client.last_contacted, todayKey(), r.client.cadence_days || 7)
+                    const healthColor =
+                      health === 'churned' ? '#6060a0' : health === 'green' ? '#2db87a' : health === 'amber' ? '#cc9a3c' : '#e05070'
+                    return (
                     <div key={r.client.id} className="rounded-2xl bg-white border border-ink/8 p-5">
-                      <div className="flex justify-between items-center mb-4">
-                        <div className="text-sm font-semibold text-ink">{r.client.name}</div>
-                        <div className="flex gap-2">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: healthColor }} title={`Contact health: ${health}`} />
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-ink">{r.client.name}</span>
+                              <span className="text-xs font-semibold" style={{ color: stageColor(stage) }}>
+                                {stageLabel(stage)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-sage mt-0.5">
+                              {r.client.last_contacted ? `Last contacted ${formatDate(r.client.last_contacted)}` : 'Never contacted'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
                           <span className="rounded-full bg-sand/60 text-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">
                             {r.taskCount} task{r.taskCount !== 1 ? 's' : ''}
                           </span>
@@ -583,7 +625,8 @@ export default function ReportsClient({
                         </div>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
