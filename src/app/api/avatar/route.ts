@@ -70,6 +70,13 @@ export async function POST(request: Request) {
   const { error: upErr } = await admin.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/webp' })
   if (upErr) return apiError('Could not upload your picture', 500, upErr)
 
+  // Clean up any leftover file from before every upload was normalized to avatar.webp (older
+  // uploads kept the source extension - avatar.png/.jpg/.gif) so old pictures don't linger in
+  // storage once nothing references them.
+  const { data: existing } = await admin.storage.from('avatars').list(user.id)
+  const stale = (existing || []).filter((f) => f.name !== 'avatar.webp').map((f) => `${user.id}/${f.name}`)
+  if (stale.length) await admin.storage.from('avatars').remove(stale)
+
   const { data: pub } = admin.storage.from('avatars').getPublicUrl(path)
   // Cache-bust so the new picture shows immediately even though the storage path is stable.
   const url = `${pub.publicUrl}?t=${Date.now()}`
