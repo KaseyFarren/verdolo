@@ -24,6 +24,7 @@ export default async function globalTeardown() {
     supabase.from('proposals').delete().like('title', like),
     supabase.from('time_entries').delete().like('note', like),
     supabase.from('client_notes').delete().like('text', like),
+    supabase.from('messages').delete().like('body', like),
   ])
 
   const failed = results.filter((r) => r.error)
