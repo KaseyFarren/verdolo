@@ -48,7 +48,7 @@ export default function SettingsClient({
   trialEndsAt,
   seatsPurchased,
   activeMemberCount,
-  hasStripeCustomer,
+  hasSubscription,
   planType,
 }: {
   orgId: string
@@ -65,7 +65,7 @@ export default function SettingsClient({
   trialEndsAt: string | null
   seatsPurchased: number
   activeMemberCount: number
-  hasStripeCustomer: boolean
+  hasSubscription: boolean
   planType: 'subscription' | 'lifetime'
 }) {
   const searchParams = useSearchParams()
@@ -117,7 +117,7 @@ export default function SettingsClient({
               trialEndsAt={trialEndsAt}
               seatsPurchased={seatsPurchased}
               activeMemberCount={activeMemberCount}
-              hasStripeCustomer={hasStripeCustomer}
+              hasSubscription={hasSubscription}
               planType={planType}
             />
           )}

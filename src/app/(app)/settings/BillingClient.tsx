@@ -106,7 +106,7 @@ export default function BillingClient({
   trialEndsAt,
   seatsPurchased,
   activeMemberCount,
-  hasStripeCustomer,
+  hasSubscription,
   planType,
 }: {
   orgId: string
@@ -115,7 +115,7 @@ export default function BillingClient({
   trialEndsAt: string | null
   seatsPurchased: number
   activeMemberCount: number
-  hasStripeCustomer: boolean
+  hasSubscription: boolean
   planType: 'subscription' | 'lifetime'
 }) {
   const [loading, setLoading] = useState<'checkout' | 'seats' | 'panel' | 'payment' | 'cancel' | null>(null)
@@ -275,7 +275,7 @@ export default function BillingClient({
       </div>
 
       <div className="flex gap-2 mb-6">
-        {(!hasStripeCustomer || subscriptionStatus === 'canceled' || trialExpired) && (
+        {(!hasSubscription || subscriptionStatus === 'canceled' || trialExpired) && (
           <button
             className="rounded bg-accent text-white shadow-md px-4 py-2 text-sm font-medium disabled:opacity-50"
             onClick={startCheckout}
@@ -284,7 +284,7 @@ export default function BillingClient({
             {loading === 'checkout' ? 'Starting…' : 'Subscribe'}
           </button>
         )}
-        {hasStripeCustomer && (
+        {hasSubscription && (
           <button
             className="rounded border border-ink/10 px-4 py-2 text-sm disabled:opacity-50"
             onClick={openBillingPanel}
@@ -295,7 +295,7 @@ export default function BillingClient({
         )}
       </div>
 
-      {hasStripeCustomer && subscriptionStatus !== 'canceled' && (
+      {hasSubscription && subscriptionStatus !== 'canceled' && (
         <div className="rounded-lg border border-ink/10 bg-white p-4">
           <div className="text-xs font-semibold tracking-wide text-sage mb-2">Seats</div>
           <div className="flex items-center gap-2">

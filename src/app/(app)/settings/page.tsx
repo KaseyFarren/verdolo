@@ -31,7 +31,7 @@ export default async function SettingsPage() {
       trialEndsAt={org?.trial_ends_at ?? null}
       seatsPurchased={org?.seats_purchased ?? 1}
       activeMemberCount={activeMemberCount ?? 0}
-      hasStripeCustomer={!!org?.stripe_customer_id}
+      hasSubscription={!!org?.stripe_subscription_id}
       planType={org?.plan_type ?? 'subscription'}
     />
   )
