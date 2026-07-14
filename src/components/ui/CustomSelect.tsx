@@ -63,13 +63,13 @@ export default function CustomSelect({
             ? // no default text color here - it must come from the wrapping `className` prop (e.g.
               // `text-sage` for a neutral field, or a semantic color like priorityColor(...) for one
               // that needs to stay visible/legible once a value is selected) so callers can control it
-              `w-full flex items-center gap-1 rounded px-1 -mx-1 text-left hover:bg-sand/60 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`
+              `block w-full rounded px-1 -mx-1 text-left hover:bg-sand/60 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`
             : `w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left ${
                 disabled ? 'opacity-50 cursor-not-allowed' : ''
               }`
         }
       >
-        <span className="truncate">{current?.label ?? placeholder}</span>
+        <span className="block truncate">{current?.label ?? placeholder}</span>
         {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && !disabled && (

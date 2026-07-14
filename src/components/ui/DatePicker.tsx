@@ -77,11 +77,11 @@ export default function DatePicker({
         onClick={toggleOpen}
         className={
           variant === 'plain'
-            ? 'flex items-center gap-1 rounded px-1 -mx-1 text-left hover:bg-sand/60'
+            ? 'block w-full rounded px-1 -mx-1 text-left hover:bg-sand/60'
             : 'w-full flex items-center justify-between gap-2 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-sm text-left'
         }
       >
-        <span className={`truncate ${value ? '' : 'text-sage'}`}>{value ? formatDate(value) : placeholder}</span>
+        <span className={`block truncate ${value ? '' : 'text-sage'}`}>{value ? formatDate(value) : placeholder}</span>
         {variant === 'pill' && <span className={`text-sage text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>}
       </button>
       {open && (

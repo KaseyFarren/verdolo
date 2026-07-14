@@ -18,7 +18,7 @@ import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
 // no min-width. Actions get their own reserved (capped) column so they never overlap data columns.
 // Notes are NOT a column (too cramped) - they render in a full-width bar under the row instead.
 export const ROW_GRID_COLS =
-  'grid-cols-[20px_24px_minmax(0,1fr)_minmax(0,60px)_minmax(0,84px)_minmax(0,132px)] lg:grid-cols-[20px_24px_minmax(0,2fr)_minmax(0,64px)_minmax(0,1fr)_minmax(0,60px)_minmax(0,88px)_minmax(0,64px)_minmax(0,132px)]'
+  'grid-cols-[20px_24px_minmax(0,1fr)_minmax(0,60px)_minmax(0,116px)_minmax(0,132px)] lg:grid-cols-[20px_24px_minmax(0,2fr)_minmax(0,64px)_minmax(0,1fr)_minmax(0,60px)_minmax(0,128px)_minmax(0,64px)_minmax(0,132px)]'
 
 export function TaskListHeader() {
   return (
@@ -159,9 +159,9 @@ export default function TaskRow({
           )}
         </div>
 
-        <div className="hidden lg:block text-xs text-sage truncate">{taskType}</div>
+        <div className="hidden lg:block min-w-0 text-xs text-sage truncate">{taskType}</div>
 
-        <div className="hidden lg:block text-xs">
+        <div className="hidden lg:block min-w-0 text-xs">
           <CustomSelect
             variant="plain"
             value={t.client_id || ''}
@@ -171,7 +171,7 @@ export default function TaskRow({
           />
         </div>
 
-        <div className="text-xs">
+        <div className="min-w-0 text-xs">
           <MultiSelect
             variant="plain"
             value={assigneeIds}
@@ -192,12 +192,18 @@ export default function TaskRow({
           />
         </div>
 
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-1 min-w-0 text-xs">
           {isOverdue && <AlertTriangleIcon size={13} className="text-red-600 shrink-0" />}
-          <DatePicker variant="plain" allowClear={false} value={t.due_date} onChange={(v) => updateField('due_date', v)} className={isOverdue ? 'text-red-600 font-medium' : 'text-sage'} />
+          <DatePicker
+            variant="plain"
+            allowClear={false}
+            value={t.due_date}
+            onChange={(v) => updateField('due_date', v)}
+            className={`flex-1 min-w-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-sage'}`}
+          />
         </div>
 
-        <div className="hidden lg:block text-xs">
+        <div className="hidden lg:block min-w-0 text-xs">
           {!t.quick && (
             <CustomSelect
               variant="plain"
