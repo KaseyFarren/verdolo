@@ -185,6 +185,31 @@ export default function TasksClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Live-sync tasks created/edited/deleted by teammates so this page never needs a manual
+  // refresh. Own optimistic changes echo back here too (Postgres Changes fires for the sender
+  // as well) - INSERT dedupes by id, UPDATE/DELETE are idempotent against already-applied state.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`tasks-org-${orgId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Task
+        setTasks((prev) => (prev.some((t) => t.id === incoming.id) ? prev : [...prev, incoming]))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const incoming = payload.new as Task
+        setTasks((prev) => prev.map((t) => (t.id === incoming.id ? incoming : t)))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const old = payload.old as { id: string }
+        setTasks((prev) => prev.filter((t) => t.id !== old.id))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId, supabase])
+
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || ''
   const memberEmail = (id: string | null) => memberName(members.find((m) => m.user_id === id))
 
