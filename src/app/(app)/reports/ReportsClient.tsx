@@ -8,10 +8,9 @@ import {
   formatDate,
   todayKey,
   getWeekAnchor,
-  getStage,
-  stageLabel,
-  stageColor,
-  getHealthScore,
+  clientHealthKey,
+  HEALTH_COLOR,
+  HEALTH_LABEL,
   memberName,
   effectiveRate,
   currencySymbol,
@@ -547,21 +546,17 @@ export default function ReportsClient({
               <div className="@container">
                 <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-4">
                   {clientReports.map((r) => {
-                    const stage = getStage(r.client)
-                    const isChurned = stage === 'Churned'
-                    const health = isChurned ? 'churned' : getHealthScore(r.client.last_contacted, todayKey(), r.client.cadence_days || 7)
-                    const healthColor =
-                      health === 'churned' ? '#6060a0' : health === 'green' ? '#2db87a' : health === 'amber' ? '#cc9a3c' : '#e05070'
+                    const health = clientHealthKey(r.client, todayKey())
                     return (
                     <div key={r.client.id} className="rounded-2xl bg-white border border-ink/8 p-5">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: healthColor }} title={`Contact health: ${health}`} />
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: HEALTH_COLOR[health] }} />
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-semibold text-ink">{r.client.name}</span>
-                              <span className="text-xs font-semibold" style={{ color: stageColor(stage) }}>
-                                {stageLabel(stage)}
+                              <span className="text-xs font-semibold" style={{ color: HEALTH_COLOR[health] }}>
+                                {HEALTH_LABEL[health]}
                               </span>
                             </div>
                             <div className="text-xs text-sage mt-0.5">

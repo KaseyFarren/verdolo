@@ -104,6 +104,21 @@ export function getHealthScore(lastContacted: string | null | undefined, today: 
   return 'red'
 }
 
+/** How overdue a client is for contact - independent of `stage`, which is a manually-set
+ * pipeline status (Lead/Trial/Active/At Risk/Churned) and says nothing about contact recency.
+ * A client can be "At Risk" and contacted today, or "Active" and long overdue - this is the
+ * other axis. Single source of truth so Dashboard/Reports/Clients render the same labels. */
+export type HealthKey = 'green' | 'amber' | 'red' | 'churned'
+export const HEALTH_LABEL: Record<HealthKey, string> = { green: 'On track', amber: 'Check in soon', red: 'Overdue', churned: 'Paused' }
+export const HEALTH_COLOR: Record<HealthKey, string> = { green: '#2db87a', amber: '#cc9a3c', red: '#e05070', churned: '#6060a0' }
+
+export function clientHealthKey(
+  client: { stage?: string | null; status?: string | null; last_contacted?: string | null; cadence_days?: number | null },
+  today: string,
+): HealthKey {
+  return getStage(client) === 'Churned' ? 'churned' : getHealthScore(client.last_contacted, today, client.cadence_days || 7)
+}
+
 export function mrrCentsTotal(clients: { stage?: string | null; status?: string | null; retainer_cents?: number | null }[]) {
   return clients
     .filter((c) => !['Churned', 'Lead'].includes(getStage(c)))

@@ -18,13 +18,15 @@ import {
   TONES,
   cadenceLabel,
   centsToDollars,
+  clientHealthKey,
   currencySymbol,
   dollarsToCents,
   formatDate,
   formatNoteTime,
-  getHealthScore,
   getInitials,
   getStage,
+  HEALTH_COLOR,
+  HEALTH_LABEL,
   memberName,
   stageColor,
   stageLabel,
@@ -148,9 +150,6 @@ export default function ClientsClient({
 
   function clientHealthTrend(clientId: string) {
     return healthSnapshots.filter((s) => s.client_id === clientId).sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
-  }
-  function healthDotColor(health: HealthSnapshot['health']) {
-    return health === 'churned' ? '#6060a0' : health === 'green' ? '#2db87a' : health === 'amber' ? '#cc9a3c' : '#e05070'
   }
 
   async function addClient() {
@@ -286,8 +285,8 @@ export default function ClientsClient({
   if (selected) {
     const stage = getStage(selected)
     const isChurned = stage === 'Churned'
-    const hs = isChurned ? 'grey' : getHealthScore(selected.last_contacted, today, selected.cadence_days || 7)
-    const dotColor = isChurned ? '#6060a0' : hs === 'green' ? '#2db87a' : hs === 'amber' ? '#cc9a3c' : '#e05070'
+    const health = clientHealthKey(selected, today)
+    const dotColor = HEALTH_COLOR[health]
     const sColor = stageColor(stage)
     const clientNotes = notes.filter((n) => n.client_id === selected.id)
     const clientTasks = completedTasks.filter((t) => t.client_id === selected.id)
@@ -354,8 +353,13 @@ export default function ClientsClient({
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="font-bold text-lg">{selected.name}</div>
                   <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: sColor, background: `${sColor}22` }}>
-                    {stage}
+                    {stageLabel(stage)}
                   </span>
+                  {!isChurned && (
+                    <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: dotColor, background: `${dotColor}22` }}>
+                      {HEALTH_LABEL[health]}
+                    </span>
+                  )}
                   {selected.awaiting_reply && <span className="text-xs text-amber-700 font-medium">⏳ Awaiting reply</span>}
                   {selected.primary_contact_id && (
                     <span className="text-xs text-sage bg-ink/5 rounded-full px-2 py-0.5">Owner: {memberName(memberById(selected.primary_contact_id))}</span>
@@ -374,8 +378,8 @@ export default function ClientsClient({
                       <div
                         key={s.snapshot_date}
                         className="h-2 w-2 rounded-full"
-                        style={{ background: healthDotColor(s.health) }}
-                        title={`${formatDate(s.snapshot_date)}: ${s.health}`}
+                        style={{ background: HEALTH_COLOR[s.health] }}
+                        title={`${formatDate(s.snapshot_date)}: ${HEALTH_LABEL[s.health]}`}
                       />
                     ))}
                     <span className="text-xs text-sage ml-1">health, last {clientHealthTrend(selected.id).length}d</span>
@@ -614,9 +618,8 @@ export default function ClientsClient({
         return filteredClients.map((c) => {
         const i = clients.indexOf(c)
         const stage = getStage(c)
-        const isChurned = stage === 'Churned'
-        const hs = isChurned ? 'grey' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
-        const dotColor = isChurned ? '#6060a0' : hs === 'green' ? '#2db87a' : hs === 'amber' ? '#cc9a3c' : '#e05070'
+        const health = clientHealthKey(c, today)
+        const dotColor = HEALTH_COLOR[health]
         return (
           <div key={c.id} className="flex items-center gap-3 py-3 border-b border-ink/10 cursor-pointer" onClick={() => setSelectedId(c.id)}>
             <div className="relative shrink-0">
@@ -627,8 +630,13 @@ export default function ClientsClient({
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="font-medium text-sm">{c.name}</div>
                 <span className="text-xs font-semibold" style={{ color: stageColor(stage) }}>
-                  {stage}
+                  {stageLabel(stage)}
                 </span>
+                {stage !== 'Churned' && (
+                  <span className="text-xs font-semibold" style={{ color: dotColor }}>
+                    {HEALTH_LABEL[health]}
+                  </span>
+                )}
               </div>
               <div className="text-xs text-sage mt-0.5 flex gap-2 flex-wrap">
                 {c.business && <span>{c.business}</span>}

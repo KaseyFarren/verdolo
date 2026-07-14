@@ -16,17 +16,17 @@ import QuickAddTime from '@/components/QuickAddTime'
 import {
   AVATAR_COLORS,
   centsToDollars,
+  clientHealthKey,
   currencySymbol,
   formatDate,
   getInitials,
   getOffsetDate,
   getStage,
+  HEALTH_COLOR,
+  HEALTH_LABEL,
   memberName,
   priorityColor,
   sortTasks,
-  stageColor,
-  stageLabel,
-  STAGES,
   todayKey,
   topByKey,
   type Currency,
@@ -43,6 +43,8 @@ type Client = {
   tone: string | null
   awaiting_reply: boolean
   primary_contact_id: string | null
+  last_contacted: string | null
+  cadence_days: number | null
 }
 type Task = {
   id: string
@@ -64,6 +66,8 @@ type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seco
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type WeekCompletedTask = { assigned_to: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
+
+const HEALTH_ORDER = ['green', 'amber', 'red', 'churned'] as const
 
 function formatHoursMins(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -200,9 +204,9 @@ export default function DashboardClient({
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
-  const clientHealth = STAGES.map((stage) => ({
-    stage,
-    count: clients.filter((c) => getStage(c) === stage).length,
+  const clientHealth = HEALTH_ORDER.map((key) => ({
+    key,
+    count: clients.filter((c) => clientHealthKey(c, today) === key).length,
   })).filter((s) => s.count > 0)
 
   const currencySign = currencySymbol(currency)
@@ -501,12 +505,12 @@ export default function DashboardClient({
           ) : (
             <div className="flex flex-col">
               {clientHealth.map((s) => (
-                <div key={s.stage} className="flex justify-between items-center py-1 text-sm">
+                <div key={s.key} className="flex justify-between items-center py-1 text-sm">
                   <span className="flex items-center gap-2 text-ink">
-                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: stageColor(s.stage) }} />
-                    {stageLabel(s.stage)}
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: HEALTH_COLOR[s.key] }} />
+                    {HEALTH_LABEL[s.key]}
                   </span>
-                  <span className="font-medium" style={{ color: stageColor(s.stage) }}>
+                  <span className="font-medium" style={{ color: HEALTH_COLOR[s.key] }}>
                     {s.count}
                   </span>
                 </div>

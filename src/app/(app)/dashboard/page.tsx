@@ -52,7 +52,7 @@ export default async function DashboardPage() {
     // bucketing needs the true full active set, and is now covered by idx_tasks_active.
     supabase
       .from('clients')
-      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id')
+      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id, last_contacted, cadence_days')
       .eq('org_id', orgId)
       .order('name')
       .limit(2000),
