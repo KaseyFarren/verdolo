@@ -261,7 +261,12 @@ export default function TasksClient({
       assignee_ids: assigneeIds,
       assigned_to: deriveAssignedTo(assigneeIds),
       due_date: subtaskForm.dueDate,
-      priority: subtaskForm.priority,
+      // subtaskForm's priority starts as '' (emptyTaskForm) and the subtask form has no
+      // priority selector to set it, so an unfixed '' here always violated the DB's
+      // check(priority in ('High','Medium','Low')) constraint - the insert failed silently,
+      // the optimistic row rolled back, and the subtask never actually persisted. Mirror
+      // addTask()'s fallback.
+      priority: subtaskForm.priority || 'Medium',
       notes: subtaskForm.notes,
       quick: false,
       done: false,
@@ -423,8 +428,11 @@ export default function TasksClient({
     }
   }
   async function deleteRecurring(id: string) {
-    await supabase.from('recurring_templates').delete().eq('id', id)
+    // tasks.recurring_id is "on delete set null" against recurring_templates, so deleting the
+    // template first would null it out on every instance before this could match them - delete
+    // the instances first, while recurring_id is still intact, then the template.
     await supabase.from('tasks').delete().eq('recurring_id', id)
+    await supabase.from('recurring_templates').delete().eq('id', id)
     setRecurring((prev) => prev.filter((r) => r.id !== id))
     setTasks((prev) => prev.filter((t) => t.recurring_id !== id))
   }
@@ -479,8 +487,10 @@ export default function TasksClient({
     }
   }
   async function deleteDefault(id: string) {
-    await supabase.from('default_task_templates').delete().eq('id', id)
+    // same ordering hazard as deleteRecurring above: default_template_id is "on delete set
+    // null" against default_task_templates, so instances must be cleared first.
     await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false)
+    await supabase.from('default_task_templates').delete().eq('id', id)
     setDefaults((prev) => prev.filter((d) => d.id !== id))
     setTasks((prev) => prev.filter((t) => !(t.default_template_id === id && !t.done)))
   }
