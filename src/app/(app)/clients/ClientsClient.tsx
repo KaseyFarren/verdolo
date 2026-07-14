@@ -500,7 +500,7 @@ export default function ClientsClient({
         <div className="rounded-lg border border-ink/10 bg-white p-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-3">Quick note</div>
           <textarea
-            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
+            className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
             placeholder="Jot anything down…"
             value={selected.quick_note || ''}
             disabled={!canEdit}
@@ -529,7 +529,7 @@ export default function ClientsClient({
           </div>
           <div className="flex gap-2 mb-4 items-end">
             <textarea
-              className="flex-1 rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
+              className="flex-1 rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[44px]"
               placeholder="Add a note…"
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
@@ -750,14 +750,14 @@ function ClientForm({
       <div className="text-xs font-semibold uppercase tracking-wide text-sage mb-2">Basics</div>
       <label className="block text-xs text-sage mb-1">Name *</label>
       <input
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         value={(form.name as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         autoFocus
       />
       <label className="block text-xs text-sage mb-1">Business / Brand</label>
       <input
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         value={(form.business as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, business: e.target.value }))}
       />
@@ -784,7 +784,7 @@ function ClientForm({
       <label className="block text-xs text-sage mb-1">Contact email</label>
       <input
         type="email"
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         placeholder="jane@acme.com"
         value={(form.contact_email as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, contact_email: e.target.value }))}
@@ -828,14 +828,14 @@ function ClientForm({
       <label className="block text-xs text-sage mb-1">Background context</label>
       <div className="text-xs text-sage/70 mb-1">General background the AI should know about this client - history, quirks, how they like to be talked to.</div>
       <textarea
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         value={(form.notes as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
       />
       <label className="block text-xs text-sage mb-1">Talking points</label>
       <div className="text-xs text-sage/70 mb-1">Specific things to make sure get mentioned (optional) - stays set until you clear it.</div>
       <textarea
-        className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
+        className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
         value={(form.talking_points as string) || ''}
         onChange={(e) => setForm((f) => ({ ...f, talking_points: e.target.value }))}
       />

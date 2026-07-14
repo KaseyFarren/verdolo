@@ -214,7 +214,7 @@ export default function ImportTasksModal({
               ) : (
                 <>
                   <textarea
-                    className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2 min-h-[140px]"
+                    className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm mb-2 min-h-[140px]"
                     placeholder="Paste a meeting transcript or notes here…"
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}

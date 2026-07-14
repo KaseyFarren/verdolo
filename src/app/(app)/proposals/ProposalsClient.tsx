@@ -249,7 +249,7 @@ export default function ProposalsClient({
           </div>
           {clientMode === 'new' && <div className="text-xs text-sage/70 -mt-1">Adds them to Clients as a Lead so they show up in the pipeline too.</div>}
           <textarea
-            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px]"
+            className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px]"
             placeholder="Notes (optional)"
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
