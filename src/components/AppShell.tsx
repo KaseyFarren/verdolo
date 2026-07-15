@@ -19,6 +19,7 @@ import {
   FileIcon,
   HomeIcon,
   LockIcon,
+  LogOutIcon,
   MenuIcon,
   MessageCircleIcon,
   SettingsIcon,
@@ -145,19 +146,31 @@ export default function AppShell({
               })}
             </nav>
             <div className="px-4 py-4 border-t border-cream/10">
-              <div className="text-xs text-cream/50 truncate mb-2">{userEmail}</div>
+              <div className="flex items-center gap-2 mb-3">
+                <span
+                  className="flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[11px] font-heading font-bold text-white"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  {userEmail.charAt(0).toUpperCase()}
+                </span>
+                <div className="text-xs text-cream/50 truncate">{userEmail}</div>
+              </div>
               <div className="flex items-center gap-3">
-                <button onClick={logout} className="text-xs text-cream/70 hover:text-white transition-colors">
-                  Log out
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1.5 text-xs text-cream/70 hover:text-white transition-colors"
+                >
+                  <LogOutIcon size={13} /> Log out
                 </button>
                 <LockButton />
               </div>
-              <div className="mt-2">
+              <div className="mt-2.5">
                 <BugReportModal />
               </div>
-              <div className="mt-2 flex gap-2 text-xs text-cream/40">
-                <Link href="/terms" className="hover:text-cream/70">Terms</Link>
-                <Link href="/privacy" className="hover:text-cream/70">Privacy</Link>
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-cream/35">
+                <Link href="/terms" className="hover:text-cream/70 transition-colors">Terms</Link>
+                <span className="text-cream/20" aria-hidden="true">&middot;</span>
+                <Link href="/privacy" className="hover:text-cream/70 transition-colors">Privacy</Link>
               </div>
             </div>
           </div>
