@@ -1,28 +1,10 @@
 import { redirect } from 'next/navigation'
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getWeekAnchor, todayKey } from '@/lib/agency'
+import { periodBounds, type Period } from '@/lib/period'
 import ReportsClient from './ReportsClient'
 
-export type ReportRange = 'this_week' | 'last_week' | 'this_month'
-
-function rangeBounds(range: ReportRange) {
-  if (range === 'this_month') {
-    const now = new Date()
-    const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    const end = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
-    return { start, end }
-  }
-  const thisWeekStart = getWeekAnchor()
-  if (range === 'last_week') {
-    const start = getWeekAnchor(new Date(new Date(thisWeekStart).getTime() - 7 * 86400000))
-    return { start, end: thisWeekStart }
-  }
-  // this_week
-  const nextWeek = new Date(thisWeekStart)
-  nextWeek.setDate(nextWeek.getDate() + 7)
-  return { start: thisWeekStart, end: todayKey(nextWeek) }
-}
+export const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'custom']
 
 function monthKeyBounds(y: number, m: number) {
   // m is 1-indexed
@@ -49,7 +31,11 @@ function trendWindow(pMonth: string) {
   return { start, end, monthKeys }
 }
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; pMonth?: string }> }) {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; start?: string; end?: string; pMonth?: string }>
+}) {
   const { supabase, orgId, role, org } = await requireOrgContext()
 
   // Reports is admin/owner only - members' tasks/time_entries RLS only exposes their own rows,
@@ -57,9 +43,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // reasoning as the Team/Revenue gates.
   if (!isAdminRole(role)) redirect('/dashboard')
 
-  const { range: rangeParam, pMonth: pMonthParam } = await searchParams
-  const range: ReportRange = rangeParam === 'last_week' || rangeParam === 'this_month' ? rangeParam : 'this_week'
-  const { start, end } = rangeBounds(range)
+  const { range: rangeParam, start: rangeStartParam, end: rangeEndParam, pMonth: pMonthParam } = await searchParams
+  const range: Period = REPORT_RANGE_PRESETS.includes(rangeParam as Period) ? (rangeParam as Period) : 'this_week'
+  const { start, end } = periodBounds({ period: range, start: rangeStartParam, end: rangeEndParam }) as { start: string; end: string }
 
   // Capacity is always calendar-week, independent of the "by client" range picker above -
   // "who's overloaded" means this week regardless of what range the activity table is set to.
@@ -128,7 +114,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <ReportsClient
       orgId={orgId}
-      range={range}
+      range={{ period: range, start: rangeStartParam, end: rangeEndParam }}
       clients={clients ?? []}
       tasks={tasks ?? []}
       entries={entries ?? []}

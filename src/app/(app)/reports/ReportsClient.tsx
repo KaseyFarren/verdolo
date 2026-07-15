@@ -16,14 +16,14 @@ import {
   currencySymbol,
   type Currency,
 } from '@/lib/agency'
-import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays } from '@/lib/period'
+import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays, periodBounds, type Period, type PeriodValue } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
 import CustomSelect from '@/components/ui/CustomSelect'
+import PeriodSelector from '@/components/ui/PeriodSelector'
 import TrendLineChart from '@/components/charts/TrendLineChart'
 import DivergingBarChart from '@/components/charts/DivergingBarChart'
-import type { ReportRange } from './page'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 import Tooltip from '@/components/ui/Tooltip'
 import { AlertTriangleIcon, CheckIcon, ClockIcon, RefreshIcon, SparkleIcon } from '@/components/ui/icons'
@@ -89,11 +89,7 @@ function reportLabel(r: Report) {
   return r.period_type === 'week' ? `Week of ${formatDate(r.period_start)}` : monthLabel(r.period_start)
 }
 
-const RANGE_LABELS: Record<ReportRange, string> = {
-  this_week: 'This week',
-  last_week: 'Last week',
-  this_month: 'This month',
-}
+const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'custom']
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -132,7 +128,7 @@ export default function ReportsClient({
   currency,
 }: {
   orgId: string
-  range: ReportRange
+  range: PeriodValue
   clients: Client[]
   tasks: Task[]
   entries: TimeEntry[]
@@ -149,6 +145,7 @@ export default function ReportsClient({
   currency?: Currency
 }) {
   const currencySign = currencySymbol(currency)
+  const rangeLabel = periodBounds(range).label
   const router = useRouter()
   const [view, setView] = useState<View>('overview')
   const [recap, setRecap] = useState<string | null>(reports.find((r) => r.period_type === 'week' && r.period_start === weekAnchor)?.content ?? null)
@@ -472,8 +469,15 @@ export default function ReportsClient({
   }, [members, openTasks, weekTimeEntries])
   const maxOpenCount = Math.max(1, ...capacity.map((c) => c.openCount))
 
-  function onRangeChange(next: string) {
-    router.push(`/reports?range=${next}`)
+  function onRangeChange(next: PeriodValue) {
+    const params = new URLSearchParams()
+    if (next.period !== 'this_week') params.set('range', next.period)
+    if (next.period === 'custom') {
+      if (next.start) params.set('start', next.start)
+      if (next.end) params.set('end', next.end)
+    }
+    const qs = params.toString()
+    router.push(qs ? `/reports?${qs}` : '/reports')
   }
 
   return (
@@ -509,12 +513,7 @@ export default function ReportsClient({
       {view === 'overview' && (
         <>
           <div className="mb-6">
-            <CustomSelect
-              value={range}
-              onChange={(v) => onRangeChange(v)}
-              options={(Object.keys(RANGE_LABELS) as ReportRange[]).map((r) => ({ value: r, label: RANGE_LABELS[r] }))}
-              className="w-40"
-            />
+            <PeriodSelector layoutId="reports-range-active" value={range} onChange={onRangeChange} presets={REPORT_RANGE_PRESETS} />
           </div>
 
           <div className="mb-8" data-tour="reports-recap">
@@ -547,7 +546,7 @@ export default function ReportsClient({
           </div>
 
           <div className="mb-8">
-            <div className="text-xs font-semibold tracking-wide text-sage mb-2">By client · {RANGE_LABELS[range]}</div>
+            <div className="text-xs font-semibold tracking-wide text-sage mb-2">By client · {rangeLabel}</div>
             {clientReports.length === 0 ? (
               <div className="text-sm text-sage py-3">No task or time activity in this range.</div>
             ) : (
