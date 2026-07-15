@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
 import { qaName } from './helpers/qa-data'
 
-function messageBubble(page: Page, text: string) {
-  // the persisted reaction-pill row is a SIBLING of the ".relative" bubble+quick-react wrapper,
-  // not nested inside it (see MessagesClient.tsx) - scope to their shared "flex-col" parent so
-  // both the hover quick-react bar and the resulting pill are reachable from one locator.
-  return page.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(@class,"flex-col")][1]')
+function messageRow(page: Page, text: string) {
+  // the hover quick-react bar and the persisted reaction pill are both descendants of the row's
+  // "group relative" wrapper (see MessageRow in MessagesClient.tsx) - scope to that ancestor so
+  // both are reachable from one locator.
+  return page.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(@class,"group") and contains(@class,"relative")][1]')
 }
 
 test.describe('Messages @owner', () => {
@@ -54,12 +54,12 @@ test.describe('Messages @owner', () => {
     const text = qaName('react-msg')
     await page.getByPlaceholder('Message the team… (@ to mention)').fill(text)
     await page.getByRole('button', { name: 'Send', exact: true }).click()
-    const bubble = messageBubble(page, text)
-    await expect(bubble).toBeVisible({ timeout: 15_000 })
+    const row = messageRow(page, text)
+    await expect(row).toBeVisible({ timeout: 15_000 })
 
-    await bubble.hover()
-    await bubble.getByText('👍', { exact: true }).first().click()
-    const reactionPill = bubble.locator('button', { hasText: '👍' }).filter({ hasText: '1' })
+    await row.hover()
+    await row.getByText('👍', { exact: true }).first().click()
+    const reactionPill = row.locator('button', { hasText: '👍' }).filter({ hasText: '1' })
     await expect(reactionPill).toBeVisible({ timeout: 10_000 })
 
     await reactionPill.click()
@@ -71,8 +71,9 @@ test.describe('Messages @owner', () => {
 
   test('open a DM thread and send a message', async ({ page }) => {
     await page.goto('/messages')
-    // aside sidebar buttons in order: Team, then each DM contact - nth(1) is the first contact
-    const firstContact = page.locator('aside').getByRole('button').nth(1)
+    // aside sidebar buttons in order: All, Unread, @Mentions filter toggle, Team, then each DM
+    // contact - nth(4) is the first contact
+    const firstContact = page.locator('aside').getByRole('button').nth(4)
     await firstContact.click()
 
     const text = qaName('dm-msg')
@@ -81,5 +82,40 @@ test.describe('Messages @owner', () => {
     await page.getByRole('button', { name: 'Send', exact: true }).click()
 
     await expect(page.getByText(text, { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('reply in thread opens the thread panel and shows the reply count', async ({ page }) => {
+    await page.goto('/messages')
+    await page.getByRole('button', { name: 'Team' }).click()
+
+    const parentText = qaName('thread-parent')
+    await page.getByPlaceholder('Message the team… (@ to mention)').fill(parentText)
+    await page.getByRole('button', { name: 'Send', exact: true }).click()
+    const row = messageRow(page, parentText)
+    await expect(row).toBeVisible({ timeout: 15_000 })
+
+    await row.hover()
+    await row.getByTitle('Reply in thread').click()
+    await expect(page.getByText('Thread', { exact: true })).toBeVisible({ timeout: 10_000 })
+
+    const replyText = qaName('thread-reply')
+    const replyInput = page.getByPlaceholder('Reply…')
+    await replyInput.fill(replyText)
+    await replyInput.locator('xpath=ancestor::form[1]').getByRole('button', { name: 'Send', exact: true }).click()
+
+    await expect(page.getByText(replyText, { exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(row.getByText('1 reply', { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('sidebar unread filter hides already-read conversations', async ({ page }) => {
+    await page.goto('/messages')
+    await page.getByRole('button', { name: 'Team' }).click()
+    await expect(page.getByRole('button', { name: 'Team' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Unread', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Team' })).not.toBeVisible()
+
+    await page.getByRole('button', { name: 'All', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Team' })).toBeVisible()
   })
 })

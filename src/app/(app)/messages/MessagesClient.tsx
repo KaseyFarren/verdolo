@@ -9,6 +9,10 @@ import { FileIcon, ImageFileIcon, MessageCircleIcon, PaperclipIcon, PdfFileIcon,
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 const PAGE_SIZE = 50
+const GROUP_WINDOW_MS = 5 * 60 * 1000
+
+const MESSAGE_COLUMNS =
+  'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids, parent_message_id, reply_count, last_reply_at'
 
 type Member = {
   user_id: string
@@ -31,6 +35,9 @@ type Message = {
   attachment_size_bytes: number | null
   attachment_signed_url?: string | null
   mentioned_user_ids: string[]
+  parent_message_id: string | null
+  reply_count: number
+  last_reply_at: string | null
   reactions: Reaction[]
 }
 
@@ -84,21 +91,64 @@ function sameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString()
 }
 
-function patchMessage(
-  byThread: Record<string, Message[]>,
-  threadId: string,
-  messageId: string,
-  update: (m: Message) => Message
-) {
+function timeLabel(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function lastActivityLabel(dateStr: string) {
+  return sameDay(dateStr, new Date().toISOString()) ? timeLabel(dateStr) : `${dateLabel(dateStr)} at ${timeLabel(dateStr)}`
+}
+
+// A message is a visual "continuation" of the previous row (no repeated avatar/name/timestamp)
+// when it's the same sender, same day, and close enough in time - matches Slack's grouping.
+function showDateSeparatorAt(list: Message[], i: number) {
+  return i === 0 || !sameDay(list[i - 1].created_at, list[i].created_at)
+}
+function groupedAt(list: Message[], i: number, dateSeparator: boolean) {
+  if (dateSeparator || i === 0) return false
+  const prev = list[i - 1]
+  const cur = list[i]
+  if (prev.sender_id !== cur.sender_id) return false
+  return new Date(cur.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS
+}
+
+function patchMessage(byThread: Record<string, Message[]>, threadId: string, messageId: string, update: (m: Message) => Message) {
   const list = byThread[threadId]
-  if (!list) return byThread
+  if (!list || !list.some((m) => m.id === messageId)) return byThread
   return { ...byThread, [threadId]: list.map((m) => (m.id === messageId ? update(m) : m)) }
+}
+
+// Same idea as patchMessage but for the thread-panel store, which is keyed by parent message id
+// rather than thread id - scans each open thread's reply list for the message being patched.
+function patchReplyMessage(byParent: Record<string, Message[]>, messageId: string, update: (m: Message) => Message) {
+  for (const [parentId, list] of Object.entries(byParent)) {
+    if (list.some((m) => m.id === messageId)) {
+      return { ...byParent, [parentId]: list.map((m) => (m.id === messageId ? update(m) : m)) }
+    }
+  }
+  return byParent
+}
+
+function withResolvedAttachments(list: Message[], urlByPath: Map<string, string>) {
+  return list.map((m) => (m.attachment_path && urlByPath.has(m.attachment_path) ? { ...m, attachment_signed_url: urlByPath.get(m.attachment_path) } : m))
+}
+
+function computeMentionResults(text: string, contacts: Member[]): MentionOption[] {
+  const match = text.match(MENTION_TRIGGER)
+  const query = match?.[1] ?? null
+  if (query === null) return []
+  return [
+    ...(ALL_MENTION_NAME.includes(query.toLowerCase()) || 'everyone'.includes(query.toLowerCase())
+      ? [{ id: ALL_MENTION_ID, name: ALL_MENTION_NAME, isAll: true }]
+      : []),
+    ...contacts.filter((c) => memberName(c).toLowerCase().includes(query.toLowerCase())).map((c) => ({ id: c.user_id, name: memberName(c), avatar_url: c.avatar_url })),
+  ]
 }
 
 // Splits a message body on any mentioned member's "@Name" (longest names first, so "Sam" can't
 // shadow a match inside "Sam Osei") plus a literal "@all" token, and wraps matches in a
 // highlighted span.
-function renderBody(m: Message, memberMap: Map<string, Member>, userId: string) {
+function renderBody(m: Message, memberMap: Map<string, Member>) {
   if (!m.mentioned_user_ids?.length) return m.body
   const names = [...new Set(m.mentioned_user_ids.map((id) => memberName(memberMap.get(id))).filter((n) => n && n !== '-'))].sort(
     (a, b) => b.length - a.length
@@ -114,7 +164,7 @@ function renderBody(m: Message, memberMap: Map<string, Member>, userId: string) 
   while ((match = pattern.exec(m.body))) {
     if (match.index > lastIndex) parts.push(m.body.slice(lastIndex, match.index))
     parts.push(
-      <span key={match.index} className={`font-semibold ${m.sender_id === userId ? 'text-white' : 'text-accent'}`}>
+      <span key={match.index} className="font-semibold text-accent">
         @{match[1]}
       </span>
     )
@@ -129,26 +179,32 @@ function renderBody(m: Message, memberMap: Map<string, Member>, userId: string) 
 // updates (send/react/realtime) only ever replace the object reference for the message that
 // actually changed (see patchMessage above), so React.memo's default shallow prop comparison is
 // enough to skip the rest.
-const MessageBubble = memo(function MessageBubble({
+const MessageRow = memo(function MessageRow({
   m,
-  own,
+  grouped,
   avatarUrl,
   senderName,
   showDateSeparator,
   userId,
   memberMap,
+  showThreadIndicator,
+  allowThreadReply,
   onToggleReaction,
   onOpenAttachment,
+  onOpenThread,
 }: {
   m: Message
-  own: boolean
+  grouped: boolean
   avatarUrl: string | null
   senderName: string
   showDateSeparator: boolean
   userId: string
   memberMap: Map<string, Member>
+  showThreadIndicator: boolean
+  allowThreadReply: boolean
   onToggleReaction: (m: Message, emoji: string) => void
   onOpenAttachment: (m: Message) => void
+  onOpenThread: (m: Message) => void
 }) {
   const reactionGroups = useMemo(() => {
     const groups = new Map<string, Reaction[]>()
@@ -156,7 +212,7 @@ const MessageBubble = memo(function MessageBubble({
     return groups
   }, [m.reactions])
 
-  const bodyNodes = useMemo(() => renderBody(m, memberMap, userId), [m, memberMap, userId])
+  const bodyNodes = useMemo(() => renderBody(m, memberMap), [m, memberMap])
 
   return (
     <div>
@@ -165,71 +221,58 @@ const MessageBubble = memo(function MessageBubble({
           <span className="text-xs text-sage bg-sand rounded-full px-3 py-1">{dateLabel(m.created_at)}</span>
         </div>
       )}
-      <div className={`group flex gap-2 py-1.5 ${own ? 'justify-end' : 'justify-start'}`}>
-        {!own &&
-          (avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover shrink-0 self-end" />
+      <div className={`group relative flex gap-2.5 px-2 rounded-lg hover:bg-sand/50 ${grouped ? 'py-0.5' : 'pt-2.5 pb-0.5'}`}>
+        <div className="w-8 shrink-0 flex justify-center">
+          {!grouped ? (
+            avatarUrl ? (
+              <img src={avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+            ) : (
+              <span className="h-8 w-8 rounded-full bg-green/15 text-green text-[11px] font-medium flex items-center justify-center shrink-0">
+                {getInitials(senderName)}
+              </span>
+            )
           ) : (
-            <span className="h-6 w-6 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0 self-end">
-              {getInitials(senderName)}
-            </span>
-          ))}
-        <div className={`max-w-[75%] ${own ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
-          <span className="text-xs text-sage px-1">{senderName}</span>
-          <div className="relative">
-            <div
-              className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                own ? 'bg-accent text-white' : 'bg-sand text-ink'
-              }`}
-            >
-              {m.body && <div>{bodyNodes}</div>}
-              {m.attachment_path &&
-                (m.attachment_type?.startsWith('image/') ? (
-                  m.attachment_signed_url ? (
-                    <img
-                      src={m.attachment_signed_url}
-                      alt={m.attachment_name ?? ''}
-                      className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-2' : ''}`}
-                      onClick={() => onOpenAttachment(m)}
-                    />
-                  ) : (
-                    <div className={`text-xs opacity-70 ${m.body ? 'mt-2' : ''}`}>Loading image…</div>
-                  )
-                ) : (
-                  <button
-                    onClick={() => onOpenAttachment(m)}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
-                      own ? 'bg-white/15 hover:bg-white/25' : 'bg-white hover:shadow-sm'
-                    } ${m.body ? 'mt-2' : ''}`}
-                  >
-                    <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-xs font-medium truncate max-w-[140px]">{m.attachment_name}</span>
-                      <span className={`text-[10px] ${own ? 'opacity-70' : 'text-sage'}`}>{formatFileSize(m.attachment_size_bytes)}</span>
-                    </span>
-                  </button>
-                ))}
-            </div>
+            <span className="hidden group-hover:flex h-5 items-center justify-center text-[10px] text-sage w-8">{timeLabel(m.created_at)}</span>
+          )}
+        </div>
 
-            <div
-              className={`absolute top-0 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-full px-1.5 py-1 z-10 ${
-                own ? 'right-full mr-1' : 'left-full ml-1'
-              }`}
-            >
-              {QUICK_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => onToggleReaction(m, emoji)}
-                  className="text-sm leading-none hover:scale-125 transition-transform"
-                >
-                  {emoji}
-                </button>
-              ))}
+        <div className="min-w-0 flex-1">
+          {!grouped && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-semibold text-ink">{senderName}</span>
+              <span className="text-[11px] text-sage">{timeLabel(m.created_at)}</span>
             </div>
-          </div>
+          )}
+
+          {m.body && <div className="text-sm text-ink whitespace-pre-wrap break-words">{bodyNodes}</div>}
+
+          {m.attachment_path &&
+            (m.attachment_type?.startsWith('image/') ? (
+              m.attachment_signed_url ? (
+                <img
+                  src={m.attachment_signed_url}
+                  alt={m.attachment_name ?? ''}
+                  className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-1.5' : ''}`}
+                  onClick={() => onOpenAttachment(m)}
+                />
+              ) : (
+                <div className={`text-xs text-sage ${m.body ? 'mt-1.5' : ''}`}>Loading image…</div>
+              )
+            ) : (
+              <button
+                onClick={() => onOpenAttachment(m)}
+                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left bg-sand hover:shadow-sm ${m.body ? 'mt-1.5' : ''}`}
+              >
+                <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
+                <span className="flex flex-col leading-tight">
+                  <span className="text-xs font-medium truncate max-w-[220px]">{m.attachment_name}</span>
+                  <span className="text-[10px] text-sage">{formatFileSize(m.attachment_size_bytes)}</span>
+                </span>
+              </button>
+            ))}
 
           {reactionGroups.size > 0 && (
-            <div className="flex flex-wrap gap-1 px-1">
+            <div className="flex flex-wrap gap-1 mt-1">
               {[...reactionGroups.entries()].map(([emoji, reacts]) => {
                 const mine = reacts.some((r) => r.user_id === userId)
                 return (
@@ -248,14 +291,155 @@ const MessageBubble = memo(function MessageBubble({
             </div>
           )}
 
-          <span className="text-[10px] text-sage px-1">
-            {new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-          </span>
+          {showThreadIndicator && m.reply_count > 0 && (
+            <button
+              onClick={() => onOpenThread(m)}
+              className="mt-1 flex items-center gap-1.5 text-xs text-accent hover:underline"
+            >
+              <MessageCircleIcon size={13} />
+              <span className="font-medium">
+                {m.reply_count} {m.reply_count === 1 ? 'reply' : 'replies'}
+              </span>
+              {m.last_reply_at && <span className="text-sage font-normal">Last reply {lastActivityLabel(m.last_reply_at)}</span>}
+            </button>
+          )}
+        </div>
+
+        <div className="absolute -top-3 right-2 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-lg border border-ink/10 px-1 py-1 z-10">
+          {QUICK_EMOJIS.map((emoji) => (
+            <button key={emoji} onClick={() => onToggleReaction(m, emoji)} className="text-sm leading-none hover:scale-125 transition-transform px-0.5">
+              {emoji}
+            </button>
+          ))}
+          {allowThreadReply && (
+            <>
+              <span className="w-px h-4 bg-ink/10 mx-0.5" />
+              <button onClick={() => onOpenThread(m)} title="Reply in thread" className="text-sage hover:text-ink px-0.5">
+                <MessageCircleIcon size={15} />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
   )
 })
+
+function MessageComposer({
+  draft,
+  setDraft,
+  pendingFile,
+  setPendingFile,
+  sending,
+  onSubmit,
+  mentionQuery,
+  mentionResults,
+  onInsertMention,
+  placeholder,
+  disabled,
+}: {
+  draft: string
+  setDraft: React.Dispatch<React.SetStateAction<string>>
+  pendingFile: File | null
+  setPendingFile: (f: File | null) => void
+  sending: boolean
+  onSubmit: () => void
+  mentionQuery: string | null
+  mentionResults: MentionOption[]
+  onInsertMention: (option: MentionOption) => void
+  placeholder: string
+  disabled: boolean
+}) {
+  return (
+    <>
+      {pendingFile && (
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-lg bg-sand px-2.5 py-1.5 text-xs">
+          <AttachmentTypeIcon fileName={pendingFile.name} size={14} />
+          <span className="truncate flex-1">{pendingFile.name}</span>
+          <span className="text-sage">{formatFileSize(pendingFile.size)}</span>
+          <button onClick={() => setPendingFile(null)} className="text-sage hover:text-ink">
+            <XIcon size={13} />
+          </button>
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSubmit()
+        }}
+        className="border-t border-ink/10 p-3 flex gap-2 items-center"
+      >
+        <label className="shrink-0 text-sage hover:text-ink cursor-pointer p-1.5">
+          <PaperclipIcon size={18} />
+          <input
+            type="file"
+            className="hidden"
+            disabled={sending}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) {
+                if (file.size > MAX_ATTACHMENT_BYTES) {
+                  toast.error(`That file is too large - attachments are limited to ${formatFileSize(MAX_ATTACHMENT_BYTES)}`)
+                } else {
+                  setPendingFile(file)
+                }
+              }
+              e.target.value = ''
+            }}
+          />
+        </label>
+        <div className="relative flex-1">
+          {mentionQuery !== null && mentionResults.length > 0 && (
+            <div className="absolute bottom-full mb-1 left-0 w-56 max-h-48 overflow-y-auto rounded-lg border border-ink/10 bg-white shadow-md py-1 z-10">
+              {mentionResults.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onInsertMention(c)}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-sand flex items-center gap-2"
+                >
+                  {c.isAll ? (
+                    <span className="h-5 w-5 rounded-full bg-accent/15 text-accent text-xs font-bold flex items-center justify-center shrink-0">@</span>
+                  ) : c.avatar_url ? (
+                    <img src={c.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <span className="h-5 w-5 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0">
+                      {getInitials(c.name)}
+                    </span>
+                  )}
+                  <span className="truncate">{c.isAll ? 'Everyone' : c.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && mentionQuery !== null && mentionResults.length > 0) {
+                e.preventDefault()
+                onInsertMention(mentionResults[0])
+              }
+            }}
+            placeholder={placeholder}
+            className="w-full rounded-lg border border-ink/15 px-3 py-2 text-sm outline-none focus:border-accent"
+            disabled={disabled}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={(!draft.trim() && !pendingFile) || disabled || sending}
+          className="rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:pointer-events-none hover:brightness-110 transition"
+        >
+          {sending ? 'Sending…' : 'Send'}
+        </button>
+      </form>
+    </>
+  )
+}
+
+type SidebarFilter = 'all' | 'unread' | 'mentions'
 
 export default function MessagesClient({
   orgId,
@@ -294,11 +478,25 @@ export default function MessagesClient({
   const [mentionCandidates, setMentionCandidates] = useState<MentionOption[]>([])
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [sending, setSending] = useState(false)
+  const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>('all')
+
+  const [openThreadParentId, setOpenThreadParentId] = useState<string | null>(null)
+  const [repliesByParent, setRepliesByParent] = useState<Record<string, Message[]>>({})
+  const [loadingThread, setLoadingThread] = useState(false)
+  const [threadDraft, setThreadDraft] = useState('')
+  const [threadMentionCandidates, setThreadMentionCandidates] = useState<MentionOption[]>([])
+  const [threadPendingFile, setThreadPendingFile] = useState<File | null>(null)
+  const [threadSending, setThreadSending] = useState(false)
+
   const scrollRef = useRef<HTMLDivElement>(null)
+  const threadScrollRef = useRef<HTMLDivElement>(null)
   const activeThreadIdRef = useRef(activeThreadId)
   const loadedThreads = useRef(new Set<string>())
+  const loadedThreadParents = useRef(new Set<string>())
   const messagesByThreadRef = useRef(messagesByThread)
   const isLoadingOlderRef = useRef(false)
+
+  const activeIsTeam = activeThreadId === teamThreadId
 
   useEffect(() => {
     messagesByThreadRef.current = messagesByThread
@@ -317,25 +515,41 @@ export default function MessagesClient({
     [supabase, userId]
   )
 
+  // Generic image-attachment resolver: fetches signed URLs then hands the map to whichever
+  // store (main channel list or thread-panel replies) the caller wants patched.
   const resolveImageAttachments = useCallback(
-    async (threadId: string, msgs: Message[]) => {
+    async (msgs: Message[], apply: (urlByPath: Map<string, string>) => void) => {
       const imagePaths = msgs.filter((m) => m.attachment_path && m.attachment_type?.startsWith('image/')).map((m) => m.attachment_path!)
       if (imagePaths.length === 0) return
       const { data } = await supabase.storage.from('message-attachments').createSignedUrls(imagePaths, 3600)
       if (!data) return
-      const urlByPath = new Map(data.map((d) => [d.path, d.signedUrl]))
-      setMessagesByThread((prev) => {
-        const list = prev[threadId]
-        if (!list) return prev
-        return {
-          ...prev,
-          [threadId]: list.map((m) =>
-            m.attachment_path && urlByPath.has(m.attachment_path) ? { ...m, attachment_signed_url: urlByPath.get(m.attachment_path) } : m
-          ),
-        }
-      })
+      apply(new Map(data.filter((d): d is typeof d & { path: string; signedUrl: string } => Boolean(d.path && d.signedUrl)).map((d) => [d.path, d.signedUrl])))
     },
     [supabase]
+  )
+
+  const resolveMainImageAttachments = useCallback(
+    (threadId: string, msgs: Message[]) =>
+      resolveImageAttachments(msgs, (urlByPath) =>
+        setMessagesByThread((prev) => {
+          const list = prev[threadId]
+          if (!list) return prev
+          return { ...prev, [threadId]: withResolvedAttachments(list, urlByPath) }
+        })
+      ),
+    [resolveImageAttachments]
+  )
+
+  const resolveThreadImageAttachments = useCallback(
+    (parentId: string, msgs: Message[]) =>
+      resolveImageAttachments(msgs, (urlByPath) =>
+        setRepliesByParent((prev) => {
+          const list = prev[parentId]
+          if (!list) return prev
+          return { ...prev, [parentId]: withResolvedAttachments(list, urlByPath) }
+        })
+      ),
+    [resolveImageAttachments]
   )
 
   const fetchReactionsFor = useCallback(
@@ -353,18 +567,18 @@ export default function MessagesClient({
     [supabase]
   )
 
-  // Loads only the latest PAGE_SIZE messages - a long-lived thread's full history used to be
-  // fetched on every open, which only gets slower as a thread grows. "Load older" (below) pages
-  // further back on demand instead.
+  // Loads only the latest PAGE_SIZE top-level messages - a long-lived thread's full history used
+  // to be fetched on every open, which only gets slower as a thread grows. "Load older" (below)
+  // pages further back on demand instead. Replies are excluded here - they only load into the
+  // thread panel when opened.
   const loadThread = useCallback(
     async (threadId: string) => {
       setLoading(true)
       const { data: msgs } = await supabase
         .from('messages')
-        .select(
-          'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
-        )
+        .select(MESSAGE_COLUMNS)
         .eq('thread_id', threadId)
+        .is('parent_message_id', null)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
       const ordered = (msgs ?? []).slice().reverse()
@@ -374,9 +588,9 @@ export default function MessagesClient({
       setMessagesByThread((prev) => ({ ...prev, [threadId]: full }))
       setHasMoreOlderByThread((prev) => ({ ...prev, [threadId]: (msgs ?? []).length >= PAGE_SIZE }))
       setLoading(false)
-      resolveImageAttachments(threadId, full)
+      resolveMainImageAttachments(threadId, full)
     },
-    [supabase, fetchReactionsFor, resolveImageAttachments]
+    [supabase, fetchReactionsFor, resolveMainImageAttachments]
   )
 
   const loadOlderMessages = useCallback(
@@ -390,10 +604,9 @@ export default function MessagesClient({
 
       const { data: msgs } = await supabase
         .from('messages')
-        .select(
-          'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids'
-        )
+        .select(MESSAGE_COLUMNS)
         .eq('thread_id', threadId)
+        .is('parent_message_id', null)
         .lt('created_at', oldest.created_at)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
@@ -403,7 +616,7 @@ export default function MessagesClient({
 
       setMessagesByThread((prev) => ({ ...prev, [threadId]: [...older, ...(prev[threadId] ?? [])] }))
       setHasMoreOlderByThread((prev) => ({ ...prev, [threadId]: older.length >= PAGE_SIZE }))
-      resolveImageAttachments(threadId, older)
+      resolveMainImageAttachments(threadId, older)
 
       requestAnimationFrame(() => {
         if (container) container.scrollTop += container.scrollHeight - prevScrollHeight
@@ -411,7 +624,21 @@ export default function MessagesClient({
         setLoadingOlder(false)
       })
     },
-    [supabase, fetchReactionsFor, resolveImageAttachments, loadingOlder]
+    [supabase, fetchReactionsFor, resolveMainImageAttachments, loadingOlder]
+  )
+
+  const loadThreadReplies = useCallback(
+    async (parentId: string) => {
+      setLoadingThread(true)
+      const { data: msgs } = await supabase.from('messages').select(MESSAGE_COLUMNS).eq('parent_message_id', parentId).order('created_at', { ascending: true })
+      const reactionsByMessage = await fetchReactionsFor((msgs ?? []).map((m) => m.id))
+      const full: Message[] = (msgs ?? []).map((m) => ({ ...m, reactions: reactionsByMessage.get(m.id) ?? [] }))
+      loadedThreadParents.current.add(parentId)
+      setRepliesByParent((prev) => ({ ...prev, [parentId]: full }))
+      setLoadingThread(false)
+      resolveThreadImageAttachments(parentId, full)
+    },
+    [supabase, fetchReactionsFor, resolveThreadImageAttachments]
   )
 
   useEffect(() => {
@@ -422,6 +649,7 @@ export default function MessagesClient({
       setLoading(false)
     }
     markRead(activeThreadId)
+    setOpenThreadParentId(null)
   }, [activeThreadId, loadThread, markRead])
 
   useEffect(() => {
@@ -434,15 +662,33 @@ export default function MessagesClient({
         if (incoming.mentioned_user_ids?.includes(userId)) {
           setLastMentionAtByThread((prev) => ({ ...prev, [incoming.thread_id]: incoming.created_at }))
         }
-        setMessagesByThread((prev) => {
-          if (!loadedThreads.current.has(incoming.thread_id)) return prev
-          const list = prev[incoming.thread_id] ?? []
-          if (list.some((m) => m.id === incoming.id)) return prev
-          return { ...prev, [incoming.thread_id]: [...list, withReactions] }
-        })
-        if (incoming.attachment_path && incoming.attachment_type?.startsWith('image/')) {
-          resolveImageAttachments(incoming.thread_id, [withReactions])
+
+        if (incoming.parent_message_id) {
+          const parentId = incoming.parent_message_id
+          setMessagesByThread((prev) =>
+            patchMessage(prev, incoming.thread_id, parentId, (m) => ({ ...m, reply_count: m.reply_count + 1, last_reply_at: incoming.created_at }))
+          )
+          setRepliesByParent((prev) => {
+            if (!loadedThreadParents.current.has(parentId)) return prev
+            const list = prev[parentId] ?? []
+            if (list.some((m) => m.id === incoming.id)) return prev
+            return { ...prev, [parentId]: [...list, withReactions] }
+          })
+          if (incoming.attachment_path && incoming.attachment_type?.startsWith('image/')) {
+            resolveThreadImageAttachments(parentId, [withReactions])
+          }
+        } else {
+          setMessagesByThread((prev) => {
+            if (!loadedThreads.current.has(incoming.thread_id)) return prev
+            const list = prev[incoming.thread_id] ?? []
+            if (list.some((m) => m.id === incoming.id)) return prev
+            return { ...prev, [incoming.thread_id]: [...list, withReactions] }
+          })
+          if (incoming.attachment_path && incoming.attachment_type?.startsWith('image/')) {
+            resolveMainImageAttachments(incoming.thread_id, [withReactions])
+          }
         }
+
         if (incoming.thread_id === activeThreadIdRef.current) {
           markRead(incoming.thread_id)
         }
@@ -452,11 +698,10 @@ export default function MessagesClient({
         { event: 'INSERT', schema: 'public', table: 'message_reactions', filter: `org_id=eq.${orgId}` },
         (payload) => {
           const r = payload.new as { id: string; message_id: string; thread_id: string; emoji: string; user_id: string }
-          setMessagesByThread((prev) =>
-            patchMessage(prev, r.thread_id, r.message_id, (m) =>
-              m.reactions.some((x) => x.id === r.id) ? m : { ...m, reactions: [...m.reactions, { id: r.id, emoji: r.emoji, user_id: r.user_id }] }
-            )
-          )
+          const apply = (m: Message) =>
+            m.reactions.some((x) => x.id === r.id) ? m : { ...m, reactions: [...m.reactions, { id: r.id, emoji: r.emoji, user_id: r.user_id }] }
+          setMessagesByThread((prev) => patchMessage(prev, r.thread_id, r.message_id, apply))
+          setRepliesByParent((prev) => patchReplyMessage(prev, r.message_id, apply))
         }
       )
       .on(
@@ -464,9 +709,9 @@ export default function MessagesClient({
         { event: 'DELETE', schema: 'public', table: 'message_reactions', filter: `org_id=eq.${orgId}` },
         (payload) => {
           const old = payload.old as { id: string; thread_id: string; message_id: string }
-          setMessagesByThread((prev) =>
-            patchMessage(prev, old.thread_id, old.message_id, (m) => ({ ...m, reactions: m.reactions.filter((x) => x.id !== old.id) }))
-          )
+          const apply = (m: Message) => ({ ...m, reactions: m.reactions.filter((x) => x.id !== old.id) })
+          setMessagesByThread((prev) => patchMessage(prev, old.thread_id, old.message_id, apply))
+          setRepliesByParent((prev) => patchReplyMessage(prev, old.message_id, apply))
         }
       )
       .subscribe()
@@ -514,6 +759,10 @@ export default function MessagesClient({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messagesByThread, activeThreadId])
 
+  useEffect(() => {
+    threadScrollRef.current?.scrollTo({ top: threadScrollRef.current.scrollHeight })
+  }, [repliesByParent, openThreadParentId])
+
   function unread(threadId: string | null | undefined) {
     if (!threadId) return false
     const lastMessage = lastMessageAtByThread[threadId]
@@ -528,6 +777,12 @@ export default function MessagesClient({
     if (!lastMention) return false
     const lastRead = lastReadAtByThread[threadId]
     return !lastRead || new Date(lastRead) < new Date(lastMention)
+  }
+
+  function passesSidebarFilter(threadId: string | null | undefined) {
+    if (sidebarFilter === 'all') return true
+    if (sidebarFilter === 'unread') return unread(threadId)
+    return hasUnreadMention(threadId)
   }
 
   function openTeamChannel() {
@@ -551,78 +806,144 @@ export default function MessagesClient({
     setActiveThreadId(data)
   }
 
+  const insertMessage = useCallback(
+    async ({
+      body,
+      pendingFile: file,
+      mentionCandidates: candidates,
+      threadId,
+      parentId,
+    }: {
+      body: string
+      pendingFile: File | null
+      mentionCandidates: MentionOption[]
+      threadId: string
+      parentId?: string
+    }): Promise<Message | null> => {
+      let attachment: Pick<Message, 'attachment_path' | 'attachment_name' | 'attachment_type' | 'attachment_size_bytes'> | null = null
+      if (file) {
+        const path = `${threadId}/${Date.now()}-${file.name}`
+        const { error: uploadError } = await supabase.storage.from('message-attachments').upload(path, file)
+        if (uploadError) {
+          toast.error('File upload failed')
+          return null
+        }
+        attachment = { attachment_path: path, attachment_name: file.name, attachment_type: file.type || null, attachment_size_bytes: file.size }
+      }
+
+      const mentionedUserIds = new Set<string>()
+      for (const c of candidates) {
+        if (!body.includes(`@${c.name}`)) continue
+        if (c.id === ALL_MENTION_ID) {
+          if (activeIsTeam) {
+            for (const m of members) if (m.user_id !== userId) mentionedUserIds.add(m.user_id)
+          } else if (activeContactId) {
+            mentionedUserIds.add(activeContactId)
+          }
+        } else {
+          mentionedUserIds.add(c.id)
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          thread_id: threadId,
+          org_id: orgId,
+          sender_id: userId,
+          body,
+          mentioned_user_ids: [...mentionedUserIds],
+          parent_message_id: parentId ?? null,
+          ...(attachment ?? {}),
+        })
+        .select()
+        .single()
+      if (error) {
+        toast.error('Message failed to send')
+        return null
+      }
+      return { ...(data as Omit<Message, 'reactions'>), reactions: [] }
+    },
+    [supabase, activeIsTeam, members, userId, activeContactId, orgId]
+  )
+
   async function send() {
     const body = draft.trim()
     if ((!body && !pendingFile) || !activeThreadId || sending) return
     setSending(true)
-
-    let attachment: Pick<Message, 'attachment_path' | 'attachment_name' | 'attachment_type' | 'attachment_size_bytes'> | null = null
-    if (pendingFile) {
-      const path = `${activeThreadId}/${Date.now()}-${pendingFile.name}`
-      const { error: uploadError } = await supabase.storage.from('message-attachments').upload(path, pendingFile)
-      if (uploadError) {
-        toast.error('File upload failed')
-        setSending(false)
-        return
-      }
-      attachment = {
-        attachment_path: path,
-        attachment_name: pendingFile.name,
-        attachment_type: pendingFile.type || null,
-        attachment_size_bytes: pendingFile.size,
-      }
-    }
-
-    const mentionedUserIds = new Set<string>()
-    for (const c of mentionCandidates) {
-      if (!body.includes(`@${c.name}`)) continue
-      if (c.id === ALL_MENTION_ID) {
-        if (activeIsTeam) {
-          for (const m of members) if (m.user_id !== userId) mentionedUserIds.add(m.user_id)
-        } else if (activeContactId) {
-          mentionedUserIds.add(activeContactId)
-        }
-      } else {
-        mentionedUserIds.add(c.id)
-      }
-    }
-
+    const savedDraft = body
+    const savedFile = pendingFile
+    const savedMentions = mentionCandidates
     setDraft('')
     setPendingFile(null)
     setMentionCandidates([])
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ thread_id: activeThreadId, org_id: orgId, sender_id: userId, body, mentioned_user_ids: [...mentionedUserIds], ...(attachment ?? {}) })
-      .select()
-      .single()
+
+    const full = await insertMessage({ body, pendingFile, mentionCandidates, threadId: activeThreadId })
     setSending(false)
-    if (error) {
-      toast.error('Message failed to send')
-      setDraft(body)
+    if (!full) {
+      setDraft(savedDraft)
+      setPendingFile(savedFile)
+      setMentionCandidates(savedMentions)
       return
     }
-    const full: Message = { ...(data as Omit<Message, 'reactions'>), reactions: [] }
     setMessagesByThread((prev) => {
       const list = prev[activeThreadId] ?? []
       if (list.some((m) => m.id === full.id)) return prev
       return { ...prev, [activeThreadId]: [...list, full] }
     })
     if (full.attachment_path && full.attachment_type?.startsWith('image/')) {
-      resolveImageAttachments(activeThreadId, [full])
+      resolveMainImageAttachments(activeThreadId, [full])
     }
     markRead(activeThreadId)
   }
 
-  // useCallback'd (stable identity across renders) so MessageBubble - memoized below - doesn't
+  async function sendReply(parentId: string) {
+    const body = threadDraft.trim()
+    if ((!body && !threadPendingFile) || !activeThreadId || threadSending) return
+    setThreadSending(true)
+    const savedDraft = body
+    const savedFile = threadPendingFile
+    const savedMentions = threadMentionCandidates
+    setThreadDraft('')
+    setThreadPendingFile(null)
+    setThreadMentionCandidates([])
+
+    const full = await insertMessage({ body, pendingFile: threadPendingFile, mentionCandidates: threadMentionCandidates, threadId: activeThreadId, parentId })
+    setThreadSending(false)
+    if (!full) {
+      setThreadDraft(savedDraft)
+      setThreadPendingFile(savedFile)
+      setThreadMentionCandidates(savedMentions)
+      return
+    }
+    setRepliesByParent((prev) => {
+      const list = prev[parentId] ?? []
+      if (list.some((m) => m.id === full.id)) return prev
+      return { ...prev, [parentId]: [...list, full] }
+    })
+    if (full.attachment_path && full.attachment_type?.startsWith('image/')) {
+      resolveThreadImageAttachments(parentId, [full])
+    }
+    markRead(activeThreadId)
+  }
+
+  function openThread(m: Message) {
+    setOpenThreadParentId(m.id)
+    if (!loadedThreadParents.current.has(m.id)) {
+      loadThreadReplies(m.id)
+    }
+  }
+
+  // useCallback'd (stable identity across renders) so MessageRow - memoized below - doesn't
   // re-render every message row just because its parent re-rendered for an unrelated reason.
   const toggleReaction = useCallback(
     async (message: Message, emoji: string) => {
       if (!activeThreadId) return
       const mine = message.reactions.find((r) => r.emoji === emoji && r.user_id === userId)
       if (mine) {
-        setMessagesByThread((prev) =>
-          patchMessage(prev, activeThreadId, message.id, (m) => ({ ...m, reactions: m.reactions.filter((r) => r.id !== mine.id) }))
-        )
+        const apply = (m: Message) => ({ ...m, reactions: m.reactions.filter((r) => r.id !== mine.id) })
+        setMessagesByThread((prev) => patchMessage(prev, activeThreadId, message.id, apply))
+        setRepliesByParent((prev) => patchReplyMessage(prev, message.id, apply))
         await supabase.from('message_reactions').delete().eq('id', mine.id)
       } else {
         const { data, error } = await supabase
@@ -631,11 +952,9 @@ export default function MessagesClient({
           .select()
           .single()
         if (!error && data) {
-          setMessagesByThread((prev) =>
-            patchMessage(prev, activeThreadId, message.id, (m) =>
-              m.reactions.some((r) => r.id === data.id) ? m : { ...m, reactions: [...m.reactions, { id: data.id, emoji: data.emoji, user_id: data.user_id }] }
-            )
-          )
+          const apply = (m: Message) => (m.reactions.some((r) => r.id === data.id) ? m : { ...m, reactions: [...m.reactions, { id: data.id, emoji: data.emoji, user_id: data.user_id }] })
+          setMessagesByThread((prev) => patchMessage(prev, activeThreadId, message.id, apply))
+          setRepliesByParent((prev) => patchReplyMessage(prev, message.id, apply))
         } else if (error) {
           toast.error('Could not add reaction')
         }
@@ -666,27 +985,25 @@ export default function MessagesClient({
     return memberMap.get(senderId)?.avatar_url ?? null
   }
 
-  function insertMention(option: MentionOption) {
-    setDraft((prev) => prev.replace(MENTION_TRIGGER, (m) => (m.startsWith(' ') ? ' ' : '') + `@${option.name} `))
-    setMentionCandidates((prev) => [...prev, option])
+  function insertMention(option: MentionOption, setDraftFn: React.Dispatch<React.SetStateAction<string>>, setCandidatesFn: React.Dispatch<React.SetStateAction<MentionOption[]>>) {
+    setDraftFn((prev) => prev.replace(MENTION_TRIGGER, (m) => (m.startsWith(' ') ? ' ' : '') + `@${option.name} `))
+    setCandidatesFn((prev) => [...prev, option])
   }
 
-
-  const activeIsTeam = activeThreadId === teamThreadId
   const messages = (activeThreadId && messagesByThread[activeThreadId]) || []
   const mentionMatch = draft.match(MENTION_TRIGGER)
   const mentionQuery = mentionMatch?.[1] ?? null
-  const mentionResults: MentionOption[] =
-    mentionQuery !== null
-      ? [
-          ...(ALL_MENTION_NAME.includes(mentionQuery.toLowerCase()) || 'everyone'.includes(mentionQuery.toLowerCase())
-            ? [{ id: ALL_MENTION_ID, name: ALL_MENTION_NAME, isAll: true }]
-            : []),
-          ...contacts
-            .filter((c) => memberName(c).toLowerCase().includes(mentionQuery.toLowerCase()))
-            .map((c) => ({ id: c.user_id, name: memberName(c), avatar_url: c.avatar_url })),
-        ]
-      : []
+  const mentionResults = computeMentionResults(draft, contacts)
+
+  const threadMentionMatch = threadDraft.match(MENTION_TRIGGER)
+  const threadMentionQuery = threadMentionMatch?.[1] ?? null
+  const threadMentionResults = computeMentionResults(threadDraft, contacts)
+
+  const openThreadParent = openThreadParentId ? messages.find((m) => m.id === openThreadParentId) ?? null : null
+  const threadReplies = openThreadParentId ? repliesByParent[openThreadParentId] ?? [] : []
+
+  const visibleContacts = contacts.filter((c) => passesSidebarFilter(dmThreads[c.user_id]))
+  const teamVisible = passesSidebarFilter(teamThreadId)
 
   return (
     <div className="mb-6">
@@ -696,26 +1013,45 @@ export default function MessagesClient({
       </div>
 
       <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[420px]">
-        <aside className="w-48 shrink-0 rounded-2xl bg-white shadow-md p-2 overflow-y-auto">
-          <button
-            onClick={openTeamChannel}
-            className={`w-full text-left rounded-lg px-3 py-2 mb-1 text-sm flex items-center gap-2 transition-colors ${
-              activeIsTeam ? 'bg-accent text-white font-medium' : 'text-ink hover:bg-sand'
-            }`}
-          >
-            <MessageCircleIcon size={15} />
-            <span className="flex-1">Team</span>
-            {!activeIsTeam && hasUnreadMention(teamThreadId) && (
-              <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
-            )}
-            {!activeIsTeam && !hasUnreadMention(teamThreadId) && unread(teamThreadId) && (
-              <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
-            )}
-          </button>
+        <aside className="w-56 shrink-0 rounded-2xl bg-white shadow-md p-2 overflow-y-auto">
+          <div className="flex items-center gap-0.5 rounded-lg bg-sand p-0.5 mb-2">
+            {(['all', 'unread', 'mentions'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setSidebarFilter(f)}
+                className={`flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
+                  sidebarFilter === f ? 'bg-white text-ink shadow-sm' : 'text-sage hover:text-ink'
+                }`}
+              >
+                {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : '@Mentions'}
+              </button>
+            ))}
+          </div>
+
+          {teamVisible && (
+            <button
+              onClick={openTeamChannel}
+              className={`w-full text-left rounded-lg px-3 py-2 mb-1 text-sm flex items-center gap-2 transition-colors ${
+                activeIsTeam ? 'bg-accent text-white font-medium' : 'text-ink hover:bg-sand'
+              }`}
+            >
+              <MessageCircleIcon size={15} />
+              <span className="flex-1">Team</span>
+              {!activeIsTeam && hasUnreadMention(teamThreadId) && (
+                <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
+              )}
+              {!activeIsTeam && !hasUnreadMention(teamThreadId) && unread(teamThreadId) && (
+                <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+              )}
+            </button>
+          )}
 
           <div className="px-3 pt-3 pb-1 text-xs font-medium text-sage tracking-wide">Direct messages</div>
           {contacts.length === 0 && <div className="px-3 py-2 text-xs text-sage">No other teammates yet</div>}
-          {contacts.map((c) => {
+          {contacts.length > 0 && visibleContacts.length === 0 && !teamVisible && (
+            <div className="px-3 py-2 text-xs text-sage">{sidebarFilter === 'unread' ? 'No unread conversations' : 'No unread mentions'}</div>
+          )}
+          {visibleContacts.map((c) => {
             const active = !activeIsTeam && activeContactId === c.user_id
             const threadId = dmThreads[c.user_id]
             return (
@@ -743,12 +1079,10 @@ export default function MessagesClient({
           })}
         </aside>
 
-        <section className="flex-1 rounded-2xl bg-white shadow-md flex flex-col overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1">
-            {loading && <div className="text-sm text-sage">Loading…</div>}
-            {!loading && messages.length === 0 && (
-              <div className="text-sm text-sage">No messages yet. Say hi!</div>
-            )}
+        <section className="flex-1 min-w-0 rounded-2xl bg-white shadow-md flex flex-col overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-0.5">
+            {loading && <div className="text-sm text-sage px-2">Loading…</div>}
+            {!loading && messages.length === 0 && <div className="text-sm text-sage px-2">No messages yet. Say hi!</div>}
             {!loading && activeThreadId && hasMoreOlderByThread[activeThreadId] && (
               <button
                 onClick={() => loadOlderMessages(activeThreadId)}
@@ -758,108 +1092,115 @@ export default function MessagesClient({
                 {loadingOlder ? 'Loading…' : 'Load older messages'}
               </button>
             )}
-            {messages.map((m, i) => (
-              <MessageBubble
-                key={m.id}
-                m={m}
-                own={m.sender_id === userId}
-                avatarUrl={senderAvatar(m.sender_id)}
-                senderName={senderLabel(m.sender_id)}
-                showDateSeparator={i === 0 || !sameDay(messages[i - 1].created_at, m.created_at)}
-                userId={userId}
-                memberMap={memberMap}
-                onToggleReaction={toggleReaction}
-                onOpenAttachment={openAttachment}
-              />
-            ))}
+            {messages.map((m, i) => {
+              const showDateSeparator = showDateSeparatorAt(messages, i)
+              return (
+                <MessageRow
+                  key={m.id}
+                  m={m}
+                  grouped={groupedAt(messages, i, showDateSeparator)}
+                  avatarUrl={senderAvatar(m.sender_id)}
+                  senderName={senderLabel(m.sender_id)}
+                  showDateSeparator={showDateSeparator}
+                  userId={userId}
+                  memberMap={memberMap}
+                  showThreadIndicator
+                  allowThreadReply
+                  onToggleReaction={toggleReaction}
+                  onOpenAttachment={openAttachment}
+                  onOpenThread={openThread}
+                />
+              )
+            })}
           </div>
 
-          {pendingFile && (
-            <div className="mx-3 mb-2 flex items-center gap-2 rounded-lg bg-sand px-2.5 py-1.5 text-xs">
-              <AttachmentTypeIcon fileName={pendingFile.name} size={14} />
-              <span className="truncate flex-1">{pendingFile.name}</span>
-              <span className="text-sage">{formatFileSize(pendingFile.size)}</span>
-              <button onClick={() => setPendingFile(null)} className="text-sage hover:text-ink">
-                <XIcon size={13} />
+          <MessageComposer
+            draft={draft}
+            setDraft={setDraft}
+            pendingFile={pendingFile}
+            setPendingFile={setPendingFile}
+            sending={sending}
+            onSubmit={send}
+            mentionQuery={mentionQuery}
+            mentionResults={mentionResults}
+            onInsertMention={(c) => insertMention(c, setDraft, setMentionCandidates)}
+            placeholder={activeIsTeam ? 'Message the team… (@ to mention)' : 'Type a message…'}
+            disabled={!activeThreadId}
+          />
+        </section>
+
+        {openThreadParentId && (
+          <section className="w-[380px] shrink-0 rounded-2xl bg-white shadow-md flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-3 border-b border-ink/10">
+              <span className="text-sm font-semibold text-ink">Thread</span>
+              <button onClick={() => setOpenThreadParentId(null)} className="text-sage hover:text-ink p-1">
+                <XIcon size={16} />
               </button>
             </div>
-          )}
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              send()
-            }}
-            className="border-t border-ink/10 p-3 flex gap-2 items-center"
-          >
-            <label className="shrink-0 text-sage hover:text-ink cursor-pointer p-1.5">
-              <PaperclipIcon size={18} />
-              <input
-                type="file"
-                className="hidden"
-                disabled={sending}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    if (file.size > MAX_ATTACHMENT_BYTES) {
-                      toast.error(`That file is too large - attachments are limited to ${formatFileSize(MAX_ATTACHMENT_BYTES)}`)
-                    } else {
-                      setPendingFile(file)
-                    }
-                  }
-                  e.target.value = ''
-                }}
-              />
-            </label>
-            <div className="relative flex-1">
-              {mentionQuery !== null && mentionResults.length > 0 && (
-                <div className="absolute bottom-full mb-1 left-0 w-56 max-h-48 overflow-y-auto rounded-lg border border-ink/10 bg-white shadow-md py-1 z-10">
-                  {mentionResults.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => insertMention(c)}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-sand flex items-center gap-2"
-                    >
-                      {c.isAll ? (
-                        <span className="h-5 w-5 rounded-full bg-accent/15 text-accent text-xs font-bold flex items-center justify-center shrink-0">
-                          @
-                        </span>
-                      ) : c.avatar_url ? (
-                        <img src={c.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <span className="h-5 w-5 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0">
-                          {getInitials(c.name)}
-                        </span>
-                      )}
-                      <span className="truncate">{c.isAll ? 'Everyone' : c.name}</span>
-                    </button>
-                  ))}
-                </div>
+            <div ref={threadScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-0.5">
+              {loadingThread && <div className="text-sm text-sage px-2">Loading…</div>}
+              {!loadingThread && openThreadParent && (
+                <>
+                  <MessageRow
+                    m={openThreadParent}
+                    grouped={false}
+                    avatarUrl={senderAvatar(openThreadParent.sender_id)}
+                    senderName={senderLabel(openThreadParent.sender_id)}
+                    showDateSeparator={false}
+                    userId={userId}
+                    memberMap={memberMap}
+                    showThreadIndicator={false}
+                    allowThreadReply={false}
+                    onToggleReaction={toggleReaction}
+                    onOpenAttachment={openAttachment}
+                    onOpenThread={() => {}}
+                  />
+                  <div className="flex items-center gap-2 my-2 px-2">
+                    <span className="text-xs font-medium text-sage">
+                      {threadReplies.length} {threadReplies.length === 1 ? 'reply' : 'replies'}
+                    </span>
+                    <span className="flex-1 h-px bg-ink/10" />
+                  </div>
+                  {threadReplies.map((m, i) => {
+                    const showDateSeparator = showDateSeparatorAt(threadReplies, i)
+                    return (
+                      <MessageRow
+                        key={m.id}
+                        m={m}
+                        grouped={groupedAt(threadReplies, i, showDateSeparator)}
+                        avatarUrl={senderAvatar(m.sender_id)}
+                        senderName={senderLabel(m.sender_id)}
+                        showDateSeparator={showDateSeparator}
+                        userId={userId}
+                        memberMap={memberMap}
+                        showThreadIndicator={false}
+                        allowThreadReply={false}
+                        onToggleReaction={toggleReaction}
+                        onOpenAttachment={openAttachment}
+                        onOpenThread={() => {}}
+                      />
+                    )
+                  })}
+                </>
               )}
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && mentionQuery !== null && mentionResults.length > 0) {
-                    e.preventDefault()
-                    insertMention(mentionResults[0])
-                  }
-                }}
-                placeholder={activeIsTeam ? 'Message the team… (@ to mention)' : 'Type a message…'}
-                className="w-full rounded-lg border border-ink/15 px-3 py-2 text-sm outline-none focus:border-accent"
-                disabled={!activeThreadId}
-              />
             </div>
-            <button
-              type="submit"
-              disabled={(!draft.trim() && !pendingFile) || !activeThreadId || sending}
-              className="rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:pointer-events-none hover:brightness-110 transition"
-            >
-              {sending ? 'Sending…' : 'Send'}
-            </button>
-          </form>
-        </section>
+
+            <MessageComposer
+              draft={threadDraft}
+              setDraft={setThreadDraft}
+              pendingFile={threadPendingFile}
+              setPendingFile={setThreadPendingFile}
+              sending={threadSending}
+              onSubmit={() => openThreadParentId && sendReply(openThreadParentId)}
+              mentionQuery={threadMentionQuery}
+              mentionResults={threadMentionResults}
+              onInsertMention={(c) => insertMention(c, setThreadDraft, setThreadMentionCandidates)}
+              placeholder="Reply…"
+              disabled={!activeThreadId}
+            />
+          </section>
+        )}
       </div>
     </div>
   )
