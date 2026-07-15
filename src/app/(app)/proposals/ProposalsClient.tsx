@@ -160,7 +160,12 @@ export default function ProposalsClient({
 
   async function setStatus(p: Proposal, status: Status) {
     const patch: Partial<Proposal> = { status }
-    if (status === 'sent') patch.sent_at = new Date().toISOString()
+    // Reopening (signed/declined -> sent) should clear the old decision timestamp,
+    // otherwise a proposal back in play would still show a stale decided_at.
+    if (status === 'sent') {
+      patch.sent_at = new Date().toISOString()
+      patch.decided_at = null
+    }
     if (status === 'signed' || status === 'declined') patch.decided_at = new Date().toISOString()
     const { data } = await supabase.from('proposals').update(patch).eq('id', p.id).select().single()
     if (data) setProposals((prev) => prev.map((x) => (x.id === p.id ? (data as Proposal) : x)))
@@ -395,6 +400,11 @@ export default function ProposalsClient({
                             Declined
                           </button>
                         </>
+                      )}
+                      {(p.status === 'signed' || p.status === 'declined') && (
+                        <button className="text-xs text-sage hover:text-ink" onClick={() => setStatus(p, 'sent')}>
+                          Reopen
+                        </button>
                       )}
                       <button className="text-xs text-sage hover:text-ink" onClick={() => startEdit(p)}>
                         Edit
