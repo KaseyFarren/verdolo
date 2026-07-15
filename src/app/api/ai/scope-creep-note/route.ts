@@ -147,7 +147,11 @@ export async function POST(request: Request) {
       },
       brandVoice,
     })
-    const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+    const result = await callClaude(
+      apiKey,
+      { model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] },
+      { orgId, route: 'scope-creep-note' }
+    )
     const txt = extractText(result).replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(txt) as { note: string; clientMessage: string }
     return NextResponse.json({ note: parsed.note, clientMessage: parsed.clientMessage })

@@ -62,7 +62,11 @@ export async function POST(request: Request) {
     : [{ type: 'text', text: prompt }]
 
   try {
-    const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content }] })
+    const result = await callClaude(
+      apiKey,
+      { model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content }] },
+      { orgId, route: 'tasks-from-doc' }
+    )
     const txt = extractText(result)
     const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim())
     const tasks: ExtractedTask[] = Array.isArray(parsed.tasks)

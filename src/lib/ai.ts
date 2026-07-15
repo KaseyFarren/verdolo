@@ -1,3 +1,5 @@
+import { createAdminClient } from '@/lib/supabase/admin'
+
 type ClientCtx = {
   name: string
   business?: string | null
@@ -14,7 +16,42 @@ type PriorContext = {
   recentlyCompleted?: string[]
 }
 
-export async function callClaude(apiKey: string, body: Record<string, unknown>) {
+// $ per 1M tokens. Numerically identical to micros-per-token, which is what cost_micros wants -
+// see the migration comment. Keep in sync with the model strings actually used in src/app/api/ai/*.
+const MODEL_PRICING_PER_MTOK: Record<string, { input: number; output: number }> = {
+  'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
+  'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
+}
+
+// Fire-and-forget would risk the insert getting cut off when the serverless function returns,
+// so this is awaited - but errors are swallowed so a logging hiccup never fails a generation
+// the org already spent a credit on.
+async function logAiUsage(params: { orgId: string; route: string; model: string; usage?: { input_tokens?: number; output_tokens?: number } }) {
+  try {
+    const inputTokens = params.usage?.input_tokens ?? 0
+    const outputTokens = params.usage?.output_tokens ?? 0
+    const pricing = MODEL_PRICING_PER_MTOK[params.model]
+    const costMicros = pricing ? Math.round(inputTokens * pricing.input + outputTokens * pricing.output) : null
+    const admin = createAdminClient()
+    const { error } = await admin.from('ai_usage_log').insert({
+      org_id: params.orgId,
+      route: params.route,
+      model: params.model,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_micros: costMicros,
+    })
+    if (error) console.error('ai_usage_log insert failed:', error)
+  } catch (e) {
+    console.error('ai_usage_log logging error:', e)
+  }
+}
+
+export async function callClaude(
+  apiKey: string,
+  body: Record<string, unknown>,
+  log?: { orgId: string; route: string }
+) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -25,7 +62,11 @@ export async function callClaude(apiKey: string, body: Record<string, unknown>) 
     body: JSON.stringify(body),
   })
   if (!r.ok) throw new Error(`Anthropic API error: ${r.status}`)
-  return r.json()
+  const json = await r.json()
+  if (log) {
+    await logAiUsage({ orgId: log.orgId, route: log.route, model: body.model as string, usage: json.usage })
+  }
+  return json
 }
 
 export function extractText(response: { content?: { text?: string }[] }) {

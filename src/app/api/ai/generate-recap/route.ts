@@ -82,7 +82,11 @@ export async function POST(request: Request) {
 
   try {
     const prompt = buildRecapPrompt({ periodType, periodStart: start, periodEnd: end, today, clientSummaries: summaries, brandVoice })
-    const result = await callClaude(apiKey, { model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+    const result = await callClaude(
+      apiKey,
+      { model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] },
+      { orgId, route: 'generate-recap' }
+    )
     const recap = extractText(result)
     await supabase
       .from('reports')

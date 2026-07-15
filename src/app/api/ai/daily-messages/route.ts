@@ -84,7 +84,11 @@ export async function POST(request: Request) {
 
   try {
     const prompt = buildDailyMessagesPrompt(clientsWithContext, brandVoice)
-    const result = await callClaude(apiKey, { model: 'claude-haiku-4-5-20251001', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] })
+    const result = await callClaude(
+      apiKey,
+      { model: 'claude-haiku-4-5-20251001', max_tokens: 1200, messages: [{ role: 'user', content: prompt }] },
+      { orgId, route: 'daily-messages' }
+    )
     const txt = extractText(result)
     const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim())
     return NextResponse.json({ messages: parsed.messages || [] })
