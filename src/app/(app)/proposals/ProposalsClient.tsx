@@ -60,6 +60,7 @@ export default function ProposalsClient({
   const [statusFilter, setStatusFilter] = useState<Status | ''>('')
   const [clientFilter, setClientFilter] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -163,6 +164,65 @@ export default function ProposalsClient({
     if (status === 'signed' || status === 'declined') patch.decided_at = new Date().toISOString()
     const { data } = await supabase.from('proposals').update(patch).eq('id', p.id).select().single()
     if (data) setProposals((prev) => prev.map((x) => (x.id === p.id ? (data as Proposal) : x)))
+
+    // A signed proposal means the prospect converted - move them off the Lead stage
+    // automatically so Clients doesn't need a manual follow-up step for the same event.
+    if (status === 'signed') {
+      const client = clientList.find((c) => c.id === p.client_id)
+      if (client) {
+        const { data: full } = await supabase.from('clients').select('stage').eq('id', client.id).single()
+        if (full?.stage === 'Lead') {
+          await supabase.from('clients').update({ stage: 'Active' }).eq('id', client.id)
+        }
+      }
+    }
+  }
+
+  function startEdit(p: Proposal) {
+    setEditingId(p.id)
+    setForm({
+      client_id: p.client_id,
+      title: p.title,
+      amount: p.amount_cents > 0 ? String(centsToDollars(p.amount_cents)) : '',
+      notes: p.notes ?? '',
+      doc_url: p.doc_url ?? '',
+    })
+    setClientMode('existing')
+    setShowAdd(true)
+  }
+
+  function cancelForm() {
+    setShowAdd(false)
+    setEditingId(null)
+    setForm(emptyForm)
+    setNewClientName('')
+    setClientMode('existing')
+  }
+
+  async function saveEdit() {
+    if (!editingId || !form.title.trim() || !form.client_id) return
+    setSaving(true)
+    const { data, error } = await supabase
+      .from('proposals')
+      .update({
+        client_id: form.client_id,
+        title: form.title.trim(),
+        amount_cents: dollarsToCents(form.amount || '0'),
+        notes: form.notes.trim() || null,
+        doc_url: form.doc_url.trim() || null,
+      })
+      .eq('id', editingId)
+      .select()
+      .single()
+    setSaving(false)
+    if (error) {
+      toast.error('Failed to update proposal')
+      return
+    }
+    const updated = data as Proposal
+    setProposals((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+    cancelForm()
+    toast.success('Proposal updated')
   }
 
   async function deleteProposal(p: Proposal) {
@@ -186,7 +246,13 @@ export default function ProposalsClient({
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Proposals</h1>
         {canEdit && (
-          <Button variant="primary" size="lg" className="rounded-full" data-tour="new-proposal-button" onClick={() => setShowAdd((v) => !v)}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="rounded-full"
+            data-tour="new-proposal-button"
+            onClick={() => (showAdd ? cancelForm() : setShowAdd(true))}
+          >
             {showAdd ? 'Cancel' : '+ New proposal'}
           </Button>
         )}
@@ -194,22 +260,24 @@ export default function ProposalsClient({
 
       {showAdd && (
         <div className="rounded-2xl bg-white shadow-md p-5 mb-5 space-y-3">
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setClientMode('existing')}
-              className={`px-3 py-1 rounded-full text-xs border ${clientMode === 'existing' ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
-            >
-              Existing client
-            </button>
-            <button
-              type="button"
-              onClick={() => setClientMode('new')}
-              className={`px-3 py-1 rounded-full text-xs border ${clientMode === 'new' ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
-            >
-              New prospect
-            </button>
-          </div>
+          {!editingId && (
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setClientMode('existing')}
+                className={`px-3 py-1 rounded-full text-xs border ${clientMode === 'existing' ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
+              >
+                Existing client
+              </button>
+              <button
+                type="button"
+                onClick={() => setClientMode('new')}
+                className={`px-3 py-1 rounded-full text-xs border ${clientMode === 'new' ? 'bg-accent text-white border-accent' : 'border-ink/15 text-sage'}`}
+              >
+                New prospect
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {clientMode === 'existing' ? (
               <CustomSelect
@@ -247,7 +315,9 @@ export default function ProposalsClient({
               onChange={(e) => setForm((f) => ({ ...f, doc_url: e.target.value }))}
             />
           </div>
-          {clientMode === 'new' && <div className="text-xs text-sage/70 -mt-1">Adds them to Clients as a Lead so they show up in the pipeline too.</div>}
+          {!editingId && clientMode === 'new' && (
+            <div className="text-xs text-sage/70 -mt-1">Adds them to Clients as a Lead so they show up in the pipeline too.</div>
+          )}
           <textarea
             className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px]"
             placeholder="Notes (optional)"
@@ -256,10 +326,10 @@ export default function ProposalsClient({
           />
           <Button
             variant="primary"
-            onClick={addProposal}
+            onClick={editingId ? saveEdit : addProposal}
             disabled={saving || !form.title.trim() || (clientMode === 'existing' ? !form.client_id : !newClientName.trim())}
           >
-            {saving ? 'Saving…' : 'Create proposal'}
+            {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create proposal'}
           </Button>
         </div>
       )}
@@ -326,6 +396,9 @@ export default function ProposalsClient({
                           </button>
                         </>
                       )}
+                      <button className="text-xs text-sage hover:text-ink" onClick={() => startEdit(p)}>
+                        Edit
+                      </button>
                       <button className="text-xs text-sage hover:text-red-600" onClick={() => deleteProposal(p)}>
                         Delete
                       </button>
