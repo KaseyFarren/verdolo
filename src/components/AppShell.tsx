@@ -146,16 +146,8 @@ export default function AppShell({
               })}
             </nav>
             <div className="px-4 py-4 border-t border-cream/10">
-              <div className="flex items-start gap-2 mb-3">
-                <span
-                  className="flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[11px] font-heading font-bold text-white"
-                  style={{ background: 'var(--accent)' }}
-                >
-                  {userEmail.charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1 text-xs text-cream/50 break-all leading-snug pt-0.5" title={userEmail}>
-                  {userEmail}
-                </div>
+              <div className="text-xs text-cream/50 truncate mb-3" title={userEmail}>
+                {userEmail}
               </div>
               <div className="flex items-center gap-3">
                 <button
