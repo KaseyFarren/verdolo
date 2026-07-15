@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { AVATAR_COLORS, formatDate, getInitials, memberName, todayKey } from '@/lib/agency'
 import { periodBounds, type PeriodValue } from '@/lib/period'
+import { markSelfAssigned } from '@/lib/selfNotify'
 import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -14,8 +15,12 @@ import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
 
+// Sentinel task-select value that reveals the inline "new task" title field, instead of picking
+// an existing task.
+const NEW_TASK_VALUE = '__new_task__'
+
 type Client = { id: string; name: string; billing_mode?: string | null }
-type Task = { id: string; title: string; client_id: string | null }
+type Task = { id: string; title: string; client_id: string | null; due_date?: string | null; is_auto?: boolean; recurring_id?: string | null }
 type Entry = {
   id: string
   client_id: string | null
@@ -152,18 +157,35 @@ export default function TimeClient({
     router.push(qs ? `/time?${qs}` : '/time')
   }
 
+  // Tasks created inline from the "+ New task" option, before `tasks`/`allTasks` catch up via
+  // router.refresh() - merged into the dropdown options and title lookups below so a just-created
+  // task shows up immediately instead of blinking blank until the server round trip lands.
+  const [extraTasks, setExtraTasks] = useState<Task[]>([])
+  const mergedAllTasks = useMemo(() => {
+    const known = new Set(allTasks.map((t) => t.id))
+    const fresh = extraTasks.filter((t) => !known.has(t.id))
+    return fresh.length ? [...allTasks, ...fresh] : allTasks
+  }, [allTasks, extraTasks])
+  const mergedOpenTasks = useMemo(() => {
+    const known = new Set(tasks.map((t) => t.id))
+    const fresh = extraTasks.filter((t) => !known.has(t.id))
+    return fresh.length ? [...tasks, ...fresh] : tasks
+  }, [tasks, extraTasks])
+
   const [timerClientId, setTimerClientId] = useState('')
   const [timerTaskId, setTimerTaskId] = useState('')
+  const [timerNewTaskTitle, setTimerNewTaskTitle] = useState('')
   const [timerNote, setTimerNote] = useState('')
   const [starting, setStarting] = useState(false)
 
-  const [showManual, setShowManual] = useState(false)
   const [manualClientId, setManualClientId] = useState('')
   const [manualTaskId, setManualTaskId] = useState('')
+  const [manualNewTaskTitle, setManualNewTaskTitle] = useState('')
   const [manualDate, setManualDate] = useState(todayKey())
   const [manualHours, setManualHours] = useState('')
   const [manualNote, setManualNote] = useState('')
   const [manualBillable, setManualBillable] = useState(true)
+  const [savingManual, setSavingManual] = useState(false)
 
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set([todayKey().slice(0, 7)]))
   function toggleMonth(month: string) {
@@ -195,12 +217,42 @@ export default function TimeClient({
   // so the entry is orphaned but kept - time_entries.client_id is ON DELETE SET NULL to preserve
   // billable/reporting history. Label it clearly instead of a bare '-'.
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name || 'No client'
-  const taskTitle = (id: string | null) => allTasks.find((t) => t.id === id)?.title || null
+  const taskTitle = (id: string | null) => mergedAllTasks.find((t) => t.id === id)?.title || null
   const memberEmail = (id: string) => memberName(members.find((m) => m.user_id === id))
+
+  // Creates a task on the fly from the "+ New task" option, assigned to whoever's logging the
+  // time. Used by both the timer and manual entry forms, right before the time_entries insert.
+  async function createInlineTask(clientId: string, title: string): Promise<Task | null> {
+    const id = crypto.randomUUID()
+    markSelfAssigned(id)
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({ id, org_id: orgId, client_id: clientId, title: title.trim(), due_date: todayKey(), assigned_to: userId, assignee_ids: [userId], done: false })
+      .select()
+      .single()
+    if (error || !data) {
+      toast.error('Could not create that task')
+      return null
+    }
+    const task = data as Task
+    setExtraTasks((prev) => [...prev, task])
+    router.refresh()
+    return task
+  }
 
   async function startTimer() {
     if (!timerClientId) return
+    if (timerTaskId === NEW_TASK_VALUE && !timerNewTaskTitle.trim()) return
     setStarting(true)
+    let taskId = timerTaskId === NEW_TASK_VALUE ? null : timerTaskId || null
+    if (timerTaskId === NEW_TASK_VALUE) {
+      const newTask = await createInlineTask(timerClientId, timerNewTaskTitle)
+      if (!newTask) {
+        setStarting(false)
+        return
+      }
+      taskId = newTask.id
+    }
     // Optimistic: id is client-generated so we can show the running timer before the round-trip
     // and reconcile with the server row once it lands.
     const id = crypto.randomUUID()
@@ -208,7 +260,7 @@ export default function TimeClient({
       id,
       org_id: orgId,
       client_id: timerClientId,
-      task_id: timerTaskId || null,
+      task_id: taskId,
       user_id: userId,
       started_at: new Date().toISOString(),
       note: timerNote || null,
@@ -216,6 +268,8 @@ export default function TimeClient({
     }
     const optimisticEntry: Entry = { ...insertRow, ended_at: null, duration_seconds: null }
     setEntries((prev) => [optimisticEntry, ...prev])
+    setTimerTaskId(taskId || '')
+    setTimerNewTaskTitle('')
     const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
     if (error) {
       setEntries((prev) => prev.filter((e) => e.id !== id))
@@ -244,6 +298,7 @@ export default function TimeClient({
     )
     setTimerClientId('')
     setTimerTaskId('')
+    setTimerNewTaskTitle('')
     setTimerNote('')
     const { data, error } = await supabase.from('time_entries').update(fields).eq('id', stoppedId).select().single()
     if (error) {
@@ -257,6 +312,17 @@ export default function TimeClient({
   async function addManualEntry() {
     const hours = parseFloat(manualHours)
     if (!manualClientId || !hours || hours <= 0) return
+    if (manualTaskId === NEW_TASK_VALUE && !manualNewTaskTitle.trim()) return
+    setSavingManual(true)
+    let taskId = manualTaskId === NEW_TASK_VALUE ? null : manualTaskId || null
+    if (manualTaskId === NEW_TASK_VALUE) {
+      const newTask = await createInlineTask(manualClientId, manualNewTaskTitle)
+      if (!newTask) {
+        setSavingManual(false)
+        return
+      }
+      taskId = newTask.id
+    }
     const startedAt = `${manualDate}T12:00:00`
     const durationSeconds = Math.round(hours * 3600)
     const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString()
@@ -266,7 +332,7 @@ export default function TimeClient({
       id,
       org_id: orgId,
       client_id: manualClientId,
-      task_id: manualTaskId || null,
+      task_id: taskId,
       user_id: userId,
       started_at: startedAt,
       ended_at: endedAt,
@@ -278,9 +344,10 @@ export default function TimeClient({
     setEntries((prev) => [optimisticEntry, ...prev])
     setManualClientId('')
     setManualTaskId('')
+    setManualNewTaskTitle('')
     setManualHours('')
     setManualNote('')
-    setShowManual(false)
+    setSavingManual(false)
     const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
     if (error) {
       setEntries((prev) => prev.filter((e) => e.id !== id))
@@ -528,8 +595,14 @@ export default function TimeClient({
         .sort((a, b) => b.seconds - a.seconds)
     : []
 
-  const timerTasks = tasks.filter((t) => t.client_id === timerClientId)
-  const manualTasks = tasks.filter((t) => t.client_id === manualClientId)
+  // Auto/recurring tasks (e.g. a daily check-in) get generated a day ahead so they're visible on
+  // the Tasks page before they're due - that means today's *and* tomorrow's instance both exist
+  // as open tasks at once. Logging time only ever makes sense against the current one, so these
+  // two pickers hide any auto/recurring instance not yet due.
+  const today = todayKey()
+  const isFutureAutoInstance = (t: Task) => !!(t.is_auto || t.recurring_id) && !!t.due_date && t.due_date > today
+  const timerTasks = mergedOpenTasks.filter((t) => t.client_id === timerClientId && !isFutureAutoInstance(t))
+  const manualTasks = mergedOpenTasks.filter((t) => t.client_id === manualClientId && !isFutureAutoInstance(t))
 
   const monthGroups: { month: string; label: string; totalSeconds: number; days: { date: string; items: Entry[] }[] }[] = []
   for (const e of completed) {
@@ -693,16 +766,33 @@ export default function TimeClient({
                 onChange={(v) => {
                   setTimerClientId(v)
                   setTimerTaskId('')
+                  setTimerNewTaskTitle('')
                 }}
                 options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
               />
               <CustomSelect
                 value={timerTaskId}
-                onChange={setTimerTaskId}
+                onChange={(v) => {
+                  setTimerTaskId(v)
+                  if (v !== NEW_TASK_VALUE) setTimerNewTaskTitle('')
+                }}
                 disabled={!timerClientId}
-                options={[{ value: '', label: 'No task' }, ...timerTasks.map((t) => ({ value: t.id, label: t.title }))]}
+                options={[
+                  { value: '', label: 'No task' },
+                  { value: NEW_TASK_VALUE, label: '+ New task' },
+                  ...timerTasks.map((t) => ({ value: t.id, label: t.title })),
+                ]}
               />
             </div>
+            {timerTaskId === NEW_TASK_VALUE && (
+              <input
+                autoFocus
+                className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+                placeholder="New task title…"
+                value={timerNewTaskTitle}
+                onChange={(e) => setTimerNewTaskTitle(e.target.value)}
+              />
+            )}
             <input
               className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-3"
               placeholder="What are you working on? (optional)"
@@ -712,7 +802,7 @@ export default function TimeClient({
             <button
               className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
               onClick={startTimer}
-              disabled={!timerClientId || starting}
+              disabled={!timerClientId || starting || (timerTaskId === NEW_TASK_VALUE && !timerNewTaskTitle.trim())}
             >
               ▶ Start
             </button>
@@ -720,55 +810,69 @@ export default function TimeClient({
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold tracking-wide text-sage">Log time manually</div>
-        <button className="text-xs text-sage" onClick={() => setShowManual((v) => !v)}>
-          {showManual ? 'Cancel' : '+ Add'}
+      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
+        <div className="text-xs font-semibold tracking-wide text-sage mb-2">Log time manually</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <CustomSelect
+            value={manualClientId}
+            onChange={(v) => {
+              setManualClientId(v)
+              setManualTaskId('')
+              setManualNewTaskTitle('')
+            }}
+            options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+          />
+          <CustomSelect
+            value={manualTaskId}
+            onChange={(v) => {
+              setManualTaskId(v)
+              if (v !== NEW_TASK_VALUE) setManualNewTaskTitle('')
+            }}
+            disabled={!manualClientId}
+            options={[
+              { value: '', label: 'No task' },
+              { value: NEW_TASK_VALUE, label: '+ New task' },
+              ...manualTasks.map((t) => ({ value: t.id, label: t.title })),
+            ]}
+          />
+          <DatePicker value={manualDate} onChange={setManualDate} placeholder="Date" allowClear={false} />
+          <input
+            type="number"
+            step="0.25"
+            min="0"
+            className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            placeholder="Hours (e.g. 1.5)"
+            value={manualHours}
+            onChange={(e) => setManualHours(e.target.value)}
+          />
+        </div>
+        {manualTaskId === NEW_TASK_VALUE && (
+          <input
+            autoFocus
+            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+            placeholder="New task title…"
+            value={manualNewTaskTitle}
+            onChange={(e) => setManualNewTaskTitle(e.target.value)}
+          />
+        )}
+        <input
+          className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
+          placeholder="Note (optional)"
+          value={manualNote}
+          onChange={(e) => setManualNote(e.target.value)}
+        />
+        <label className="flex items-center gap-2 text-sm mb-3">
+          <input type="checkbox" checked={manualBillable} onChange={(e) => setManualBillable(e.target.checked)} />
+          Billable
+        </label>
+        <button
+          className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+          onClick={addManualEntry}
+          disabled={!manualClientId || !manualHours || savingManual || (manualTaskId === NEW_TASK_VALUE && !manualNewTaskTitle.trim())}
+        >
+          Save entry
         </button>
       </div>
-      {showManual && (
-        <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-            <CustomSelect
-              value={manualClientId}
-              onChange={(v) => {
-                setManualClientId(v)
-                setManualTaskId('')
-              }}
-              options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
-            />
-            <CustomSelect
-              value={manualTaskId}
-              onChange={setManualTaskId}
-              disabled={!manualClientId}
-              options={[{ value: '', label: 'No task' }, ...manualTasks.map((t) => ({ value: t.id, label: t.title }))]}
-            />
-            <DatePicker value={manualDate} onChange={setManualDate} placeholder="Date" allowClear={false} />
-            <input
-              type="number"
-              step="0.25"
-              min="0"
-              className="rounded border border-ink/10 bg-white px-2 py-2 text-sm"
-              placeholder="Hours (e.g. 1.5)"
-              value={manualHours}
-              onChange={(e) => setManualHours(e.target.value)}
-            />
-          </div>
-          <input
-            className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
-            placeholder="Note (optional)"
-            value={manualNote}
-            onChange={(e) => setManualNote(e.target.value)}
-          />
-          <label className="flex items-center gap-2 text-sm mb-3">
-            <input type="checkbox" checked={manualBillable} onChange={(e) => setManualBillable(e.target.checked)} />
-            Billable
-          </label>
-          <button className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium" onClick={addManualEntry}>
-            Save entry
-          </button>
-        </div>
-      )}
 
       <div className="mb-6">
         <div className="text-xs font-semibold tracking-wide text-sage mb-2">Filter</div>

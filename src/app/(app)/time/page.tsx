@@ -34,7 +34,7 @@ export default async function TimePage({
   // it (TimeClient's summary math already treats an empty archivedTotals array as zero).
   const [{ data: clients }, { data: openTasks }, { data: allTasks }, { data: entries }, { data: members }, { data: archivedTotals }] = await Promise.all([
     supabase.from('clients').select('id, name, billing_mode').eq('org_id', orgId).order('name'),
-    supabase.from('tasks').select('id, title, client_id').eq('org_id', orgId).eq('done', false),
+    supabase.from('tasks').select('id, title, client_id, due_date, is_auto, recurring_id').eq('org_id', orgId).eq('done', false),
     supabase.from('tasks').select('id, title, client_id').eq('org_id', orgId),
     entriesQuery,
     supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url, role, title').eq('org_id', orgId).eq('status', 'active'),
