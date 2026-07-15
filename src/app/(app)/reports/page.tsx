@@ -4,7 +4,7 @@ import { getWeekAnchor, todayKey } from '@/lib/agency'
 import { periodBounds, type Period } from '@/lib/period'
 import ReportsClient from './ReportsClient'
 
-export const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'custom']
+export const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'last_month', 'custom']
 
 function monthKeyBounds(y: number, m: number) {
   // m is 1-indexed

@@ -89,7 +89,7 @@ function reportLabel(r: Report) {
   return r.period_type === 'week' ? `Week of ${formatDate(r.period_start)}` : monthLabel(r.period_start)
 }
 
-const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'custom']
+const REPORT_RANGE_PRESETS: Period[] = ['this_week', 'last_week', 'this_month', 'last_month', 'custom']
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -147,9 +147,40 @@ export default function ReportsClient({
   const currencySign = currencySymbol(currency)
   const rangeLabel = periodBounds(range).label
   const router = useRouter()
+
+  // The recap card follows whichever preset is selected above - a custom range has no single
+  // matching report period, so it has nothing to show/generate here (the backfill widget in the
+  // library below still covers arbitrary weeks/months).
+  const recapPeriod = useMemo(() => {
+    switch (range.period) {
+      case 'this_week':
+        return { type: 'week' as const, start: weekAnchor, label: `Week of ${formatDate(weekAnchor)}` }
+      case 'last_week': {
+        const start = addDays(weekAnchor, -7)
+        return { type: 'week' as const, start, label: `Week of ${formatDate(start)}` }
+      }
+      case 'this_month': {
+        const start = `${todayKey().slice(0, 7)}-01`
+        return { type: 'month' as const, start, label: monthLabel(start) }
+      }
+      case 'last_month': {
+        const start = `${shiftMonth(todayKey().slice(0, 7), -1)}-01`
+        return { type: 'month' as const, start, label: monthLabel(start) }
+      }
+      default:
+        return null
+    }
+  }, [range.period, weekAnchor])
+
   const [view, setView] = useState<View>('overview')
-  const [recap, setRecap] = useState<string | null>(reports.find((r) => r.period_type === 'week' && r.period_start === weekAnchor)?.content ?? null)
+  // Optimistic override for whichever period's recap was just generated - keyed so a generate in
+  // one period (e.g. regenerating "last month" after switching away) never bleeds into another's
+  // display once `reports` catches up via router.refresh().
+  const [optimisticRecap, setOptimisticRecap] = useState<{ key: string; content: string } | null>(null)
   const [loadingRecap, setLoadingRecap] = useState(false)
+  const currentReport = recapPeriod ? reports.find((r) => r.period_type === recapPeriod.type && r.period_start === recapPeriod.start) : undefined
+  const recapKey = recapPeriod ? `${recapPeriod.type}:${recapPeriod.start}` : null
+  const displayedRecap = (recapKey && optimisticRecap?.key === recapKey ? optimisticRecap.content : currentReport?.content) ?? null
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [scopeNotes, setScopeNotes] = useState<Record<string, { note: string; clientMessage: string }>>({})
   const [loadingNote, setLoadingNote] = useState<string | null>(null)
@@ -173,17 +204,18 @@ export default function ReportsClient({
   }
 
   async function generateRecap() {
+    if (!recapPeriod) return
     setLoadingRecap(true)
     try {
       const res = await fetch('/api/ai/generate-recap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, periodType: 'week' }),
+        body: JSON.stringify({ orgId, periodType: recapPeriod.type, periodStart: recapPeriod.start }),
       })
       const body = await res.json()
       if (res.ok) {
-        setRecap(body.recap)
-        highlightReport(`week:${weekAnchor}`)
+        setOptimisticRecap({ key: `${recapPeriod.type}:${recapPeriod.start}`, content: body.recap })
+        highlightReport(`${recapPeriod.type}:${recapPeriod.start}`)
         router.refresh()
       } else {
         toast.error(body.error || 'Failed to generate recap')
@@ -516,34 +548,38 @@ export default function ReportsClient({
             <PeriodSelector layoutId="reports-range-active" value={range} onChange={onRangeChange} presets={REPORT_RANGE_PRESETS} />
           </div>
 
-          <div className="mb-8" data-tour="reports-recap">
-            <div className="text-xs font-semibold tracking-wide text-sage mb-2">Weekly overall recap</div>
-            {recap ? (
-              <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-xs font-semibold text-sage">Week of {formatDate(weekAnchor)}</div>
-                  <button className="text-xs text-sage hover:text-ink inline-flex items-center gap-1" onClick={generateRecap} disabled={loadingRecap}>
-                    <RefreshIcon size={12} /> Regenerate
-                  </button>
-                </div>
-                <div className="text-sm leading-relaxed text-ink">{loadingRecap ? 'Generating…' : recap}</div>
+          {recapPeriod && (
+            <div className="mb-8" data-tour="reports-recap">
+              <div className="text-xs font-semibold tracking-wide text-sage mb-2">
+                {recapPeriod.type === 'week' ? 'Weekly' : 'Monthly'} recap
               </div>
-            ) : (
-              <button
-                className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
-                onClick={generateRecap}
-                disabled={loadingRecap || !hasApiKey}
-              >
-                {loadingRecap ? (
-                  <><ClockIcon size={13} /> Generating recap…</>
-                ) : hasApiKey ? (
-                  <><SparkleIcon size={13} /> Generate weekly recap</>
-                ) : (
-                  'AI features aren’t configured on this deployment'
-                )}
-              </button>
-            )}
-          </div>
+              {displayedRecap ? (
+                <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-xs font-semibold text-sage">{recapPeriod.label}</div>
+                    <button className="text-xs text-sage hover:text-ink inline-flex items-center gap-1" onClick={generateRecap} disabled={loadingRecap}>
+                      <RefreshIcon size={12} /> Regenerate
+                    </button>
+                  </div>
+                  <div className="text-sm leading-relaxed text-ink">{loadingRecap ? 'Generating…' : displayedRecap}</div>
+                </div>
+              ) : (
+                <button
+                  className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                  onClick={generateRecap}
+                  disabled={loadingRecap || !hasApiKey}
+                >
+                  {loadingRecap ? (
+                    <><ClockIcon size={13} /> Generating recap…</>
+                  ) : hasApiKey ? (
+                    <><SparkleIcon size={13} /> Generate {recapPeriod.type === 'week' ? 'weekly' : 'monthly'} recap</>
+                  ) : (
+                    'AI features aren’t configured on this deployment'
+                  )}
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="mb-8">
             <div className="text-xs font-semibold tracking-wide text-sage mb-2">By client · {rangeLabel}</div>
