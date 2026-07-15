@@ -1,0 +1,43 @@
+#!/bin/sh
+# Blocks `git push` if local Supabase migrations haven't been applied to the
+# linked prod project yet (app deploys and db pushes are separate steps here).
+# Bypass in a real emergency: SKIP_MIGRATION_CHECK=1 git push
+#
+# This hook is tracked in .githooks/ and wired up via:
+#   git config core.hooksPath .githooks
+
+if [ -n "$SKIP_MIGRATION_CHECK" ]; then
+  echo "pre-push: skipping migration drift check (SKIP_MIGRATION_CHECK set)"
+  exit 0
+fi
+
+if [ ! -d supabase/migrations ]; then
+  exit 0
+fi
+
+if ! command -v npx >/dev/null 2>&1; then
+  echo "pre-push: npx not found, skipping migration drift check"
+  exit 0
+fi
+
+RESULT=$(npx supabase migration list --output-format json 2>/tmp/verdolo-migration-check.log)
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo "pre-push: warning - could not check migration status (network/auth issue), allowing push"
+  echo "  see /tmp/verdolo-migration-check.log for details"
+  exit 0
+fi
+
+PENDING=$(echo "$RESULT" | jq -r '[.migrations[] | select(.remote == "" or .remote == null)] | length')
+
+if [ "$PENDING" != "0" ]; then
+  echo ""
+  echo "pre-push BLOCKED: $PENDING local migration(s) have not been applied to prod."
+  echo "  Run: npx supabase db push"
+  echo "  Then re-run your push. (Bypass: SKIP_MIGRATION_CHECK=1 git push)"
+  echo ""
+  exit 1
+fi
+
+exit 0
