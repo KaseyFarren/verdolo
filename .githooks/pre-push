@@ -1,43 +1,74 @@
-#!/bin/sh
-# Blocks `git push` if local Supabase migrations haven't been applied to the
-# linked prod project yet (app deploys and db pushes are separate steps here).
-# Bypass in a real emergency: SKIP_MIGRATION_CHECK=1 git push
+#!/bin/bash
+# Blocks `git push` if local Supabase migrations or env vars haven't been
+# applied to prod yet (app deploys, db pushes, and env var pushes are all
+# separate steps here).
 #
 # This hook is tracked in .githooks/ and wired up via:
 #   git config core.hooksPath .githooks
 
+# --- Migration drift check ---
+# Bypass in a real emergency: SKIP_MIGRATION_CHECK=1 git push
 if [ -n "$SKIP_MIGRATION_CHECK" ]; then
   echo "pre-push: skipping migration drift check (SKIP_MIGRATION_CHECK set)"
-  exit 0
-fi
-
-if [ ! -d supabase/migrations ]; then
-  exit 0
-fi
-
-if ! command -v npx >/dev/null 2>&1; then
+elif [ ! -d supabase/migrations ]; then
+  :
+elif ! command -v npx >/dev/null 2>&1; then
   echo "pre-push: npx not found, skipping migration drift check"
-  exit 0
+else
+  RESULT=$(npx supabase migration list --output-format json 2>/tmp/verdolo-migration-check.log)
+  STATUS=$?
+
+  if [ $STATUS -ne 0 ]; then
+    echo "pre-push: warning - could not check migration status (network/auth issue), allowing push"
+    echo "  see /tmp/verdolo-migration-check.log for details"
+  else
+    PENDING=$(echo "$RESULT" | jq -r '[.migrations[] | select(.remote == "" or .remote == null)] | length')
+
+    if [ "$PENDING" != "0" ]; then
+      echo ""
+      echo "pre-push BLOCKED: $PENDING local migration(s) have not been applied to prod."
+      echo "  Run: npx supabase db push"
+      echo "  Then re-run your push. (Bypass: SKIP_MIGRATION_CHECK=1 git push)"
+      echo ""
+      exit 1
+    fi
+  fi
 fi
 
-RESULT=$(npx supabase migration list --output-format json 2>/tmp/verdolo-migration-check.log)
-STATUS=$?
+# --- Env var drift check ---
+# Compares keys in .env.local against Vercel's production env vars. Excludes
+# Vercel/Nx/Turbo system vars that are auto-injected, never manually added.
+# Bypass in a real emergency: SKIP_ENV_CHECK=1 git push
+if [ -n "$SKIP_ENV_CHECK" ]; then
+  echo "pre-push: skipping env var drift check (SKIP_ENV_CHECK set)"
+elif [ ! -f .env.local ]; then
+  :
+elif ! command -v npx >/dev/null 2>&1; then
+  echo "pre-push: npx not found, skipping env var drift check"
+else
+  PROD_KEYS=$(npx vercel env ls production 2>/tmp/verdolo-env-check.log | tail -n +2 | awk '{print $1}' | grep -v '^$' | sort)
 
-if [ $STATUS -ne 0 ]; then
-  echo "pre-push: warning - could not check migration status (network/auth issue), allowing push"
-  echo "  see /tmp/verdolo-migration-check.log for details"
-  exit 0
-fi
+  if [ -z "$PROD_KEYS" ]; then
+    echo "pre-push: warning - could not fetch Vercel production env vars (network/auth issue), allowing push"
+    echo "  see /tmp/verdolo-env-check.log for details"
+  else
+    LOCAL_KEYS=$(grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env.local \
+      | sed 's/=$//' \
+      | grep -vE '^(VERCEL(_.*)?|NX_DAEMON|TURBO_.*)$' \
+      | sort)
 
-PENDING=$(echo "$RESULT" | jq -r '[.migrations[] | select(.remote == "" or .remote == null)] | length')
+    MISSING=$(comm -23 <(echo "$LOCAL_KEYS") <(echo "$PROD_KEYS"))
 
-if [ "$PENDING" != "0" ]; then
-  echo ""
-  echo "pre-push BLOCKED: $PENDING local migration(s) have not been applied to prod."
-  echo "  Run: npx supabase db push"
-  echo "  Then re-run your push. (Bypass: SKIP_MIGRATION_CHECK=1 git push)"
-  echo ""
-  exit 1
+    if [ -n "$MISSING" ]; then
+      echo ""
+      echo "pre-push BLOCKED: these .env.local keys are missing from Vercel production:"
+      echo "$MISSING" | sed 's/^/    /'
+      echo "  Run: npx vercel env add <KEY> production"
+      echo "  Then re-run your push. (Bypass: SKIP_ENV_CHECK=1 git push)"
+      echo ""
+      exit 1
+    fi
+  fi
 fi
 
 exit 0
