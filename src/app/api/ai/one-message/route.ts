@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       todaysFocus,
       brandVoice
     )
-    const result = await callClaude(apiKey, { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+    const result = await callClaude(apiKey, { model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
     return NextResponse.json({ message: extractText(result) })
   } catch {
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
