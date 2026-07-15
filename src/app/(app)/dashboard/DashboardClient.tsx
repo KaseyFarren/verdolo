@@ -546,7 +546,7 @@ export default function DashboardClient({
           <div className="text-sm text-sage mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
           {activeClients.length > 0 && (
             <div className="text-sm text-sage mt-1">
-              {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
+              {activeClients.length} client{activeClients.length !== 1 ? 's' : ''} (excl. paused)
             </div>
           )}
         </div>
