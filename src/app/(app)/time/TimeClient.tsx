@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { AVATAR_COLORS, formatDate, getInitials, memberName, todayKey } from '@/lib/agency'
-import { periodBounds, type PeriodValue } from '@/lib/period'
+import { type PeriodValue } from '@/lib/period'
 import { markSelfAssigned } from '@/lib/selfNotify'
 import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -66,6 +66,7 @@ export default function TimeClient({
   tasks,
   allTasks,
   initialEntries,
+  runningEntry,
   members,
   archivedTotals,
   period,
@@ -80,6 +81,7 @@ export default function TimeClient({
   tasks: Task[]
   allTasks: Task[]
   initialEntries: Entry[]
+  runningEntry: Entry | null
   members: Member[]
   archivedTotals: { client_id: string | null; user_id: string; seconds: number }[]
   period: PeriodValue
@@ -91,43 +93,23 @@ export default function TimeClient({
   const router = useRouter()
   const confirm = useConfirm()
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
+  const [running, setRunning] = useState<Entry | null>(runningEntry)
   const [localArchivedTotals, setLocalArchivedTotals] = useState(archivedTotals)
   const [now, setNow] = useState<number | null>(null)
-  const PAGE_SIZE = 100
-  const [fetchedCount, setFetchedCount] = useState(initialEntries.length)
-  const [hasMore, setHasMore] = useState(initialEntries.length >= PAGE_SIZE)
-  const [loadingMore, setLoadingMore] = useState(false)
 
   // router.refresh() re-runs the server component and gives a new initialEntries array, but
   // useState's initializer only runs on mount - without this, the prop update never lands.
   useEffect(() => {
     setEntries(initialEntries)
-    setFetchedCount(initialEntries.length)
-    setHasMore(initialEntries.length >= PAGE_SIZE)
   }, [initialEntries])
+
+  useEffect(() => {
+    setRunning(runningEntry)
+  }, [runningEntry])
 
   useEffect(() => {
     setLocalArchivedTotals(archivedTotals)
   }, [archivedTotals])
-
-  const bounds = useMemo(() => periodBounds(period), [period])
-
-  async function loadMore() {
-    setLoadingMore(true)
-    let q = supabase.from('time_entries').select('*').eq('org_id', orgId)
-    if (bounds.start) q = q.gte('started_at', bounds.start)
-    if (bounds.end) q = q.lt('started_at', bounds.end)
-    if (filterClientId) q = q.eq('client_id', filterClientId)
-    if (filterUserId) q = q.eq('user_id', filterUserId)
-    if (filterTaskId) q = q.eq('task_id', filterTaskId)
-    const { data } = await q.order('started_at', { ascending: false }).range(fetchedCount, fetchedCount + PAGE_SIZE - 1)
-    if (data) {
-      setEntries((prev) => [...prev, ...(data as Entry[])])
-      setFetchedCount((prev) => prev + data.length)
-      if (data.length < PAGE_SIZE) setHasMore(false)
-    }
-    setLoadingMore(false)
-  }
 
   // Filters live in the URL (?period=&start=&end=&clientId=&userId=&taskId=) so the server
   // component re-fetches an already-filtered page - same convention as Reports' ?range= and
@@ -187,15 +169,24 @@ export default function TimeClient({
   const [manualBillable, setManualBillable] = useState(true)
   const [savingManual, setSavingManual] = useState(false)
 
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set([todayKey().slice(0, 7)]))
-  function toggleMonth(month: string) {
-    setExpandedMonths((prev) => {
+  // Days render collapsed to a one-line total by default (like months used to) - only today
+  // starts expanded. The Entries list itself is paginated by day (see entriesPage below) so it
+  // stays a bounded size no matter how much history a filter matches, instead of growing forever
+  // via a "Load more" that only ever appended.
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set([todayKey()]))
+  function toggleDay(date: string) {
+    setExpandedDays((prev) => {
       const next = new Set(prev)
-      if (next.has(month)) next.delete(month)
-      else next.add(month)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
       return next
     })
   }
+  const DAYS_PER_PAGE = 14
+  const [entriesPage, setEntriesPage] = useState(0)
+  useEffect(() => {
+    setEntriesPage(0)
+  }, [period, filterClientId, filterUserId, filterTaskId])
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editClientId, setEditClientId] = useState('')
@@ -203,8 +194,6 @@ export default function TimeClient({
   const [editHours, setEditHours] = useState('')
   const [editNote, setEditNote] = useState('')
   const [editBillable, setEditBillable] = useState(true)
-
-  const running = entries.find((e) => e.user_id === userId && e.ended_at === null) || null
 
   useEffect(() => {
     if (!running) return
@@ -267,14 +256,17 @@ export default function TimeClient({
       billable: true,
     }
     const optimisticEntry: Entry = { ...insertRow, ended_at: null, duration_seconds: null }
+    setRunning(optimisticEntry)
     setEntries((prev) => [optimisticEntry, ...prev])
     setTimerTaskId(taskId || '')
     setTimerNewTaskTitle('')
     const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
     if (error) {
+      setRunning(null)
       setEntries((prev) => prev.filter((e) => e.id !== id))
       toast.error('Could not start the timer')
     } else if (data) {
+      setRunning(data as Entry)
       setEntries((prev) => prev.map((e) => (e.id === id ? (data as Entry) : e)))
     }
     setStarting(false)
@@ -288,21 +280,17 @@ export default function TimeClient({
     const durationSeconds = Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000))
     const fields = { ended_at: endedAt.toISOString(), duration_seconds: durationSeconds }
     // Optimistic: stop the timer locally, capturing the still-running row to roll back to on error.
-    let prevEntry: Entry | undefined
-    setEntries((prev) =>
-      prev.map((e) => {
-        if (e.id !== stoppedId) return e
-        prevEntry = e
-        return { ...e, ...fields }
-      }),
-    )
+    const prevEntry = running
+    setRunning(null)
+    setEntries((prev) => prev.map((e) => (e.id === stoppedId ? { ...e, ...fields } : e)))
     setTimerClientId('')
     setTimerTaskId('')
     setTimerNewTaskTitle('')
     setTimerNote('')
     const { data, error } = await supabase.from('time_entries').update(fields).eq('id', stoppedId).select().single()
     if (error) {
-      if (prevEntry) setEntries((prev) => prev.map((e) => (e.id === stoppedId ? (prevEntry as Entry) : e)))
+      setRunning(prevEntry)
+      setEntries((prev) => prev.map((e) => (e.id === stoppedId ? prevEntry : e)))
       toast.error('Could not stop the timer')
       return
     }
@@ -604,35 +592,40 @@ export default function TimeClient({
   const timerTasks = mergedOpenTasks.filter((t) => t.client_id === timerClientId && !isFutureAutoInstance(t))
   const manualTasks = mergedOpenTasks.filter((t) => t.client_id === manualClientId && !isFutureAutoInstance(t))
 
-  const monthGroups: { month: string; label: string; totalSeconds: number; days: { date: string; items: Entry[] }[] }[] = []
+  function monthLabel(month: string) {
+    const [my, mm] = month.split('-').map(Number)
+    return new Date(my, mm - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  const allDays: { date: string; items: Entry[] }[] = []
   for (const e of completed) {
     const date = e.started_at.slice(0, 10)
-    const month = date.slice(0, 7)
-    let mg = monthGroups.find((g) => g.month === month)
-    if (!mg) {
-      const [my, mm] = month.split('-').map(Number)
-      mg = { month, label: new Date(my, mm - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), totalSeconds: 0, days: [] }
-      monthGroups.push(mg)
-    }
-    mg.totalSeconds += e.duration_seconds || 0
-    let day = mg.days.find((d) => d.date === date)
+    let day = allDays.find((d) => d.date === date)
     if (!day) {
       day = { date, items: [] }
-      mg.days.push(day)
+      allDays.push(day)
     }
     day.items.push(e)
   }
-  monthGroups.sort((a, b) => b.month.localeCompare(a.month))
-  for (const mg of monthGroups) mg.days.sort((a, b) => b.date.localeCompare(a.date))
-  // a narrow period (a week, a single custom range within one month, etc.) never needs the
-  // collapsible month wrapper - that's only useful once there's more than one month to hide
-  const spansMultipleMonths = monthGroups.length > 1
-  const allDays = monthGroups.flatMap((mg) => mg.days).sort((a, b) => b.date.localeCompare(a.date))
+  allDays.sort((a, b) => b.date.localeCompare(a.date))
+
+  // Bounded window into allDays so the rendered list stays a fixed size regardless of how much
+  // history the current filter matches - Prev/Next replaces the page instead of appending to it.
+  const totalEntriesPages = Math.max(1, Math.ceil(allDays.length / DAYS_PER_PAGE))
+  const pagedDays = allDays.slice(entriesPage * DAYS_PER_PAGE, (entriesPage + 1) * DAYS_PER_PAGE)
 
   function renderDayGroup(g: { date: string; items: Entry[] }) {
+    const expanded = expandedDays.has(g.date)
+    const daySeconds = g.items.reduce((s, e) => s + (e.duration_seconds || 0), 0)
     return (
       <div key={g.date}>
-        <div className="text-xs text-sage mb-1.5">{formatDate(g.date)}</div>
+        <button type="button" className="w-full flex items-center justify-between py-1 text-left" onClick={() => toggleDay(g.date)}>
+          <span className="text-xs text-sage">
+            {expanded ? '▾' : '▸'} {formatDate(g.date)} <span className="text-sage/60">({g.items.length})</span>
+          </span>
+          <span className="text-xs text-sage">{formatHours(daySeconds)}h</span>
+        </button>
+        {expanded && (
         <div className="rounded-lg border border-ink/10 divide-y divide-ink/10 overflow-hidden">
           {g.items.map((e) => {
             const canEdit = isAdmin || e.user_id === userId
@@ -708,6 +701,7 @@ export default function TimeClient({
             )
           })}
         </div>
+        )}
       </div>
     )
   }
@@ -739,10 +733,11 @@ export default function TimeClient({
   }
 
   return (
-    <div>
+    <div className="pb-16">
       <h1 className="text-xl font-semibold mb-5">Time</h1>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6" data-tour="start-timer">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="rounded-lg border border-ink/10 bg-white p-4" data-tour="start-timer">
         {running ? (
           <div>
             <div className="text-2xl font-mono font-semibold mb-1">
@@ -810,7 +805,7 @@ export default function TimeClient({
         )}
       </div>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-6">
+      <div className="rounded-lg border border-ink/10 bg-white p-4">
         <div className="text-xs font-semibold tracking-wide text-sage mb-2">Log time manually</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
           <CustomSelect
@@ -872,6 +867,7 @@ export default function TimeClient({
         >
           Save entry
         </button>
+      </div>
       </div>
 
       <div className="mb-6">
@@ -1002,35 +998,43 @@ export default function TimeClient({
           </div>
         </div>
       )}
-      {monthGroups.length === 0 && <div className="text-sm text-sage py-3">No time logged yet.</div>}
-      {spansMultipleMonths
-        ? monthGroups.map((mg) => {
-            const expanded = expandedMonths.has(mg.month)
-            return (
-              <div key={mg.month} className="mb-4">
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between py-1.5 text-left"
-                  onClick={() => toggleMonth(mg.month)}
-                >
-                  <span className="text-xs font-semibold tracking-wide text-sage">
-                    {expanded ? '▾' : '▸'} {mg.label}
-                  </span>
-                  <span className="text-xs text-sage">{formatHours(mg.totalSeconds)}h</span>
-                </button>
-                {expanded && <div className="pl-3 space-y-3">{mg.days.map(renderDayGroup)}</div>}
-              </div>
-            )
-          })
-        : <div className="space-y-3">{allDays.map(renderDayGroup)}</div>}
-      {hasMore && (
-        <button
-          className="w-full text-center text-xs text-sage hover:text-ink py-2 disabled:opacity-50"
-          onClick={loadMore}
-          disabled={loadingMore}
-        >
-          {loadingMore ? 'Loading…' : 'Load more'}
-        </button>
+      {allDays.length === 0 && <div className="text-sm text-sage py-3">No time logged yet.</div>}
+      <div className="space-y-1">
+        {pagedDays.map((g, i) => {
+          const month = g.date.slice(0, 7)
+          const prevMonth = i > 0 ? pagedDays[i - 1].date.slice(0, 7) : null
+          return (
+            <div key={g.date}>
+              {month !== prevMonth && (
+                <div className="text-xs font-semibold tracking-wide text-sage/70 mt-4 mb-1 first:mt-0">{monthLabel(month)}</div>
+              )}
+              {renderDayGroup(g)}
+            </div>
+          )
+        })}
+      </div>
+      {totalEntriesPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <button
+            type="button"
+            onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
+            disabled={entriesPage === 0}
+            className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
+          >
+            ← Newer
+          </button>
+          <span className="text-xs text-sage">
+            Page {entriesPage + 1} of {totalEntriesPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEntriesPage((p) => Math.min(totalEntriesPages - 1, p + 1))}
+            disabled={entriesPage >= totalEntriesPages - 1}
+            className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
+          >
+            Older →
+          </button>
+        </div>
       )}
     </div>
   )

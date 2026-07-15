@@ -166,7 +166,7 @@ export default function AppShell({
               key={pathname}
               data-app-content
               className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${
-                pathname === '/tasks' || pathname === '/dashboard' || pathname === '/reports' || pathname === '/messages' ? 'max-w-6xl' : 'max-w-3xl'
+                pathname === '/tasks' || pathname === '/dashboard' || pathname === '/reports' || pathname === '/messages' || pathname === '/time' ? 'max-w-6xl' : 'max-w-3xl'
               }`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}

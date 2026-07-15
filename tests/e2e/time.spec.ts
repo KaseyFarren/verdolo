@@ -19,7 +19,6 @@ test.describe('Time CRUD @owner', () => {
 
   test('add manual entry appears with correct duration', async ({ page }) => {
     await page.goto('/time')
-    await page.getByRole('button', { name: '+ Add' }).click()
 
     const form = page.locator('div.rounded-lg.border', { has: page.getByPlaceholder('Hours (e.g. 1.5)') })
     await pickFirstClient(form)
@@ -35,7 +34,6 @@ test.describe('Time CRUD @owner', () => {
 
   test('edit entry updates duration and persists after reload', async ({ page }) => {
     await page.goto('/time')
-    await page.getByRole('button', { name: '+ Add' }).click()
     const form = page.locator('div.rounded-lg.border', { has: page.getByPlaceholder('Hours (e.g. 1.5)') })
     await pickFirstClient(form)
     await form.getByPlaceholder('Hours (e.g. 1.5)').fill('1')
@@ -58,7 +56,6 @@ test.describe('Time CRUD @owner', () => {
 
   test('delete entry removes it (after undo window)', async ({ page }) => {
     await page.goto('/time')
-    await page.getByRole('button', { name: '+ Add' }).click()
     const form = page.locator('div.rounded-lg.border', { has: page.getByPlaceholder('Hours (e.g. 1.5)') })
     await pickFirstClient(form)
     await form.getByPlaceholder('Hours (e.g. 1.5)').fill('0.5')
