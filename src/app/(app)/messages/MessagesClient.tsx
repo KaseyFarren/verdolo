@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials, memberName } from '@/lib/agency'
@@ -1019,11 +1020,19 @@ export default function MessagesClient({
               <button
                 key={f}
                 onClick={() => setSidebarFilter(f)}
-                className={`flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
-                  sidebarFilter === f ? 'bg-white text-ink shadow-sm' : 'text-sage hover:text-ink'
+                className={`relative flex-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
+                  sidebarFilter === f ? 'text-ink' : 'text-sage hover:text-ink'
                 }`}
               >
-                {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : '@Mentions'}
+                {sidebarFilter === f && (
+                  <motion.div
+                    layoutId="messages-sidebar-filter-active"
+                    className="absolute inset-0 rounded-md bg-white"
+                    style={{ boxShadow: 'inset 2px 0 0 0 var(--accent), 0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <span className="relative">{f === 'all' ? 'All' : f === 'unread' ? 'Unread' : '@Mentions'}</span>
               </button>
             ))}
           </div>
