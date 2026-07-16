@@ -409,7 +409,15 @@ export default function TasksClient({
   }
   async function completeAll(items: Task[]) {
     const pending = items.filter((t) => !t.done)
-    for (const t of pending) await completeTask(t)
+    for (const t of pending) {
+      // A parent can't be marked done while it still has open subtasks (DB trigger
+      // guard_parent_completion) - `items` only ever contains top-level tasks (subtasks are
+      // excluded from filteredList), so without this the parent's own completeTask call below
+      // would silently fail and roll back for any task that still had open subtasks.
+      const openSubtasks = (subtasksByParent.get(t.id) || []).filter((s) => !s.done)
+      for (const st of openSubtasks) await completeTask(st)
+      await completeTask(t)
+    }
     if (pending.length) toast.success(`${pending.length} task${pending.length === 1 ? '' : 's'} completed`)
   }
   function deleteTask(id: string) {
