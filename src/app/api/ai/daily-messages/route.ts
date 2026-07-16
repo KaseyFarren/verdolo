@@ -5,6 +5,8 @@ import { rateLimit } from '@/lib/rateLimit'
 import { buildDailyMessagesPrompt, callClaude, extractText } from '@/lib/ai'
 import { getStage, todayKey, getOffsetDate } from '@/lib/agency'
 
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const { orgId } = await request.json()
   const supabase = await createClient()

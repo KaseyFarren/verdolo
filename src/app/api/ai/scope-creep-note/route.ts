@@ -6,6 +6,8 @@ import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
 import { currencySymbol, effectiveRate, todayKey } from '@/lib/agency'
 import { monthElapsedFraction } from '@/lib/period'
 
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const { orgId, clientId, periodStart, today: clientToday } = await request.json()
   const supabase = await createClient()

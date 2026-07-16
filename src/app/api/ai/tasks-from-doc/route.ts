@@ -12,6 +12,8 @@ const MAX_PDF_BYTES = 3 * 1024 * 1024
 
 type ExtractedTask = { title: string; due_date: string | null; priority: string; notes: string }
 
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const { orgId, clientId, text, pdfBase64 } = await request.json()
   const supabase = await createClient()

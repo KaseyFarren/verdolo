@@ -6,6 +6,8 @@ import { buildRecapPrompt, callClaude, extractText } from '@/lib/ai'
 import { getHealthScore, getStage, getWeekAnchor, todayKey } from '@/lib/agency'
 import { addDays } from '@/lib/period'
 
+export const maxDuration = 60
+
 type PeriodType = 'week' | 'month'
 
 function parseDate(iso: string) {

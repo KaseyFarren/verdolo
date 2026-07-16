@@ -5,6 +5,8 @@ import { rateLimit } from '@/lib/rateLimit'
 import { buildSingleMessagePrompt, callClaude, extractText } from '@/lib/ai'
 import { getOffsetDate, todayKey } from '@/lib/agency'
 
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const { orgId, clientId, todaysFocus } = await request.json()
   const supabase = await createClient()
