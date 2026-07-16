@@ -402,7 +402,10 @@ export default function TasksClient({
   async function completeTask(t: Task) {
     const completedAt = new Date().toISOString()
     await timer.stopIfRunningFor(t.id)
-    await updateTask(t.id, { done: true, completed_at: completedAt })
+    // Claiming an unassigned task on completion so it credits the completer's tally instead of
+    // vanishing from every per-person breakdown (topByKey skips null assigned_to entirely).
+    const claim = effectiveAssignees(t).length === 0 ? { assignee_ids: [userId], assigned_to: userId } : {}
+    await updateTask(t.id, { done: true, completed_at: completedAt, ...claim })
     if (t.is_auto && t.auto_type === 'checkin' && t.client_id) {
       await supabase.from('clients').update({ last_contacted: today }).eq('id', t.client_id)
     }

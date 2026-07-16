@@ -317,11 +317,16 @@ export default function DashboardClient({
   async function toggleTask(t: Task) {
     const nowDone = !t.done
     if (nowDone) await timer.stopIfRunningFor(t.id)
+    // Claiming an unassigned task on completion so it credits the completer's tally instead of
+    // vanishing from every per-person breakdown (topByKey skips null assigned_to entirely).
+    const claim = nowDone && !t.assigned_to ? { assigned_to: userId } : {}
     // Optimistic: flip the checkbox immediately, roll back if the update fails.
-    setTasks((prev) => prev.map((x) => (x.id === t.id ? ({ ...x, done: nowDone, completed_at: nowDone ? new Date().toISOString() : null } as Task) : x)))
+    setTasks((prev) =>
+      prev.map((x) => (x.id === t.id ? ({ ...x, done: nowDone, completed_at: nowDone ? new Date().toISOString() : null, ...claim } as Task) : x)),
+    )
     const { data, error } = await supabase
       .from('tasks')
-      .update({ done: nowDone, completed_at: nowDone ? new Date().toISOString() : null })
+      .update({ done: nowDone, completed_at: nowDone ? new Date().toISOString() : null, ...claim })
       .eq('id', t.id)
       .select()
       .single()
@@ -396,7 +401,13 @@ export default function DashboardClient({
     // the Tasks list - the "Sent" UI above no longer depends on this succeeding.
     const checkin = tasks.find((t) => t.client_id === client.id && t.is_auto && t.auto_type === 'checkin' && (t.due_date === today || (t.due_date < today && !t.done)))
     if (checkin) {
-      const { data } = await supabase.from('tasks').update({ done: true, completed_at: new Date().toISOString() }).eq('id', checkin.id).select().single()
+      const claim = checkin.assigned_to ? {} : { assigned_to: userId }
+      const { data } = await supabase
+        .from('tasks')
+        .update({ done: true, completed_at: new Date().toISOString(), ...claim })
+        .eq('id', checkin.id)
+        .select()
+        .single()
       if (data) setTasks((prev) => prev.map((x) => (x.id === checkin.id ? (data as Task) : x)))
     }
   }
