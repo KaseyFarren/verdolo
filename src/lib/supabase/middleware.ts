@@ -2,7 +2,16 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { buildCsp, generateNonce } from '@/lib/security/csp'
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/create-account', '/accept-invite']
+const PUBLIC_PATHS = [
+  '/login',
+  '/signup',
+  '/auth',
+  '/create-account',
+  '/accept-invite',
+  '/forgot-password',
+  '/reset-password',
+  '/confirm-signup',
+]
 
 export async function updateSession(request: NextRequest) {
   // Strip any client-supplied identity headers before we (maybe) set our own from the verified
