@@ -626,6 +626,9 @@ export default function DashboardClient({
               </button>
             </div>
           )}
+          {dashPendingMine.length > 0 && dashPendingUnassigned.length > 0 && (
+            <div className="text-xs font-medium text-sage/70 mb-1">Assigned</div>
+          )}
           <AnimatePresence initial={false}>
             {dashPendingMine.map((t) => (
               <SimpleTaskRow
