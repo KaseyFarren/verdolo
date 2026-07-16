@@ -202,6 +202,7 @@ export default function DashboardClient({
   const dashLabel = dashIsToday ? 'Today' : dashDate === yesterday ? 'Yesterday' : 'Tomorrow'
 
   const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
+  const pausedClients = clients.filter((c) => getStage(c) === 'Churned')
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
@@ -546,7 +547,8 @@ export default function DashboardClient({
           <div className="text-sm text-sage mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
           {activeClients.length > 0 && (
             <div className="text-sm text-sage mt-1">
-              {activeClients.length} client{activeClients.length !== 1 ? 's' : ''} (excl. paused)
+              {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
+              {pausedClients.length > 0 && ` (${pausedClients.length} paused)`}
             </div>
           )}
         </div>
