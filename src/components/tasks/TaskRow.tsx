@@ -81,7 +81,7 @@ export default function TaskRow({
   onAddSubtask?: () => void
   addSubtaskForm?: ReactNode
 }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [addingTime, setAddingTime] = useState(false)
   const [notesDraft, setNotesDraft] = useState(t.notes || '')
   // Resync the local notes draft when the task changes from outside this row (modal save, realtime,

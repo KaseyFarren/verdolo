@@ -21,11 +21,14 @@ type DefaultTemplate = {
   auto_type?: string | null
   paused?: boolean
 }
+type TemplateSubtask = { id: string; template_id: string; title: string }
 
 /** Idempotent and safe to call concurrently (e.g. from Dashboard and Tasks mounting at once):
  * duplicate default-task / recurring instances are prevented by DB-level unique constraints
  * (tasks_default_template_instance_unique, tasks_recurring_instance_unique), so upserting with
- * ignoreDuplicates can't race regardless of how many callers run at the same time.
+ * ignoreDuplicates can't race regardless of how many callers run at the same time. Any subtasks
+ * configured on those templates are generated right after, deduped the same way via
+ * tasks_generated_subtask_unique.
  *
  * Returns the rows actually inserted (PostgREST only returns rows that weren't skipped by
  * ON CONFLICT DO NOTHING), so callers can merge just the new tasks into state instead of
@@ -98,5 +101,72 @@ export async function ensureAutoAndRecurringTasks(
       .select()
     if (data) newRows.push(...data)
   }
+
+  const childRows = await generateTemplateSubtasks(supabase, newRows)
+  newRows.push(...childRows)
+
   return newRows
+}
+
+/** For each newly-created default/recurring instance in `newRows`, looks up that template's
+ * configured subtasks (default_task_template_subtasks / recurring_template_subtasks) and creates
+ * one child task per subtask, parented to the fresh instance. Only runs against instances that
+ * were actually just inserted (not skipped as duplicates), so a template's subtasks are only
+ * ever generated once per instance - the tasks_generated_subtask_unique constraint is a backstop
+ * against re-running this concurrently, not the primary dedupe mechanism. */
+async function generateTemplateSubtasks(supabase: SupabaseClient, newRows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const defaultParents = newRows.filter((r) => r.default_template_id)
+  const recurringParents = newRows.filter((r) => r.recurring_id)
+  if (!defaultParents.length && !recurringParents.length) return []
+
+  const childRows: Record<string, unknown>[] = []
+
+  if (defaultParents.length) {
+    const templateIds = [...new Set(defaultParents.map((r) => r.default_template_id as string))]
+    const { data: subs } = await supabase.from('default_task_template_subtasks').select('id, template_id, title').in('template_id', templateIds)
+    for (const parent of defaultParents) {
+      for (const st of ((subs as TemplateSubtask[]) || []).filter((s) => s.template_id === parent.default_template_id)) {
+        childRows.push(buildChildRow(parent, st))
+      }
+    }
+  }
+
+  if (recurringParents.length) {
+    const templateIds = [...new Set(recurringParents.map((r) => r.recurring_id as string))]
+    const { data: subs } = await supabase.from('recurring_template_subtasks').select('id, template_id, title').in('template_id', templateIds)
+    for (const parent of recurringParents) {
+      for (const st of ((subs as TemplateSubtask[]) || []).filter((s) => s.template_id === parent.recurring_id)) {
+        childRows.push(buildChildRow(parent, st))
+      }
+    }
+  }
+
+  if (!childRows.length) return []
+  const { data } = await supabase.from('tasks').upsert(childRows, { onConflict: 'parent_task_id,template_subtask_id', ignoreDuplicates: true }).select()
+  return data || []
+}
+
+// recurring_id / default_template_id are deliberately NOT copied onto the child row: those
+// columns back tasks_recurring_instance_unique / tasks_default_template_instance_unique, which
+// key on (org_id, recurring_id|default_template_id, due_date) alone - every subtask under the
+// same parent would collide on that constraint. Dedup for children instead runs entirely off
+// tasks_generated_subtask_unique (parent_task_id, template_subtask_id). is_auto IS copied from
+// the parent since it's what the "Default" vs "Recurring" Type badge and notification-sound
+// suppression key off, and neither of those touches the two constraints above.
+function buildChildRow(parent: Record<string, unknown>, subtask: TemplateSubtask) {
+  const assignedTo = (parent.assigned_to as string | null) || null
+  return {
+    org_id: parent.org_id,
+    client_id: parent.client_id,
+    assigned_to: assignedTo,
+    assignee_ids: assignedTo ? [assignedTo] : [],
+    title: subtask.title,
+    due_date: parent.due_date,
+    priority: 'Medium',
+    notes: '',
+    done: false,
+    is_auto: !!parent.is_auto,
+    parent_task_id: parent.id,
+    template_subtask_id: subtask.id,
+  }
 }

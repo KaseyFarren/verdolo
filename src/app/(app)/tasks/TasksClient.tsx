@@ -63,6 +63,7 @@ type Default = {
   auto_type: string | null
   paused: boolean
 }
+type TemplateSubtask = { id: string; template_id: string; title: string; sort_order: number }
 
 const emptyTaskForm = {
   title: '',
@@ -79,12 +80,56 @@ const emptyRecurringForm = {
   priority: 'Medium',
   frequency: 'daily',
   notes: '',
+  subtasks: [] as string[],
 }
 const emptyDefaultForm = {
   title: '',
   assignedTo: '',
   priority: 'Medium',
   notes: '',
+  subtasks: [] as string[],
+}
+
+// Titles-only editor for the fixed subtask list a default/recurring template generates
+// alongside every instance - kept minimal (no priority/assignee per subtask) to match how
+// lightweight the rest of these template forms are.
+function SubtaskListEditor({ titles, onChange }: { titles: string[]; onChange: (titles: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  function commit() {
+    if (!draft.trim()) return
+    onChange([...titles, draft.trim()])
+    setDraft('')
+  }
+  return (
+    <div className="mb-2">
+      <div className="text-xs text-sage/70 mb-1">Subtasks</div>
+      {titles.map((title, i) => (
+        <div key={i} className="flex items-center gap-2 mb-1">
+          <span className="flex-1 text-sm truncate">{title}</span>
+          <button type="button" className="text-xs text-sage hover:text-ink shrink-0" onClick={() => onChange(titles.filter((_, idx) => idx !== i))}>
+            Remove
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 rounded border border-ink/10 bg-white px-2 py-1.5 text-sm"
+          placeholder="Add a subtask"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            }
+          }}
+        />
+        <button type="button" className="text-xs text-sage hover:text-ink shrink-0 px-2" onClick={commit}>
+          Add
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function TasksClient({
@@ -95,6 +140,8 @@ export default function TasksClient({
   initialTasks,
   initialRecurring,
   initialDefaults,
+  initialDefaultSubtasks,
+  initialRecurringSubtasks,
   members,
   excludeWeekends,
 }: {
@@ -105,6 +152,8 @@ export default function TasksClient({
   initialTasks: Task[]
   initialRecurring: Recurring[]
   initialDefaults: Default[]
+  initialDefaultSubtasks: TemplateSubtask[]
+  initialRecurringSubtasks: TemplateSubtask[]
   members: Member[]
   excludeWeekends: boolean
 }) {
@@ -115,6 +164,8 @@ export default function TasksClient({
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [recurring, setRecurring] = useState<Recurring[]>(initialRecurring)
   const [defaults, setDefaults] = useState<Default[]>(initialDefaults)
+  const [defaultSubtasks, setDefaultSubtasks] = useState<TemplateSubtask[]>(initialDefaultSubtasks)
+  const [recurringSubtasks, setRecurringSubtasks] = useState<TemplateSubtask[]>(initialRecurringSubtasks)
   const [filter, setFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'due' | 'priority' | 'title' | 'client'>('due')
   const [selectedDate, setSelectedDate] = useState('')
@@ -411,10 +462,26 @@ export default function TasksClient({
       .single()
     if (data) {
       setRecurring((prev) => [...prev, data as Recurring])
+      await saveRecurringSubtasks((data as Recurring).id, recurringForm.subtasks)
       await regenerateRecurringInstance(data as Recurring)
     }
     setRecurringForm(emptyRecurringForm)
     setShowAddRecurring(false)
+  }
+  // Simplest-correct approach: wipe and re-insert rather than diff titles against ids - these
+  // template subtask lists are short and edited rarely, so the extra round-trip is a non-issue.
+  async function saveRecurringSubtasks(templateId: string, titles: string[]) {
+    const clean = titles.map((t) => t.trim()).filter(Boolean)
+    await supabase.from('recurring_template_subtasks').delete().eq('template_id', templateId)
+    if (clean.length) {
+      const { data } = await supabase
+        .from('recurring_template_subtasks')
+        .insert(clean.map((title, i) => ({ template_id: templateId, title, sort_order: i })))
+        .select()
+      setRecurringSubtasks((prev) => [...prev.filter((s) => s.template_id !== templateId), ...((data as TemplateSubtask[]) || [])])
+    } else {
+      setRecurringSubtasks((prev) => prev.filter((s) => s.template_id !== templateId))
+    }
   }
   // Regenerates this template's today/tomorrow instance right away (via the same idempotent
   // upsert used on mount) instead of leaving it missing until the next page load.
@@ -426,11 +493,13 @@ export default function TasksClient({
   async function updateRecurring(id: string, fields: Record<string, unknown>) {
     // client_id / assigned_to are uuid columns - Postgres rejects '' (the "No client" /
     // "Unassigned" option value), so coerce empty strings to null before writing.
-    const normalized = { ...fields }
+    // subtasks isn't a column on recurring_templates - it's pulled out and saved separately.
+    const { subtasks, ...normalized } = fields
     if (normalized.client_id === '') normalized.client_id = null
     if (normalized.assigned_to === '') normalized.assigned_to = null
     const { data } = await supabase.from('recurring_templates').update(normalized).eq('id', id).select().single()
     if (data) setRecurring((prev) => prev.map((r) => (r.id === id ? (data as Recurring) : r)))
+    if (Array.isArray(subtasks)) await saveRecurringSubtasks(id, subtasks as string[])
     await supabase.from('tasks').delete().eq('recurring_id', id).eq('done', false).gte('due_date', today)
     if (data && !(data as Recurring).paused) {
       await regenerateRecurringInstance(data as Recurring)
@@ -459,6 +528,7 @@ export default function TasksClient({
     await supabase.from('tasks').delete().eq('recurring_id', id)
     await supabase.from('recurring_templates').delete().eq('id', id)
     setRecurring((prev) => prev.filter((r) => r.id !== id))
+    setRecurringSubtasks((prev) => prev.filter((s) => s.template_id !== id))
     setTasks((prev) => prev.filter((t) => t.recurring_id !== id))
   }
 
@@ -477,10 +547,25 @@ export default function TasksClient({
       .single()
     if (data) {
       setDefaults((prev) => [...prev, data as Default])
+      await saveDefaultSubtasks((data as Default).id, defaultForm.subtasks)
       await regenerateDefaultInstance(data as Default)
     }
     setDefaultForm(emptyDefaultForm)
     setShowAddDefault(false)
+  }
+  // Mirrors saveRecurringSubtasks - wipe and re-insert rather than diff titles against ids.
+  async function saveDefaultSubtasks(templateId: string, titles: string[]) {
+    const clean = titles.map((t) => t.trim()).filter(Boolean)
+    await supabase.from('default_task_template_subtasks').delete().eq('template_id', templateId)
+    if (clean.length) {
+      const { data } = await supabase
+        .from('default_task_template_subtasks')
+        .insert(clean.map((title, i) => ({ template_id: templateId, title, sort_order: i })))
+        .select()
+      setDefaultSubtasks((prev) => [...prev.filter((s) => s.template_id !== templateId), ...((data as TemplateSubtask[]) || [])])
+    } else {
+      setDefaultSubtasks((prev) => prev.filter((s) => s.template_id !== templateId))
+    }
   }
   // Regenerates this template's today/tomorrow instance (one per client) right away instead of
   // leaving it missing until the next page load, mirroring regenerateRecurringInstance above.
@@ -493,13 +578,16 @@ export default function TasksClient({
     // editDefaultForm seeds assigned_to as '' for "Unassigned" (so CustomSelect has a string to
     // match against its own '' option) - sent as-is, Postgres rejects '' for the uuid column
     // (22P02) and the save silently no-ops, discarding the whole edit with no error shown.
-    const sanitized = { ...fields, assigned_to: fields.assigned_to || null }
+    // subtasks isn't a column on default_task_templates - it's pulled out and saved separately.
+    const { subtasks, ...rest } = fields
+    const sanitized = { ...rest, assigned_to: rest.assigned_to || null }
     const { data, error } = await supabase.from('default_task_templates').update(sanitized).eq('id', id).select().single()
     if (error) {
       toast.error('Could not save changes - try again')
       return
     }
     if (data) setDefaults((prev) => prev.map((d) => (d.id === id ? (data as Default) : d)))
+    if (Array.isArray(subtasks)) await saveDefaultSubtasks(id, subtasks as string[])
     await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false).gte('due_date', today)
     if (data && !(data as Default).paused) {
       await regenerateDefaultInstance(data as Default)
@@ -525,6 +613,7 @@ export default function TasksClient({
     await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false)
     await supabase.from('default_task_templates').delete().eq('id', id)
     setDefaults((prev) => prev.filter((d) => d.id !== id))
+    setDefaultSubtasks((prev) => prev.filter((s) => s.template_id !== id))
     setTasks((prev) => prev.filter((t) => !(t.default_template_id === id && !t.done)))
   }
 
@@ -984,6 +1073,7 @@ export default function TasksClient({
                       ]}
                     />
                   </div>
+                  <SubtaskListEditor titles={recurringForm.subtasks} onChange={(subtasks) => setRecurringForm((f) => ({ ...f, subtasks }))} />
                   <div className="flex gap-2">
                     <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
                       Cancel
@@ -1046,6 +1136,10 @@ export default function TasksClient({
                           options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
                         />
                       </div>
+                      <SubtaskListEditor
+                        titles={(editRecurringForm.subtasks as string[]) || []}
+                        onChange={(subtasks) => setEditRecurringForm((f) => ({ ...f, subtasks }))}
+                      />
                       <div className="flex gap-2">
                         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingRecurringId(null)}>
                           Cancel
@@ -1066,6 +1160,9 @@ export default function TasksClient({
                           {recurringFrequencyLabel(r.frequency)}
                           {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
                           {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
+                          {recurringSubtasks.filter((s) => s.template_id === r.id).length > 0
+                            ? ` · ${recurringSubtasks.filter((s) => s.template_id === r.id).length} subtask${recurringSubtasks.filter((s) => s.template_id === r.id).length !== 1 ? 's' : ''}`
+                            : ''}
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => toggleRecurringPaused(r)}>
@@ -1082,6 +1179,7 @@ export default function TasksClient({
                             frequency: r.frequency,
                             client_id: r.client_id || '',
                             assigned_to: r.assigned_to || '',
+                            subtasks: recurringSubtasks.filter((s) => s.template_id === r.id).map((s) => s.title),
                           })
                         }}
                       >
@@ -1123,6 +1221,7 @@ export default function TasksClient({
                       ]}
                     />
                   </div>
+                  <SubtaskListEditor titles={defaultForm.subtasks} onChange={(subtasks) => setDefaultForm((f) => ({ ...f, subtasks }))} />
                   <div className="flex gap-2">
                     <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddDefault(false)}>
                       Cancel
@@ -1174,6 +1273,7 @@ export default function TasksClient({
                           ]}
                         />
                       </div>
+                      <SubtaskListEditor titles={(editDefaultForm.subtasks as string[]) || []} onChange={(subtasks) => setEditDefaultForm((f) => ({ ...f, subtasks }))} />
                       <div className="flex gap-2">
                         <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setEditingDefaultId(null)}>
                           Cancel
@@ -1193,6 +1293,9 @@ export default function TasksClient({
                         <div className="text-xs text-sage mt-0.5">
                           Every client · daily
                           {d.assigned_to ? ` · ${memberEmail(d.assigned_to)}` : ''} · {d.priority}
+                          {defaultSubtasks.filter((s) => s.template_id === d.id).length > 0
+                            ? ` · ${defaultSubtasks.filter((s) => s.template_id === d.id).length} subtask${defaultSubtasks.filter((s) => s.template_id === d.id).length !== 1 ? 's' : ''}`
+                            : ''}
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => toggleDefaultPaused(d)}>
@@ -1207,6 +1310,7 @@ export default function TasksClient({
                             title: d.title,
                             priority: d.priority,
                             assigned_to: d.assigned_to || '',
+                            subtasks: defaultSubtasks.filter((s) => s.template_id === d.id).map((s) => s.title),
                           })
                         }}
                       >

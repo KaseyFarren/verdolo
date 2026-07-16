@@ -18,6 +18,17 @@ export default async function TasksPage() {
 
   const visibleClients = isAdminRole(role) ? clients ?? [] : stripBillingInfo(clients ?? [])
 
+  const defaultTemplateIds = (defaults ?? []).map((d) => d.id)
+  const recurringTemplateIds = (recurring ?? []).map((r) => r.id)
+  const [{ data: defaultSubtasks }, { data: recurringSubtasks }] = await Promise.all([
+    defaultTemplateIds.length
+      ? supabase.from('default_task_template_subtasks').select('*').in('template_id', defaultTemplateIds).order('sort_order')
+      : Promise.resolve({ data: [] }),
+    recurringTemplateIds.length
+      ? supabase.from('recurring_template_subtasks').select('*').in('template_id', recurringTemplateIds).order('sort_order')
+      : Promise.resolve({ data: [] }),
+  ])
+
   return (
     <TasksClient
       orgId={orgId}
@@ -27,6 +38,8 @@ export default async function TasksPage() {
       initialTasks={tasks ?? []}
       initialRecurring={recurring ?? []}
       initialDefaults={defaults ?? []}
+      initialDefaultSubtasks={defaultSubtasks ?? []}
+      initialRecurringSubtasks={recurringSubtasks ?? []}
       members={members ?? []}
       excludeWeekends={org?.settings?.exclude_weekends ?? true}
     />
