@@ -203,6 +203,9 @@ export default function DashboardClient({
 
   const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
   const pausedClients = clients.filter((c) => getStage(c) === 'Churned')
+  // Header count is deliberately stricter than `activeClients` (which feeds check-in messaging
+  // below and just means "not paused") - Lead/Trial clients aren't active client relationships yet.
+  const activeStageClients = clients.filter((c) => getStage(c) === 'Active')
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
@@ -545,9 +548,9 @@ export default function DashboardClient({
         <div>
           <div className="font-heading text-2xl font-bold text-ink">Dashboard</div>
           <div className="text-sm text-sage mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
-          {activeClients.length > 0 && (
+          {activeStageClients.length > 0 && (
             <div className="text-sm text-sage mt-1">
-              {activeClients.length} active client{activeClients.length !== 1 ? 's' : ''}
+              {activeStageClients.length} active client{activeStageClients.length !== 1 ? 's' : ''}
               {pausedClients.length > 0 && ` (${pausedClients.length} paused)`}
             </div>
           )}
