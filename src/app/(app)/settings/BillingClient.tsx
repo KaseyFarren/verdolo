@@ -138,7 +138,7 @@ export default function BillingClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orgId }),
     })
-    const body = await res.json()
+    const body = await res.json().catch(() => ({}))
     if (!res.ok) {
       toast.error(body.error ?? 'Could not start checkout')
       setLoading(null)
@@ -154,7 +154,7 @@ export default function BillingClient({
     setLoading('panel')
     setShowPanel(true)
     const res = await fetch(`/api/billing/details?orgId=${orgId}`)
-    const body = await res.json()
+    const body = await res.json().catch(() => ({}))
     if (!res.ok) {
       toast.error(body.error ?? 'Could not load billing details')
       setLoading(null)
@@ -180,7 +180,7 @@ export default function BillingClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orgId }),
     })
-    const body = await res.json()
+    const body = await res.json().catch(() => ({}))
     if (!res.ok) {
       toast.error(body.error ?? 'Could not start payment method update')
       setLoading(null)

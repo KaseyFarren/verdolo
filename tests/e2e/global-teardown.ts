@@ -13,6 +13,11 @@ export default async function globalTeardown() {
 
   const supabase = createClient(url, key)
   const like = `${QA_PREFIX}%`
+  // AI-generated titles (e.g. "Import from doc") embed a qaName() marker mid-string rather than
+  // at the start ("Follow up with client about the PW-QA-import-... proposal") - a prefix-only
+  // LIKE can't catch those, so tasks/proposals get a substring match too. PW-QA- is distinctive
+  // enough that this can't false-positive on real content.
+  const contains = `%${QA_PREFIX}%`
 
   // Deleting a QA client orphans (rather than removes) any auto-generated tasks the org's
   // default template already created for it, since tasks.client_id is "on delete set null" -
@@ -28,7 +33,7 @@ export default async function globalTeardown() {
   // client_id nulled (not cascaded), so those are swept independently by title/description.
   const results = await Promise.all([
     supabase.from('clients').delete().like('name', like),
-    supabase.from('tasks').delete().like('title', like),
+    supabase.from('tasks').delete().like('title', contains),
     supabase.from('recurring_templates').delete().like('title', like),
     supabase.from('default_task_templates').delete().like('title', like),
     supabase.from('proposals').delete().like('title', like),

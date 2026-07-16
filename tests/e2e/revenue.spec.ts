@@ -21,7 +21,8 @@ test.describe('Revenue (owner-only) @owner', () => {
     const chargeRow = panel.locator('div').filter({ hasText: desc }).last()
     await expect(chargeRow).toBeVisible({ timeout: 10_000 })
 
-    await chargeRow.getByText('✕', { exact: true }).click()
+    // delete trigger is an icon-only button with no text/aria-label - target by position
+    await chargeRow.locator('button').click()
     await page.getByRole('button', { name: 'Delete', exact: true }).click() // confirm dialog
     await expect(panel.locator('div').filter({ hasText: desc })).toHaveCount(0, { timeout: 5_000 })
   })

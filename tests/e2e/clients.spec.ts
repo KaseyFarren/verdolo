@@ -49,11 +49,13 @@ test.describe('Clients CRUD (admin+owner) @owner', () => {
     await createClient(page, name)
     await clientRow(page, name).click()
 
-    await page.getByRole('button', { name: '⏸ Pause' }).click()
-    await expect(page.getByRole('button', { name: '▶ Activate' })).toBeVisible()
+    // Pause/Activate render an SVG icon component, not a literal "⏸"/"▶" character - the
+    // accessible name is just the word
+    await page.getByRole('button', { name: 'Pause', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Activate', exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: '▶ Activate' }).click()
-    await expect(page.getByRole('button', { name: '⏸ Pause' })).toBeVisible()
+    await page.getByRole('button', { name: 'Activate', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible()
   })
 
   test('add note then delete note', async ({ page }) => {
@@ -67,8 +69,10 @@ test.describe('Clients CRUD (admin+owner) @owner', () => {
     await expect(page.getByText(noteText)).toBeVisible({ timeout: 5_000 })
 
     // regression check for the client_notes RLS delete-policy bug fixed alongside this suite
-    // (migration 0054) - deleting a note used to always fail with a rollback + error toast
-    await page.getByText(noteText).locator('xpath=..').getByText('✕', { exact: true }).click()
+    // (migration 0054) - deleting a note used to always fail with a rollback + error toast.
+    // The delete trigger is an icon-only button with no text/aria-label, so target it by
+    // position (the only button inside the note's own container) rather than by icon text.
+    await page.getByText(noteText).locator('xpath=..').locator('button').click()
     await page.getByRole('button', { name: 'Delete', exact: true }).click() // confirm dialog
     await expect(page.getByText(noteText)).toHaveCount(0, { timeout: 5_000 })
     await expect(page.getByText('Could not delete that note')).toHaveCount(0)
@@ -129,7 +133,7 @@ test.describe('Clients role boundary (member is read-only) @member', () => {
     const firstRow = page.locator('div.cursor-pointer').first()
     await firstRow.click()
     await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '⏸ Pause' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0)
     await expect(page.getByTitle('Delete client')).toHaveCount(0)
 
     // quick-note textarea is shown but disabled for members, not hidden

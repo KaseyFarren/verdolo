@@ -47,13 +47,16 @@ export default function AcceptInvitePage() {
     const otpType = url.searchParams.get('type')
 
     let sessionEmail: string | null = null
+    let sessionUserId: string | null = null
 
     if (code) {
       const { data } = await supabase.auth.exchangeCodeForSession(code)
       sessionEmail = data.session?.user?.email ?? null
+      sessionUserId = data.session?.user?.id ?? null
     } else if (tokenHash && otpType && (KNOWN_OTP_TYPES as readonly string[]).includes(otpType)) {
       const { data } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType as (typeof KNOWN_OTP_TYPES)[number] })
       sessionEmail = data.session?.user?.email ?? null
+      sessionUserId = data.session?.user?.id ?? null
     } else {
       // Fallback for the old-style link format (hash-fragment tokens the browser client
       // auto-detects), in case an email sent before this change is still being used.
@@ -61,11 +64,25 @@ export default function AcceptInvitePage() {
         data: { session },
       } = await supabase.auth.getSession()
       sessionEmail = session?.user?.email ?? null
+      sessionUserId = session?.user?.id ?? null
+    }
+
+    // A session existing isn't proof of a real invite - anyone already logged in (e.g. from an
+    // unrelated tab) who lands on this bare URL would otherwise get a "set a new password" form
+    // that silently changes their real account's password under the guise of "finishing setup".
+    // Require an actual pending 'invited' org_members row for this user before proceeding.
+    // org_members_select requires status='active' (is_org_member), so a direct table query
+    // can't see an 'invited' row even for the legitimate invitee - has_pending_invite() is a
+    // narrow security-definer RPC scoped to auth.uid() that sidesteps that.
+    let hasPendingInvite = false
+    if (sessionUserId) {
+      const { data } = await supabase.rpc('has_pending_invite')
+      hasPendingInvite = data === true
     }
 
     window.history.replaceState(null, '', url.pathname)
     setEmail(sessionEmail)
-    setStatus(sessionEmail ? 'ready' : 'invalid')
+    setStatus(sessionEmail && hasPendingInvite ? 'ready' : 'invalid')
   }
 
   async function handleSubmit(e: React.FormEvent) {

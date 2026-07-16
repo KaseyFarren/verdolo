@@ -490,7 +490,15 @@ export default function TasksClient({
     if (fresh) setTasks(fresh as Task[])
   }
   async function updateDefault(id: string, fields: Record<string, unknown>) {
-    const { data } = await supabase.from('default_task_templates').update(fields).eq('id', id).select().single()
+    // editDefaultForm seeds assigned_to as '' for "Unassigned" (so CustomSelect has a string to
+    // match against its own '' option) - sent as-is, Postgres rejects '' for the uuid column
+    // (22P02) and the save silently no-ops, discarding the whole edit with no error shown.
+    const sanitized = { ...fields, assigned_to: fields.assigned_to || null }
+    const { data, error } = await supabase.from('default_task_templates').update(sanitized).eq('id', id).select().single()
+    if (error) {
+      toast.error('Could not save changes - try again')
+      return
+    }
     if (data) setDefaults((prev) => prev.map((d) => (d.id === id ? (data as Default) : d)))
     await supabase.from('tasks').delete().eq('default_template_id', id).eq('done', false).gte('due_date', today)
     if (data && !(data as Default).paused) {

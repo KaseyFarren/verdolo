@@ -52,11 +52,17 @@ export default function GeneralClient({
 
   // Spread the full settings object (not just this component's own fields) - otherwise saving
   // here would silently wipe out settings owned by other tabs (e.g. VoiceClient's brand_voice)
-  // since the jsonb column is replaced wholesale, not merged, on every write.
+  // since the jsonb column is replaced wholesale, not merged, on every write. The `settings` prop
+  // is only as fresh as the last full page load though - if another tab (e.g. Voice) wrote a
+  // change in this same client session without a reload in between, spreading the stale prop
+  // would silently revert that write. Re-read the row right before merging so this only ever
+  // clobbers a genuinely concurrent write, not a same-session one from a sibling tab.
   async function saveSettings(next: Partial<Settings>) {
     if (!isAdmin) return
+    const { data: fresh } = await supabase.from('orgs').select('settings').eq('id', orgId).single()
     const merged = {
       ...settings,
+      ...(fresh?.settings ?? {}),
       eod_hour: eodHour,
       exclude_weekends: excludeWeekends,
       notifications,

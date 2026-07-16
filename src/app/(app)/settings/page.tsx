@@ -31,7 +31,10 @@ export default async function SettingsPage() {
       trialEndsAt={org?.trial_ends_at ?? null}
       seatsPurchased={org?.seats_purchased ?? 1}
       activeMemberCount={activeMemberCount ?? 0}
-      hasSubscription={!!org?.stripe_subscription_id}
+      // Lifetime purchases are a one-time Stripe payment, not a subscription object, so
+      // stripe_subscription_id stays null for them - stripe_customer_id is what both plan
+      // types always get (see /api/billing/details, which already keys off it the same way).
+      hasSubscription={!!org?.stripe_customer_id}
       planType={org?.plan_type ?? 'subscription'}
     />
   )
