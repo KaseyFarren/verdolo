@@ -169,6 +169,9 @@ export default function TasksClient({
   const [filter, setFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'due' | 'priority' | 'title' | 'client'>('due')
   const [selectedDate, setSelectedDate] = useState('')
+  // Which Done-tab date groups (see doneGroups()) are expanded - starts empty so a history of
+  // months' worth of completed tasks doesn't dump onto the screen the moment you open the tab.
+  const [expandedDoneGroups, setExpandedDoneGroups] = useState<Set<string>>(new Set())
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
   const [showAddTask, setShowAddTask] = useState(false)
   const [showImportTasks, setShowImportTasks] = useState(false)
@@ -683,8 +686,57 @@ export default function TasksClient({
     else if (filter === 'overdue') items = visible.filter((t) => t.due_date < today && !t.done)
     else if (filter === 'today') items = visible.filter((t) => t.due_date === today && !t.done)
     else if (filter === 'completed') items = visible.filter((t) => t.done)
-    else items = visible.filter(matchesFilter)
+    // Every other tab is the "working list" - completed tasks leave it immediately rather than
+    // sorting to the bottom, so months of finished history don't turn it into endless scroll.
+    // Full history lives in the dedicated, grouped Done tab (filter === 'completed') below.
+    else items = visible.filter((t) => matchesFilter(t) && !t.done)
     return applySort(items)
+  }
+
+  const DONE_GROUP_ORDER = ['today', 'yesterday', 'this-week']
+  // Buckets completed tasks by completed_at into Today / Yesterday / This week, then a group per
+  // calendar month for anything older - so a huge Done history reads as a handful of collapsible
+  // groups instead of one flat, endless list. `items` is expected pre-sorted (applySort already
+  // ran in filteredTasks()); order is preserved within each group.
+  function doneGroups(items: Task[]): { key: string; label: string; tasks: Task[] }[] {
+    const map = new Map<string, { label: string; tasks: Task[] }>()
+    for (const t of items) {
+      const dateStr = (t.completed_at || t.due_date).slice(0, 10)
+      let key: string
+      let label: string
+      if (dateStr === today) {
+        key = 'today'
+        label = 'Today'
+      } else if (dateStr === getOffsetDate(-1)) {
+        key = 'yesterday'
+        label = 'Yesterday'
+      } else if (dateStr > getOffsetDate(-7)) {
+        key = 'this-week'
+        label = 'This week'
+      } else {
+        key = dateStr.slice(0, 7)
+        label = new Date(`${key}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      }
+      const group = map.get(key) || { label, tasks: [] }
+      group.tasks.push(t)
+      map.set(key, group)
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => {
+        const ai = DONE_GROUP_ORDER.indexOf(a)
+        const bi = DONE_GROUP_ORDER.indexOf(b)
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+        return b.localeCompare(a) // month keys (YYYY-MM) descending - most recent month first
+      })
+      .map(([key, group]) => ({ key, ...group }))
+  }
+  function toggleDoneGroup(key: string) {
+    setExpandedDoneGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const filteredList = filteredTasks()
@@ -1008,7 +1060,37 @@ export default function TasksClient({
             </>
           )}
 
-          {view === 'list' && (
+          {view === 'list' && filter === 'completed' && !selectedDate && (
+            <>
+              {filteredList.length === 0 && <div className="text-sm text-sage py-6 text-center">No completed tasks yet.</div>}
+              {filteredList.length > 0 &&
+                doneGroups(filteredList).map((g) => {
+                  const isOpen = expandedDoneGroups.has(g.key)
+                  return (
+                    <div key={g.key} className="border-b border-ink/10">
+                      <button
+                        type="button"
+                        onClick={() => toggleDoneGroup(g.key)}
+                        className="w-full flex items-center justify-between py-2.5 text-sm font-medium text-ink/70 hover:text-ink"
+                      >
+                        <span>
+                          {isOpen ? '▾' : '▸'} {g.label}
+                        </span>
+                        <span className="text-xs text-sage/70">{g.tasks.length}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="pb-2">
+                          <TaskListHeader />
+                          <AnimatePresence initial={false}>{g.tasks.map((t) => renderTaskRow(t))}</AnimatePresence>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </>
+          )}
+
+          {view === 'list' && (filter !== 'completed' || selectedDate) && (
             <>
               {filteredList.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
               {filteredList.length > 0 &&
