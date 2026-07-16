@@ -209,9 +209,12 @@ export default function DashboardClient({
   const thirtyDaysOut = getOffsetDate(30)
   const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
 
+  // Same scope as the header count above - Lead/Trial clients aren't active relationships yet,
+  // so they shouldn't pad the "on track" bucket. At Risk/Active/Churned all still count.
+  const clientsForHealth = clients.filter((c) => !['Lead', 'Trial'].includes(getStage(c)))
   const clientHealth = HEALTH_ORDER.map((key) => ({
     key,
-    count: clients.filter((c) => clientHealthKey(c, today) === key).length,
+    count: clientsForHealth.filter((c) => clientHealthKey(c, today) === key).length,
   })).filter((s) => s.count > 0)
 
   const currencySign = currencySymbol(currency)
