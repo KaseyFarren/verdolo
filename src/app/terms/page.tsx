@@ -10,12 +10,13 @@ export default function TermsPage() {
       </Link>
       <div className="mt-4 rounded-3xl bg-white shadow-md p-6 md:p-10 text-base leading-relaxed text-ink">
       <h1 className="mb-1 text-2xl font-semibold text-ink">Terms of Service</h1>
-      <p className="mb-8 text-sm text-sage">Last updated: [DATE - fill in when published]</p>
+      <p className="mb-8 text-sm text-sage">Last updated: 16 July 2026</p>
 
       <p className="mb-6">
         These Terms of Service (&quot;Terms&quot;) govern access to and use of Verdolo (the &quot;Service&quot;),
-        provided by [LEGAL ENTITY NAME] (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;). By creating an account or using the
-        Service, you agree to these Terms on behalf of yourself and, if applicable, the organization you represent.
+        provided by Kasey Farren, trading as Verdolo (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;), a sole trader based in the
+        United Kingdom. By creating an account or using the Service, you agree to these Terms on behalf of yourself
+        and, if applicable, the organization you represent.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">1. The Service</h2>
@@ -34,14 +35,23 @@ export default function TermsPage() {
         organization&apos;s subscription.
       </p>
 
-      <h2 className="mb-2 mt-8 text-base font-semibold text-ink">3. Subscriptions and billing</h2>
+      <h2 className="mb-2 mt-8 text-base font-semibold text-ink">3. Subscriptions, billing, and cancellation</h2>
       <p className="mb-6">
-        The Service is billed per seat (active team member) on a monthly subscription, with a 14-day free trial for
-        new organizations. After the trial, continued access requires an active paid subscription. Adding team
-        members beyond your purchased seat count requires purchasing additional seats. Subscriptions are billed in
-        advance and, except where required by law, fees are non-refundable. You may cancel at any time; access
-        continues until the end of the current billing period. We may change pricing with advance notice to the
-        organization owner.
+        The Service is available on a monthly subscription (billed per seat/active team member, with a 14-day free
+        trial for new organizations) or as a one-time Lifetime license (a single payment for a fixed set of seats,
+        with no recurring charge and continued access to future updates). After the trial, continued access to the
+        monthly plan requires an active paid subscription. Adding team members beyond your purchased or included
+        seat count requires purchasing additional seats. Subscriptions are billed in advance.
+      </p>
+      <p className="mb-6">
+        You may cancel your monthly subscription at any time from Settings; cancellation takes effect at the end of
+        your current billing period and you won&apos;t be charged again, but fees already paid are non-refundable
+        except where required by law. The Lifetime license is a one-time purchase and is non-refundable once
+        delivered, except where required by law. If you are purchasing as a consumer in the UK or EEA, you may have
+        a statutory right to cancel a distance purchase of digital content within 14 days for a full refund; by
+        starting to use the Service (e.g. logging in and creating data) before that period ends, you agree that we
+        may begin performance immediately and acknowledge that doing so may end that statutory cancellation right,
+        to the extent permitted by law. We may change pricing with advance notice to the organization owner.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">4. Your data</h2>
@@ -50,6 +60,7 @@ export default function TermsPage() {
         into the Service (&quot;Customer Data&quot;). We process Customer Data only to provide the Service. You&apos;re
         responsible for having the right to input any personal data you store about your own clients, and for
         complying with applicable law with respect to that data. You can export your data at any time from Settings.
+        Our Privacy Policy explains how we collect and use personal data, including on our marketing website.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">5. Acceptable use</h2>
@@ -75,7 +86,8 @@ export default function TermsPage() {
       <p className="mb-6">
         The Service is provided &quot;as is&quot; without warranties of any kind. To the maximum extent permitted by law,
         we are not liable for indirect, incidental, or consequential damages, and our total liability for any claim
-        will not exceed the amount you paid us in the twelve months before the claim arose.
+        will not exceed the amount you paid us in the twelve months before the claim arose. Nothing in these Terms
+        limits liability that cannot be excluded or limited under applicable law.
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">9. Changes to these Terms</h2>
@@ -85,13 +97,18 @@ export default function TermsPage() {
       </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">10. Governing law</h2>
-      <p className="mb-6">These Terms are governed by the laws of [JURISDICTION - fill in], without regard to conflict-of-law principles.</p>
+      <p className="mb-6">
+        These Terms are governed by the laws of England and Wales, without regard to conflict-of-law principles, and
+        the courts of England and Wales will have non-exclusive jurisdiction over any dispute. If you&apos;re a
+        consumer living elsewhere in the UK or EEA, mandatory consumer-protection laws of your country of residence
+        may still apply and you may bring proceedings in your local courts.
+      </p>
 
       <h2 className="mb-2 mt-8 text-base font-semibold text-ink">11. Contact</h2>
       <p className="mb-6">
         Questions about these Terms? Contact us at{' '}
-        <a href="mailto:kasey@kaseyfarren.com" className="text-accent underline">
-          kasey@kaseyfarren.com
+        <a href="mailto:team@verdolo.com" className="text-accent underline">
+          team@verdolo.com
         </a>
         .
       </p>
