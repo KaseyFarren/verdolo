@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripe } from '@/lib/stripe'
+import { trackEvent } from '@/lib/tracking/meta'
 import type Stripe from 'stripe'
 
 function mapStatus(stripeStatus: Stripe.Subscription.Status): 'trialing' | 'active' | 'past_due' | 'canceled' {
@@ -92,6 +93,24 @@ export async function POST(request: Request) {
           console.error('[api] Failed to record purchase_token for session', session.id, upsertError)
           return NextResponse.json({ error: 'Failed to record purchase' }, { status: 500 })
         }
+
+        // The Lifetime checkout runs on the marketing site (verdolo.com/checkout), so the
+        // ad-attribution cookies for it live there - fire the site Pixel's Purchase event via
+        // CAPI (email-matched) rather than client-side, since the confirmation redirect lands
+        // on app.verdolo.com/create-account instead of back on the site.
+        if (isLifetime) {
+          await trackEvent({
+            pixel: 'site',
+            eventName: 'Purchase',
+            eventId: `purchase-${session.id}`,
+            source: 'server',
+            email: session.customer_details?.email ?? null,
+            value: session.amount_total ? session.amount_total / 100 : undefined,
+            currency: session.currency?.toUpperCase(),
+            eventSourceUrl: 'https://verdolo.com/checkout',
+            properties: { content_name: 'lifetime' },
+          })
+        }
         break
       }
 
@@ -99,6 +118,22 @@ export async function POST(request: Request) {
         const stripeInstance = getStripe()
         const subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string)
         await syncSubscription(subscription)
+
+        // This checkout only runs from the authenticated in-app "Subscribe" button
+        // (src/app/api/billing/checkout/route.ts always sets org_id metadata) - i.e. a trial
+        // converting to the paid monthly plan. Renewals/quantity changes land in the
+        // customer.subscription.updated handler below and intentionally don't re-fire this.
+        await trackEvent({
+          pixel: 'app',
+          eventName: 'Subscribe',
+          eventId: `subscribe-${session.id}`,
+          source: 'server',
+          orgId: session.metadata!.org_id,
+          email: session.customer_details?.email ?? null,
+          value: session.amount_total ? session.amount_total / 100 : undefined,
+          currency: session.currency?.toUpperCase(),
+          eventSourceUrl: 'https://app.verdolo.com/settings',
+        })
       }
       break
     }

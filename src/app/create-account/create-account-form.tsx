@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { trackApp } from '@/lib/tracking/client'
 import Button from '@/components/ui/Button'
 import Logo from '@/components/Logo'
 
@@ -96,6 +97,12 @@ export default function CreateAccountForm({
       setLoading(false)
       return
     }
+
+    const { data: userData } = await supabase.auth.getUser()
+    trackApp('CompleteRegistration', { content_name: 'lifetime_account_setup' }, {
+      email: userData.user?.email ?? email,
+      userId: userData.user?.id,
+    })
 
     router.push('/dashboard')
     router.refresh()

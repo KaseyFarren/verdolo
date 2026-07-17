@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { trackApp } from '@/lib/tracking/client'
 import Button from '@/components/ui/Button'
 
 export default function CreateOrgForm() {
@@ -23,6 +24,12 @@ export default function CreateOrgForm() {
       setLoading(false)
       return
     }
+
+    const { data: userData } = await supabase.auth.getUser()
+    trackApp('CompleteRegistration', { content_name: 'trial_signup' }, {
+      email: userData.user?.email ?? undefined,
+      userId: userData.user?.id,
+    })
 
     router.push('/dashboard')
     router.refresh()

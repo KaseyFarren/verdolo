@@ -36,6 +36,8 @@ export function buildCsp(nonce: string): string {
     "'self'",
     SUPABASE_ORIGIN,
     SUPABASE_WS,
+    'https://www.facebook.com',
+    'https://connect.facebook.net',
     ...(isDev ? ['ws://localhost:*', 'http://localhost:*'] : []),
   ].join(' ')
 
@@ -43,7 +45,7 @@ export function buildCsp(nonce: string): string {
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: ${SUPABASE_ORIGIN}`,
+    `img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://www.facebook.com`,
     "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     // Stripe checkout is a top-level redirect, not an embed, but allow the frames

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { loadStripe } from '@stripe/stripe-js'
 import {
@@ -12,6 +13,7 @@ import {
   useStripe,
 } from '@stripe/react-stripe-js'
 import { XIcon } from '@/components/ui/icons'
+import { trackApp } from '@/lib/tracking/client'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -118,9 +120,26 @@ export default function BillingClient({
   hasSubscription: boolean
   planType: 'subscription' | 'lifetime'
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState<'checkout' | 'seats' | 'panel' | 'payment' | 'cancel' | null>(null)
   const [seatsInput, setSeatsInput] = useState(seatsPurchased)
   const [checkoutSecret, setCheckoutSecret] = useState<string | null>(null)
+
+  // The embedded checkout's return_url (src/app/api/billing/checkout/route.ts) lands back
+  // here with these params after a trial converts to the paid monthly plan. Fire the pixel
+  // once, then strip the params so a page refresh doesn't double-count the conversion.
+  useEffect(() => {
+    if (searchParams.get('checkout') !== 'success') return
+    const sessionId = searchParams.get('session_id')
+    if (!sessionId) return
+    trackApp('Subscribe', { content_name: 'trial_to_monthly' }, {
+      eventId: `subscribe-${sessionId}`,
+      orgId,
+    })
+    router.replace('/settings?view=billing')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const [showPanel, setShowPanel] = useState(false)
   const [invoices, setInvoices] = useState<Invoice[] | null>(null)
