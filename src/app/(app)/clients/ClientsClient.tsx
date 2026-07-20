@@ -12,7 +12,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import Tooltip from '@/components/ui/Tooltip'
 import { CheckIcon, ClockIcon, MessageCircleIcon, PauseIcon, PencilIcon, PlayIcon, XIcon } from '@/components/ui/icons'
-import { periodBounds, type PeriodValue } from '@/lib/period'
+import { periodBounds, daysUntilRenewal, type PeriodValue } from '@/lib/period'
 import {
   AVATAR_COLORS,
   PLATFORMS,
@@ -438,7 +438,9 @@ export default function ClientsClient({
                 <div className="flex gap-3 mt-1 flex-wrap">
                   {!!selected.retainer_cents && <span className="text-xs text-green font-semibold">{currencySign}{centsToDollars(selected.retainer_cents).toLocaleString()}/mo</span>}
                   {selected.billing_mode !== 'hourly' && !!selected.retainer_cents && (
-                    <span className="text-xs text-sage">renews on day {selected.billing_day || 1}</span>
+                    <span className="text-xs text-sage">
+                      renews in {daysUntilRenewal(selected.billing_day || 1)} day{daysUntilRenewal(selected.billing_day || 1) === 1 ? '' : 's'}
+                    </span>
                   )}
                   {selected.billing_mode === 'hourly' && !!selected.hourly_rate_cents && (
                     <span className="text-xs text-green font-semibold">{currencySign}{centsToDollars(selected.hourly_rate_cents).toLocaleString()}/hr</span>

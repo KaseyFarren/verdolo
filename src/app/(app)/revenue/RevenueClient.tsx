@@ -21,7 +21,7 @@ import {
   todayKey,
   type Currency,
 } from '@/lib/agency'
-import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, periodBounds, type PeriodValue } from '@/lib/period'
+import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, daysUntilRenewal, periodBounds, type PeriodValue } from '@/lib/period'
 import MetricBar from '@/components/ui/MetricBar'
 import { XIcon } from '@/components/ui/icons'
 import DatePicker from '@/components/ui/DatePicker'
@@ -56,11 +56,6 @@ function Avatar({ member, index }: { member: Member; index: number }) {
 
 function formatHours(seconds: number) {
   return (seconds / 3600).toFixed(1)
-}
-
-function daysUntilRenewal(billingDay: number) {
-  const { cycleLengthDays, elapsedDays } = billingCycleProgress(billingDay)
-  return cycleLengthDays - elapsedDays + 1
 }
 
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }

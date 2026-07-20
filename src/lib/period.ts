@@ -179,6 +179,13 @@ export function billingCycleElapsedFraction(billingDay: number, today: string = 
   return billingCycleProgress(billingDay, today).fraction
 }
 
+/** Days remaining until a client's retainer next renews, counting today - see billingCycleProgress
+ * for the cycle math this is derived from. */
+export function daysUntilRenewal(billingDay: number, today: string = todayKey()): number {
+  const { cycleLengthDays, elapsedDays } = billingCycleProgress(billingDay, today)
+  return cycleLengthDays - elapsedDays + 1
+}
+
 /** Every renewal date (clamped per clampedBillingDate) that falls within [rangeStart, rangeEnd)
  * - rangeEnd exclusive, both YYYY-MM-DD. A week only ever contains at most one, but a wide custom
  * range can span several, so this returns a list rather than a boolean. Used to recognize a
