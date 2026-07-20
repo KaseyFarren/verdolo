@@ -58,6 +58,11 @@ function formatHours(seconds: number) {
   return (seconds / 3600).toFixed(1)
 }
 
+function daysUntilRenewal(billingDay: number) {
+  const { cycleLengthDays, elapsedDays } = billingCycleProgress(billingDay)
+  return cycleLengthDays - elapsedDays + 1
+}
+
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
 type ArchivedTaskTotal = { assigned_to: string; completed: number; completed_late: number }
 
@@ -528,7 +533,11 @@ export default function RevenueClient({
                       <span className="text-sage ml-2 text-xs">{currencySign}{centsToDollars(r.client.hourly_rate_cents || 0)}/hr hourly</span>
                     ) : r.client.retainer_cents ? (
                       <span className="text-sage ml-2 text-xs">
-                        {fmtMoney(r.client.retainer_cents)}/mo retainer · renews day {r.client.billing_day || 1}
+                        {fmtMoney(r.client.retainer_cents)}/mo retainer · renews in{' '}
+                        {(() => {
+                          const days = daysUntilRenewal(r.client.billing_day || 1)
+                          return `${days} day${days === 1 ? '' : 's'}`
+                        })()}
                       </span>
                     ) : null}
                     {r.cycleProgress && r.client.retainer_cents ? (
