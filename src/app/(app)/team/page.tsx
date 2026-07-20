@@ -26,6 +26,10 @@ export default async function TeamPage() {
         <MembersList orgId={orgId} members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
       </section>
 
+      {(members?.length ?? 0) === 1 && (
+        <p className="mb-2 text-sm text-sage">You&apos;re the only one here so far - invite a teammate to start collaborating.</p>
+      )}
+
       <InviteForm orgId={orgId} canInviteOwner={role === 'owner'} />
     </>
   )
