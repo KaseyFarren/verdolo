@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Row, Section, Toggle } from '@/components/settings/SettingsUI'
 import InfoTooltip from '@/components/ui/InfoTooltip'
@@ -44,7 +45,11 @@ export default function GeneralClient({
     setRateStatus('saving')
     if (rateDebounce.current) clearTimeout(rateDebounce.current)
     rateDebounce.current = setTimeout(async () => {
-      await saveSettings({ hourly_cost_cents: Math.round(parseFloat(v) * 100) || 0 })
+      const ok = await saveSettings({ hourly_cost_cents: Math.round(parseFloat(v) * 100) || 0 })
+      if (!ok) {
+        setRateStatus('idle')
+        return
+      }
       setRateStatus('saved')
       setTimeout(() => setRateStatus((s) => (s === 'saved' ? 'idle' : s)), 2000)
     }, 700)
@@ -58,7 +63,7 @@ export default function GeneralClient({
   // would silently revert that write. Re-read the row right before merging so this only ever
   // clobbers a genuinely concurrent write, not a same-session one from a sibling tab.
   async function saveSettings(next: Partial<Settings>) {
-    if (!isAdmin) return
+    if (!isAdmin) return false
     const { data: fresh } = await supabase.from('orgs').select('settings').eq('id', orgId).single()
     const merged = {
       ...settings,
@@ -70,9 +75,14 @@ export default function GeneralClient({
       currency,
       ...next,
     }
-    await supabase.from('orgs').update({ settings: merged }).eq('id', orgId)
+    const { error } = await supabase.from('orgs').update({ settings: merged }).eq('id', orgId)
+    if (error) {
+      toast.error('Could not save - try again')
+      return false
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
+    return true
   }
 
   return (

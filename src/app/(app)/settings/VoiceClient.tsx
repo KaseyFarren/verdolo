@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Section } from '@/components/settings/SettingsUI'
 
@@ -21,7 +22,11 @@ export default function VoiceClient({ orgId, isAdmin, settings }: { orgId: strin
     // See GeneralClient's saveSettings comment: the `settings` prop is stale after a sibling tab
     // writes in the same client session, so re-read before merging to avoid clobbering it.
     const { data: fresh } = await supabase.from('orgs').select('settings').eq('id', orgId).single()
-    await supabase.from('orgs').update({ settings: { ...settings, ...(fresh?.settings ?? {}), brand_voice: brandVoice.trim() } }).eq('id', orgId)
+    const { error } = await supabase.from('orgs').update({ settings: { ...settings, ...(fresh?.settings ?? {}), brand_voice: brandVoice.trim() } }).eq('id', orgId)
+    if (error) {
+      toast.error('Could not save - try again')
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
