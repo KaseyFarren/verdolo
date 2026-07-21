@@ -138,6 +138,35 @@ ${progressLine}
 ${params.clientSummaries.join('\n')}`
 }
 
+const VTT_TIMESTAMP_RANGE_RE = /^\s*(?:\d{2}:)?\d{2}:\d{2}[.,]\d{3}\s*-->\s*(?:\d{2}:)?\d{2}:\d{2}[.,]\d{3}/
+const CUE_NUMBER_ONLY_RE = /^\d+$/
+
+// Zoom/Teams transcripts (pasted or uploaded as .vtt/.srt) carry a WEBVTT header, NOTE blocks,
+// standalone cue-number lines, and "HH:MM:SS.mmm --> HH:MM:SS.mmm" timestamp lines interleaved
+// with the actual spoken text. Strip just that noise, line by line, so normal prose (which never
+// matches these patterns) passes through untouched.
+export function stripTranscriptNoise(text: string): string {
+  const lines = text.split('\n')
+  const kept: string[] = []
+  let inNoteBlock = false
+  lines.forEach((line, i) => {
+    const trimmed = line.trim()
+    if (inNoteBlock) {
+      if (trimmed === '') inNoteBlock = false
+      return
+    }
+    if (i === 0 && /^WEBVTT\b/i.test(trimmed)) return
+    if (/^NOTE\b/i.test(trimmed)) {
+      inNoteBlock = true
+      return
+    }
+    if (VTT_TIMESTAMP_RANGE_RE.test(trimmed)) return
+    if (CUE_NUMBER_ONLY_RE.test(trimmed)) return
+    kept.push(line)
+  })
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export function buildTasksFromDocPrompt(params: { clientName?: string; today: string; text?: string }) {
   const clientLine = params.clientName ? ` for the client "${params.clientName}"` : ''
   const sourceLine = params.text

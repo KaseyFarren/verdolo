@@ -32,7 +32,7 @@ type Task = {
 }
 type Draft = { title: string; due_date: string | null; priority: string; notes: string; include: boolean }
 
-const ACCEPTED_EXT = ['.txt', '.md', '.pdf']
+const ACCEPTED_EXT = ['.txt', '.md', '.pdf', '.vtt', '.srt']
 const MAX_PDF_BYTES = 3 * 1024 * 1024
 
 function readAsText(file: File): Promise<string> {
@@ -81,7 +81,7 @@ export default function ImportTasksModal({
     if (!f) return
     const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase()
     if (!ACCEPTED_EXT.includes(ext)) {
-      toast.error('Upload a .txt, .md, or .pdf file, or paste text instead')
+      toast.error('Upload a .txt, .md, .pdf, .vtt, or .srt file, or paste text instead')
       return
     }
     if (ext === '.pdf' && f.size > MAX_PDF_BYTES) {
@@ -225,12 +225,12 @@ export default function ImportTasksModal({
                     className="w-full flex items-center justify-center gap-2 rounded border border-dashed border-ink/20 px-3 py-2 text-xs text-sage hover:text-ink hover:border-ink/40 mb-3"
                   >
                     <UploadCloudIcon size={14} />
-                    or upload a .txt, .md, or .pdf file
+                    or upload a .txt, .md, .pdf, .vtt, or .srt file
                   </button>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".txt,.md,.pdf"
+                    accept=".txt,.md,.pdf,.vtt,.srt"
                     className="hidden"
                     onChange={(e) => pickFile(e.target.files?.[0] || null)}
                   />

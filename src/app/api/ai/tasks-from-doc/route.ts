@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
-import { buildTasksFromDocPrompt, callClaude, extractText } from '@/lib/ai'
+import { buildTasksFromDocPrompt, callClaude, extractText, stripTranscriptNoise } from '@/lib/ai'
 import { todayKey } from '@/lib/agency'
 
 const MAX_TEXT_CHARS = 100_000
@@ -58,7 +58,10 @@ export async function POST(request: Request) {
     clientName = client?.name
   }
 
-  const prompt = buildTasksFromDocPrompt({ clientName, today: todayKey(), text: typeof text === 'string' ? text : undefined })
+  // Pasted transcripts carry the same WEBVTT/SRT timestamp noise as uploaded .vtt/.srt files, so
+  // strip it regardless of source rather than only when the filename says so.
+  const cleanedText = typeof text === 'string' ? stripTranscriptNoise(text) : undefined
+  const prompt = buildTasksFromDocPrompt({ clientName, today: todayKey(), text: cleanedText })
   const content: Record<string, unknown>[] = pdfBase64
     ? [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }]
