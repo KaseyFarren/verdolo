@@ -17,6 +17,7 @@ import Button from '@/components/ui/Button'
 import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
+import BoardView from '@/components/tasks/BoardView'
 
 export type Client = { id: string; name: string }
 export type Member = {
@@ -43,7 +44,10 @@ export type Task = {
   default_template_id: string | null
   quick: boolean
   skipped: boolean
+  status: TaskStatus
+  sort_order: number
 }
+export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
 type Recurring = {
   id: string
   title: string
@@ -159,7 +163,7 @@ export default function TasksClient({
 }) {
   const supabase = useMemo(() => createClient(), [])
   const searchParams = useSearchParams()
-  const [view, setView] = useState<'list' | 'calendar' | 'recurring' | 'defaults'>(searchParams.get('view') === 'calendar' ? 'calendar' : 'list')
+  const [view, setView] = useState<'list' | 'board' | 'calendar' | 'recurring' | 'defaults'>(searchParams.get('view') === 'calendar' ? 'calendar' : searchParams.get('view') === 'board' ? 'board' : 'list')
   const [clients] = useState(initialClients)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [recurring, setRecurring] = useState<Recurring[]>(initialRecurring)
@@ -314,6 +318,8 @@ export default function TasksClient({
       recurring_id: null,
       default_template_id: null,
       skipped: false,
+      status: 'todo',
+      sort_order: 0,
     }
     setTasks((prev) => [...prev, optimisticRow])
     setTaskForm(emptyTaskForm)
@@ -359,6 +365,8 @@ export default function TasksClient({
       recurring_id: null,
       default_template_id: null,
       skipped: false,
+      status: 'todo',
+      sort_order: 0,
     }
     setTasks((prev) => [...prev, optimisticRow])
     setSubtaskForm(emptyTaskForm)
@@ -399,19 +407,21 @@ export default function TasksClient({
     if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
   }
 
-  async function completeTask(t: Task) {
+  // `extra` lets board drag-drop fold in a `sort_order` (and, when un-completing into a specific
+  // column, the target `status`) alongside the completion transition without duplicating it.
+  async function completeTask(t: Task, extra: Record<string, unknown> = {}) {
     const completedAt = new Date().toISOString()
     await timer.stopIfRunningFor(t.id)
     // Claiming an unassigned task on completion so it credits the completer's tally instead of
     // vanishing from every per-person breakdown (topByKey skips null assigned_to entirely).
     const claim = effectiveAssignees(t).length === 0 ? { assignee_ids: [userId], assigned_to: userId } : {}
-    await updateTask(t.id, { done: true, completed_at: completedAt, ...claim })
+    await updateTask(t.id, { done: true, completed_at: completedAt, status: 'done', ...claim, ...extra })
     if (t.is_auto && t.auto_type === 'checkin' && t.client_id) {
       await supabase.from('clients').update({ last_contacted: today }).eq('id', t.client_id)
     }
   }
-  async function uncompleteTask(t: Task) {
-    await updateTask(t.id, { done: false, completed_at: null })
+  async function uncompleteTask(t: Task, extra: Record<string, unknown> = {}) {
+    await updateTask(t.id, { done: false, completed_at: null, status: 'todo', ...extra })
   }
   async function completeAll(items: Task[]) {
     const pending = items.filter((t) => !t.done)
@@ -881,6 +891,7 @@ export default function TasksClient({
 
   const TASK_NAV: { value: typeof view; label: string }[] = [
     { value: 'list', label: 'List' },
+    { value: 'board', label: 'Board' },
     { value: 'calendar', label: 'Calendar' },
     { value: 'recurring', label: 'Recurring' },
     { value: 'defaults', label: 'Defaults' },
@@ -936,7 +947,7 @@ export default function TasksClient({
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div className="flex flex-wrap items-center gap-2">
                 {view === 'list' && <DatePicker value={selectedDate} onChange={selectDate} placeholder="Pick a date…" className="w-40" />}
-                {(view === 'list' || view === 'calendar') && filterSelect}
+                {(view === 'list' || view === 'calendar' || view === 'board') && filterSelect}
                 {view === 'list' && sortSelect}
               </div>
               {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
@@ -955,7 +966,7 @@ export default function TasksClient({
               </div>
             </div>
 
-            {view === 'list' && showAddTask && (
+            {(view === 'list' || view === 'board') && showAddTask && (
               <AddTaskFormMulti mode={taskMode} setMode={setTaskMode} form={taskForm} setForm={setTaskForm} clients={clients} members={members} onSubmit={addTask} onCancel={() => setShowAddTask(false)} />
             )}
           </div>
@@ -1121,6 +1132,19 @@ export default function TasksClient({
                   )
                 })()}
             </>
+          )}
+
+          {view === 'board' && (
+            <BoardView
+              tasks={visible.filter((t) => matchesFilter(t))}
+              clients={clients}
+              members={members}
+              subtasksByParent={subtasksByParent}
+              updateTask={updateTask}
+              completeTask={completeTask}
+              uncompleteTask={uncompleteTask}
+              onOpenDetail={(id) => setDetailTaskId(id)}
+            />
           )}
 
           {view === 'recurring' && (

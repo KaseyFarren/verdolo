@@ -29,6 +29,8 @@ type Task = {
   default_template_id: string | null
   quick: boolean
   skipped: boolean
+  status: 'todo' | 'in_progress' | 'in_review' | 'done'
+  sort_order: number
 }
 type Draft = { title: string; due_date: string | null; priority: string; notes: string; include: boolean }
 
