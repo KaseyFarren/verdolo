@@ -23,6 +23,7 @@ import {
   getInitials,
   getOffsetDate,
   getStage,
+  formatNoteTime,
   HEALTH_COLOR,
   HEALTH_LABEL,
   memberName,
@@ -179,6 +180,7 @@ export default function DashboardClient({
 
   const [analyzingRisk, setAnalyzingRisk] = useState(false)
   const [riskResults, setRiskResults] = useState<RiskClient[] | null>(null)
+  const [riskGeneratedAt, setRiskGeneratedAt] = useState<string | null>(null)
 
   const [note, setNote] = useState(initialNote)
   const [noteSaved, setNoteSaved] = useState(true)
@@ -394,8 +396,12 @@ export default function DashboardClient({
         body: JSON.stringify({ orgId }),
       })
       const body = await res.json()
-      if (res.ok) setRiskResults(body.clients || [])
-      else toast.error(body.error || 'Generation failed')
+      if (res.ok) {
+        setRiskResults(body.clients || [])
+        setRiskGeneratedAt(body.generatedAt || null)
+      } else {
+        toast.error(body.error || 'Generation failed')
+      }
     } finally {
       setAnalyzingRisk(false)
     }
@@ -554,6 +560,11 @@ export default function DashboardClient({
                   {analyzingRisk ? 'Analyzing…' : riskResults === null ? 'Analyze risk' : 'Re-analyze'}
                 </Button>
               </div>
+              {riskGeneratedAt && (
+                <div className="text-xs text-sage/70 mb-2">
+                  As of {formatNoteTime(riskGeneratedAt)} - refreshes automatically after a few hours
+                </div>
+              )}
               {riskResults === null ? (
                 <div className="text-sm text-sage">Not analyzed yet.</div>
               ) : riskResults.length === 0 ? (
