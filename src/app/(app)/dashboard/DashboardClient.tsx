@@ -67,6 +67,7 @@ type TodayTimeEntry = { user_id: string; client_id: string | null; duration_seco
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type WeekCompletedTask = { assigned_to: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
+type RiskClient = { clientId: string; name: string; riskLevel: 'high' | 'medium'; reason: string; action: string }
 
 const HEALTH_ORDER = ['green', 'amber', 'red', 'churned'] as const
 
@@ -175,6 +176,9 @@ export default function DashboardClient({
   const [taskForm, setTaskForm] = useState<TaskFormState>({ title: '', clientId: '', assignedTo: '', dueDate: todayKey(), priority: '', notes: '' })
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
+
+  const [analyzingRisk, setAnalyzingRisk] = useState(false)
+  const [riskResults, setRiskResults] = useState<RiskClient[] | null>(null)
 
   const [note, setNote] = useState(initialNote)
   const [noteSaved, setNoteSaved] = useState(true)
@@ -381,6 +385,22 @@ export default function DashboardClient({
     }
   }
 
+  async function analyzeRisk() {
+    setAnalyzingRisk(true)
+    try {
+      const res = await fetch('/api/ai/risk-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId }),
+      })
+      const body = await res.json()
+      if (res.ok) setRiskResults(body.clients || [])
+      else toast.error(body.error || 'Generation failed')
+    } finally {
+      setAnalyzingRisk(false)
+    }
+  }
+
   async function markSent(client: Client) {
     const message = draftMessages[client.id]
     if (!message) return
@@ -516,6 +536,47 @@ export default function DashboardClient({
                   <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
                 </div>
               </div>
+            </>
+          ),
+        }
+      : null,
+    isAdmin
+      ? {
+          key: 'risk',
+          node: (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-ink/60 flex items-center">
+                  At risk
+                  <InfoTooltip content="AI-ranked clients with a warning sign - overdue contact, an expiring contract, overdue tasks, unbilled hours piling up, or no recent activity." />
+                </div>
+                <Button variant="ghost" size="sm" onClick={analyzeRisk} disabled={analyzingRisk} className="!px-0">
+                  {analyzingRisk ? 'Analyzing…' : riskResults === null ? 'Analyze risk' : 'Re-analyze'}
+                </Button>
+              </div>
+              {riskResults === null ? (
+                <div className="text-sm text-sage">Not analyzed yet.</div>
+              ) : riskResults.length === 0 ? (
+                <div className="text-sm text-sage">No clients need attention right now.</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {riskResults.map((r) => (
+                    <div key={r.clientId} className="rounded-lg border border-ink/10 p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-sm font-medium text-ink">{r.name}</span>
+                        <span
+                          className="text-xs rounded-full px-2 py-0.5 font-medium shrink-0"
+                          style={{ color: r.riskLevel === 'high' ? '#e05070' : '#cc9a3c', background: r.riskLevel === 'high' ? '#e0507015' : '#cc9a3c15' }}
+                        >
+                          {r.riskLevel === 'high' ? 'High risk' : 'Medium risk'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-sage">{r.reason}</div>
+                      <div className="text-xs text-sage mt-1">→ {r.action}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           ),
         }

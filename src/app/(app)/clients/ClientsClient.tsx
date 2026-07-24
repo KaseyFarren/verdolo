@@ -6,12 +6,13 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import ClientFiles from '@/components/ClientFiles'
+import ClientUpdateModal from '@/components/clients/ClientUpdateModal'
 import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import Tooltip from '@/components/ui/Tooltip'
-import { CheckIcon, ClockIcon, MessageCircleIcon, PauseIcon, PencilIcon, PlayIcon, XIcon } from '@/components/ui/icons'
+import { CheckIcon, ClockIcon, MessageCircleIcon, PauseIcon, PencilIcon, PlayIcon, SparkleIcon, XIcon } from '@/components/ui/icons'
 import { periodBounds, daysUntilRenewal, type PeriodValue } from '@/lib/period'
 import {
   AVATAR_COLORS,
@@ -167,6 +168,7 @@ export default function ClientsClient({
   const [stageFilter, setStageFilter] = useState('')
   const [timelineType, setTimelineType] = useState<'all' | 'note' | 'task' | 'message'>('all')
   const [timelinePeriod, setTimelinePeriod] = useState<PeriodValue>({ period: 'all_time' })
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
   const today = todayKey()
   const selected = clients.find((c) => c.id === selectedId) || null
   const memberById = (id: string | null) => members.find((m) => m.user_id === id) || null
@@ -465,6 +467,12 @@ export default function ClientsClient({
                     {isChurned ? <><PlayIcon size={11} /> Activate</> : <><PauseIcon size={11} /> Pause</>}
                   </button>
                   <button
+                    className="text-xs rounded-lg px-2.5 py-1.5 font-medium border border-ink/15 text-ink hover:bg-sand shadow-sm inline-flex items-center gap-1"
+                    onClick={() => setShowUpdateModal(true)}
+                  >
+                    <SparkleIcon size={11} /> Draft update
+                  </button>
+                  <button
                     className="text-xs rounded-lg px-2.5 py-1.5 font-medium text-white shadow-sm bg-accent"
                     onClick={() => {
                       setEditing(true)
@@ -616,6 +624,16 @@ export default function ClientsClient({
           )}
         </div>
         </div>
+        {showUpdateModal && (
+          <ClientUpdateModal
+            supabase={supabase}
+            orgId={orgId}
+            userId={userId}
+            clientId={selected.id}
+            onSaved={(note) => setNotes((prev) => [note, ...prev])}
+            onClose={() => setShowUpdateModal(false)}
+          />
+        )}
       </div>
     )
   }
