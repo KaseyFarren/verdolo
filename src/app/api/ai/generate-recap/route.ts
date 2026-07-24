@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
@@ -93,6 +94,13 @@ export async function POST(request: Request) {
     await supabase
       .from('reports')
       .upsert({ org_id: orgId, period_type: periodType, period_start: start, period_end: end, content: recap }, { onConflict: 'org_id,period_type,period_start' })
+    // The Reports page caches its server data (including this org's `reports` rows) for up to
+    // 60s under the `reports:${orgId}` tag - without this, a reload right after generating a
+    // recap can serve a stale RSC payload that's missing the report we just wrote.
+    // { expire: 0 } forces an immediate full revalidation (this Next.js version requires a
+    // second argument; omitting it only warns and would fall back to stale-while-revalidate
+    // semantics for an unmatched profile name).
+    revalidateTag(`reports:${orgId}`, { expire: 0 })
     return NextResponse.json({ recap, periodType, periodStart: start, periodEnd: end })
   } catch {
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
