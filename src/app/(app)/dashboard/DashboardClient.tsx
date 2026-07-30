@@ -554,7 +554,7 @@ export default function DashboardClient({
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-medium text-ink/60 flex items-center">
                   At risk
-                  <InfoTooltip content="AI-ranked clients with a warning sign - overdue contact, an expiring contract, overdue tasks, unbilled hours piling up, or no recent activity." />
+                  <InfoTooltip content="AI-ranked clients with a warning sign - overdue contact, an expiring contract, overdue tasks, or no recent activity." />
                 </div>
                 <Button variant="ghost" size="sm" onClick={analyzeRisk} disabled={analyzingRisk} className="!px-0">
                   {analyzingRisk ? 'Analyzing…' : riskResults === null ? 'Analyze risk' : 'Re-analyze'}

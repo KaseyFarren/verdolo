@@ -6,7 +6,7 @@ import { checkAndConsumeAiCredit, getAiCreditStatus } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
 import { isAdminRole, type Role } from '@/lib/org'
 import { buildRiskScanPrompt, callClaude, extractText, type RiskSignals } from '@/lib/ai'
-import { getStage, getHealthScore, currencySymbol, todayKey, getOffsetDate } from '@/lib/agency'
+import { getStage, getHealthScore, todayKey, getOffsetDate } from '@/lib/agency'
 
 export const maxDuration = 60
 
@@ -35,11 +35,9 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
   return unstable_cache(
     async () => {
       const admin = createAdminClient()
-      const [{ data: org }, { data: clients }, { data: tasks }, { data: timeEntries }] = await Promise.all([
-        admin.from('orgs').select('settings').eq('id', orgId).maybeSingle(),
+      const [{ data: clients }, { data: tasks }] = await Promise.all([
         admin.from('clients').select('id, name, stage, status, last_contacted, cadence_days, contract_ends').eq('org_id', orgId),
         admin.from('tasks').select('client_id, due_date, done, archived').eq('org_id', orgId).eq('done', false).eq('archived', false),
-        admin.from('time_entries').select('client_id, duration_seconds, billable, invoice_id').eq('org_id', orgId).is('invoice_id', null).eq('billable', true),
       ])
 
       const today = todayKey()
@@ -58,7 +56,6 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
         const overdueDays = c.last_contacted ? daysBetween(c.last_contacted, today) : null
         const contractDays = c.contract_ends ? daysBetween(today, c.contract_ends) : null
         const overdueTaskCount = (tasks || []).filter((t) => t.client_id === c.id && t.due_date && t.due_date < today).length
-        const unbilledSeconds = (timeEntries || []).filter((e) => e.client_id === c.id).reduce((s, e) => s + (e.duration_seconds || 0), 0)
         const hasRecentActivity =
           (recentTasks || []).some((t) => t.client_id === c.id) || (recentTime || []).some((e) => e.client_id === c.id)
 
@@ -68,7 +65,6 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
           contractEndsInDays: contractDays !== null && contractDays <= 30 ? contractDays : null,
           overdueTaskCount,
           manuallyFlagged: getStage(c) === 'At Risk',
-          unbilledHours: unbilledSeconds / 3600,
           stalled: !hasRecentActivity,
         }
 
@@ -77,7 +73,6 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
           signals.contractEndsInDays !== null ||
           signals.overdueTaskCount > 0 ||
           signals.manuallyFlagged ||
-          signals.unbilledHours >= 1 ||
           signals.stalled
 
         if (hasSignal) signalsByClient.set(c.id, signals)
@@ -101,8 +96,7 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
         signalsList.push(s)
       }
 
-      const currencySign = currencySymbol((org?.settings as { currency?: string } | null)?.currency)
-      const prompt = buildRiskScanPrompt(signalsList, currencySign)
+      const prompt = buildRiskScanPrompt(signalsList)
 
       const result = await callClaude(
         apiKey,

@@ -186,11 +186,10 @@ export type RiskSignals = {
   contractEndsInDays: number | null
   overdueTaskCount: number
   manuallyFlagged: boolean
-  unbilledHours: number
   stalled: boolean
 }
 
-export function buildRiskScanPrompt(clients: RiskSignals[], currencySign = '$') {
+export function buildRiskScanPrompt(clients: RiskSignals[]) {
   const lines = clients.map((c, i) => {
     const facts = [
       c.manuallyFlagged ? 'manually marked At Risk' : '',
@@ -201,12 +200,11 @@ export function buildRiskScanPrompt(clients: RiskSignals[], currencySign = '$') 
           : `contract ends in ${c.contractEndsInDays} day(s)`
         : '',
       c.overdueTaskCount > 0 ? `${c.overdueTaskCount} overdue task(s)` : '',
-      c.unbilledHours > 0 ? `${c.unbilledHours.toFixed(1)}h of unbilled time logged` : '',
       c.stalled ? 'no completed tasks or logged hours in the last 14 days' : '',
     ].filter(Boolean)
     return `${i + 1}. ${c.name}: ${facts.join('; ')}`
   })
-  return `You are an agency operations assistant. Below are clients that already have at least one deterministic warning sign - your job is to rank them by how urgently they need attention and explain why in plain language, not to invent new signs or recompute the numbers given. Currency sign for any amounts you reference is "${currencySign}", but no amounts are given here, only hours and days - do not estimate dollar figures. Do not use em dashes.
+  return `You are an agency operations assistant. Below are clients that already have at least one deterministic warning sign - your job is to rank them by how urgently they need attention and explain why in plain language, not to invent new signs or recompute the numbers given. No dollar amounts are given here, only days and task counts - do not estimate dollar figures. Do not use em dashes.
 Clients (numbered):
 ${lines.join('\n')}
 For each client, set riskLevel to "high" if multiple signs stack up or a sign is severe (e.g. contract already ended, more than 14 days overdue for contact), otherwise "medium". Write a one-sentence plain-language reason using only the facts given, and one concrete next action (e.g. "send a check-in message", "have a scope conversation", "confirm renewal before the contract lapses"). Include every client listed above exactly once, identified by its number. Order the array most urgent first.
