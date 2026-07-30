@@ -37,6 +37,7 @@ export type Task = {
   due_date: string
   priority: string
   notes: string | null
+  estimated_hours: number | null
   done: boolean
   completed_at: string | null
   is_auto: boolean
@@ -78,6 +79,7 @@ const emptyTaskForm = {
   dueDate: todayKey(),
   priority: '',
   notes: '',
+  estimatedHours: '',
 }
 const emptyRecurringForm = {
   title: '',
@@ -309,6 +311,7 @@ export default function TasksClient({
       due_date: taskForm.dueDate,
       priority: taskForm.priority || 'Medium',
       notes: taskForm.notes,
+      estimated_hours: taskForm.estimatedHours ? Number(taskForm.estimatedHours) : null,
       quick: taskMode === 'quick',
       done: false,
     }
@@ -357,6 +360,7 @@ export default function TasksClient({
       // addTask()'s fallback.
       priority: subtaskForm.priority || 'Medium',
       notes: subtaskForm.notes,
+      estimated_hours: subtaskForm.estimatedHours ? Number(subtaskForm.estimatedHours) : null,
       quick: false,
       done: false,
       parent_task_id: parentId,

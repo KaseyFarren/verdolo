@@ -12,6 +12,7 @@ export type TaskFormStateMulti = {
   dueDate: string
   priority: string
   notes: string
+  estimatedHours: string
 }
 
 type Client = { id: string; name: string }
@@ -90,6 +91,17 @@ export default function AddTaskFormMulti({
             value={form.assigneeIds}
             onChange={(ids) => setForm((f) => ({ ...f, assigneeIds: ids }))}
             options={members.map((m) => ({ value: m.user_id, label: memberName(m) }))}
+          />
+        )}
+        {detailed && (
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            className="rounded border border-ink/10 bg-white px-3 py-2 text-sm"
+            placeholder="Estimated hours"
+            value={form.estimatedHours}
+            onChange={(e) => setForm((f) => ({ ...f, estimatedHours: e.target.value }))}
           />
         )}
       </div>

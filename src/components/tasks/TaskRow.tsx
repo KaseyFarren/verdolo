@@ -152,6 +152,11 @@ export default function TaskRow({
           >
             {t.title}
           </button>
+          {t.estimated_hours != null && (
+            <span className="text-[10px] text-sage/70 shrink-0" title="Estimated time">
+              {t.estimated_hours}h
+            </span>
+          )}
           {isTimerRunning && (
             <span className="text-xs font-mono text-green inline-flex items-center gap-1 shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" /> {elapsed}

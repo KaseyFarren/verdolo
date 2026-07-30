@@ -31,7 +31,16 @@ export default function TaskDetailModal({
   budgets: Budget[]
   isAdmin: boolean
   effectiveAssignees: (t: Task) => string[]
-  onSave: (fields: { title: string; client_id: string | null; budget_id: string | null; assignee_ids: string[]; due_date: string; priority: string; notes: string }) => void
+  onSave: (fields: {
+    title: string
+    client_id: string | null
+    budget_id: string | null
+    assignee_ids: string[]
+    due_date: string
+    priority: string
+    notes: string
+    estimated_hours: number | null
+  }) => void
   onDelete: () => void
   onClose: () => void
 }) {
@@ -42,12 +51,22 @@ export default function TaskDetailModal({
   const [dueDate, setDueDate] = useState(task.due_date)
   const [priority, setPriority] = useState(task.priority)
   const [notes, setNotes] = useState(task.notes || '')
+  const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours != null ? String(task.estimated_hours) : '')
 
   const clientBudgets = budgets.filter((b) => b.client_id === clientId)
 
   function save() {
     if (!title.trim()) return
-    onSave({ title: title.trim(), client_id: clientId || null, budget_id: budgetId || null, assignee_ids: assigneeIds, due_date: dueDate, priority, notes })
+    onSave({
+      title: title.trim(),
+      client_id: clientId || null,
+      budget_id: budgetId || null,
+      assignee_ids: assigneeIds,
+      due_date: dueDate,
+      priority,
+      notes,
+      estimated_hours: estimatedHours ? Number(estimatedHours) : null,
+    })
     onClose()
   }
 
@@ -113,6 +132,18 @@ export default function TaskDetailModal({
             <div>
               <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Priority</div>
               <CustomSelect value={priority} onChange={setPriority} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Estimated hours</div>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                className="w-full rounded-[8px] border border-ink/10 bg-white px-3 py-2 text-sm"
+                placeholder="e.g. 2"
+                value={estimatedHours}
+                onChange={(e) => setEstimatedHours(e.target.value)}
+              />
             </div>
           </div>
 

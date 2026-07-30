@@ -21,6 +21,7 @@ type Task = {
   due_date: string
   priority: string
   notes: string | null
+  estimated_hours: number | null
   done: boolean
   completed_at: string | null
   is_auto: boolean
