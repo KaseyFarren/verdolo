@@ -29,6 +29,7 @@ export type Member = {
 export type Task = {
   id: string
   client_id: string | null
+  budget_id?: string | null
   assigned_to: string | null
   assignee_ids: string[]
   parent_task_id: string | null
@@ -47,6 +48,7 @@ export type Task = {
   status: TaskStatus
   sort_order: number
 }
+export type Budget = { id: string; client_id: string; name: string }
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
 type Recurring = {
   id: string
@@ -147,6 +149,7 @@ export default function TasksClient({
   initialDefaultSubtasks,
   initialRecurringSubtasks,
   members,
+  budgets,
   excludeWeekends,
 }: {
   orgId: string
@@ -159,6 +162,7 @@ export default function TasksClient({
   initialDefaultSubtasks: TemplateSubtask[]
   initialRecurringSubtasks: TemplateSubtask[]
   members: Member[]
+  budgets: Budget[]
   excludeWeekends: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -986,6 +990,8 @@ export default function TasksClient({
               task={detailTask}
               clients={clients}
               members={members}
+              budgets={budgets}
+              isAdmin={isAdmin}
               effectiveAssignees={effectiveAssignees}
               onSave={(fields) => updateTask(detailTask.id, { ...fields, assigned_to: deriveAssignedTo(fields.assignee_ids) })}
               onDelete={() => {

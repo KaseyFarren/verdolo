@@ -70,6 +70,43 @@ export function computeClientBurn(
   }
 }
 
+export type BudgetType = 'fixed_fee' | 'retainer' | 'hourly_cap'
+
+export type BudgetBurn = {
+  hoursCap: number
+  hoursLogged: number
+  percent: number
+  status: BurnStatus
+  spentCents: number | null
+  amountCap: number | null
+}
+
+// Budgets track cumulative spend against the budget's own start/end window, not a recurring
+// billing cycle like computeClientBurn above - a fixed-fee project or hourly cap has no monthly
+// reset. hours_cap (if set) is the direct source of truth; a budget with only amount_cents falls
+// back to the org's target hourly rate to derive an equivalent hour figure, same conversion
+// clientHoursBudget uses for retainers.
+export function computeBudgetBurn(
+  budget: { amount_cents?: number | null; hours_cap?: number | null },
+  hoursLogged: number,
+  targetRateCents: number,
+): BudgetBurn | null {
+  const hoursCap = budget.hours_cap ?? (budget.amount_cents && targetRateCents > 0 ? budget.amount_cents / targetRateCents : null)
+  if (hoursCap === null || hoursCap <= 0) return null
+
+  const percent = (hoursLogged / hoursCap) * 100
+  const spentCents = targetRateCents > 0 ? Math.round(hoursLogged * targetRateCents) : null
+
+  return {
+    hoursCap,
+    hoursLogged,
+    percent,
+    status: burnStatus(percent),
+    spentCents,
+    amountCap: budget.amount_cents ?? null,
+  }
+}
+
 export type BurnDriver = { title: string; hours: number; share: number }
 
 // Attributes a cycle's logged hours to the tasks that drove them, so a burn alert can tell a

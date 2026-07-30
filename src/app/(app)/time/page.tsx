@@ -37,7 +37,7 @@ export default async function TimePage({
   // timestamp, so it can only be folded into a period-scoped view when that period is "all
   // time" - anything narrower and the archive can't be sliced to fit, so we simply don't fetch
   // it (TimeClient's summary math already treats an empty archivedTotals array as zero).
-  const [{ data: clients }, { data: openTasks }, { data: allTasks }, { data: entries }, { data: members }, { data: archivedTotals }, { data: runningEntry }] =
+  const [{ data: clients }, { data: openTasks }, { data: allTasks }, { data: entries }, { data: members }, { data: archivedTotals }, { data: runningEntry }, { data: budgets }] =
     await Promise.all([
       supabase.from('clients').select('id, name, billing_mode').eq('org_id', orgId).order('name'),
       supabase.from('tasks').select('id, title, client_id, due_date, is_auto, recurring_id').eq('org_id', orgId).eq('done', false),
@@ -50,6 +50,9 @@ export default async function TimePage({
       // Independent of the period/client/task filters above - a live timer is "now" and should
       // stay visible in the timer card even while browsing a past period.
       supabase.from('time_entries').select('*').eq('org_id', orgId).eq('user_id', user.id).is('ended_at', null).maybeSingle(),
+      // Admin-only via RLS (budgets_select is is_org_admin) - a non-admin's query just comes back
+      // empty, same posture as billing fields elsewhere.
+      supabase.from('budgets').select('id, client_id, name').eq('org_id', orgId).eq('status', 'active').order('name'),
     ])
 
   return (
@@ -64,6 +67,7 @@ export default async function TimePage({
       runningEntry={runningEntry ?? null}
       members={members ?? []}
       archivedTotals={archivedTotals ?? []}
+      budgets={budgets ?? []}
       period={{ period, start: sp.start, end: sp.end }}
       filterClientId={filterClientId}
       filterUserId={filterUserId}

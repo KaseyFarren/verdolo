@@ -21,10 +21,12 @@ const NEW_TASK_VALUE = '__new_task__'
 
 type Client = { id: string; name: string; billing_mode?: string | null }
 type Task = { id: string; title: string; client_id: string | null; due_date?: string | null; is_auto?: boolean; recurring_id?: string | null }
+type Budget = { id: string; client_id: string; name: string }
 type Entry = {
   id: string
   client_id: string | null
   task_id: string | null
+  budget_id?: string | null
   user_id: string
   started_at: string
   ended_at: string | null
@@ -69,6 +71,7 @@ export default function TimeClient({
   runningEntry,
   members,
   archivedTotals,
+  budgets,
   period,
   filterClientId,
   filterUserId,
@@ -84,6 +87,7 @@ export default function TimeClient({
   runningEntry: Entry | null
   members: Member[]
   archivedTotals: { client_id: string | null; user_id: string; seconds: number }[]
+  budgets: Budget[]
   period: PeriodValue
   filterClientId: string
   filterUserId: string
@@ -158,6 +162,7 @@ export default function TimeClient({
   const [timerTaskId, setTimerTaskId] = useState('')
   const [timerNewTaskTitle, setTimerNewTaskTitle] = useState('')
   const [timerNote, setTimerNote] = useState('')
+  const [timerBudgetId, setTimerBudgetId] = useState('')
   const [starting, setStarting] = useState(false)
 
   const [manualClientId, setManualClientId] = useState('')
@@ -167,6 +172,7 @@ export default function TimeClient({
   const [manualHours, setManualHours] = useState('')
   const [manualNote, setManualNote] = useState('')
   const [manualBillable, setManualBillable] = useState(true)
+  const [manualBudgetId, setManualBudgetId] = useState('')
   const [savingManual, setSavingManual] = useState(false)
 
   // Days render collapsed to a one-line total by default (like months used to) - only today
@@ -194,6 +200,7 @@ export default function TimeClient({
   const [editHours, setEditHours] = useState('')
   const [editNote, setEditNote] = useState('')
   const [editBillable, setEditBillable] = useState(true)
+  const [editBudgetId, setEditBudgetId] = useState('')
 
   useEffect(() => {
     if (!running) return
@@ -250,6 +257,7 @@ export default function TimeClient({
       org_id: orgId,
       client_id: timerClientId,
       task_id: taskId,
+      budget_id: timerBudgetId || null,
       user_id: userId,
       started_at: new Date().toISOString(),
       note: timerNote || null,
@@ -260,6 +268,7 @@ export default function TimeClient({
     setEntries((prev) => [optimisticEntry, ...prev])
     setTimerTaskId(taskId || '')
     setTimerNewTaskTitle('')
+    setTimerBudgetId('')
     const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
     if (error) {
       setRunning(null)
@@ -287,6 +296,7 @@ export default function TimeClient({
     setTimerTaskId('')
     setTimerNewTaskTitle('')
     setTimerNote('')
+    setTimerBudgetId('')
     const { data, error } = await supabase.from('time_entries').update(fields).eq('id', stoppedId).select().single()
     if (error) {
       setRunning(prevEntry)
@@ -321,6 +331,7 @@ export default function TimeClient({
       org_id: orgId,
       client_id: manualClientId,
       task_id: taskId,
+      budget_id: manualBudgetId || null,
       user_id: userId,
       started_at: startedAt,
       ended_at: endedAt,
@@ -335,6 +346,7 @@ export default function TimeClient({
     setManualNewTaskTitle('')
     setManualHours('')
     setManualNote('')
+    setManualBudgetId('')
     setSavingManual(false)
     const { data, error } = await supabase.from('time_entries').insert(insertRow).select().single()
     if (error) {
@@ -520,6 +532,7 @@ export default function TimeClient({
     setEditHours(e.duration_seconds ? (e.duration_seconds / 3600).toFixed(2) : '')
     setEditNote(e.note || '')
     setEditBillable(e.billable)
+    setEditBudgetId(e.budget_id || '')
   }
 
   async function updateEntry(e: Entry) {
@@ -530,6 +543,7 @@ export default function TimeClient({
     const fields = {
       client_id: editClientId,
       task_id: editTaskId || null,
+      budget_id: editBudgetId || null,
       duration_seconds: durationSeconds,
       ended_at: endedAt,
       note: editNote || null,
@@ -591,6 +605,8 @@ export default function TimeClient({
   const isFutureAutoInstance = (t: Task) => !!(t.is_auto || t.recurring_id) && !!t.due_date && t.due_date > today
   const timerTasks = mergedOpenTasks.filter((t) => t.client_id === timerClientId && !isFutureAutoInstance(t))
   const manualTasks = mergedOpenTasks.filter((t) => t.client_id === manualClientId && !isFutureAutoInstance(t))
+  const timerBudgets = budgets.filter((b) => b.client_id === timerClientId)
+  const manualBudgets = budgets.filter((b) => b.client_id === manualClientId)
 
   function monthLabel(month: string) {
     const [my, mm] = month.split('-').map(Number)
@@ -631,6 +647,7 @@ export default function TimeClient({
             const canEdit = isAdmin || e.user_id === userId
             if (editingId === e.id) {
               const editTasks = allTasks.filter((t) => t.client_id === editClientId)
+              const editBudgets = budgets.filter((b) => b.client_id === editClientId)
               return (
                 <div key={e.id} className="bg-white p-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
@@ -639,6 +656,7 @@ export default function TimeClient({
                       onChange={(v) => {
                         setEditClientId(v)
                         setEditTaskId('')
+                        setEditBudgetId('')
                       }}
                       options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
                     />
@@ -648,6 +666,13 @@ export default function TimeClient({
                       disabled={!editClientId}
                       options={[{ value: '', label: 'No task' }, ...editTasks.map((t) => ({ value: t.id, label: t.title }))]}
                     />
+                    {isAdmin && editBudgets.length > 0 && (
+                      <CustomSelect
+                        value={editBudgetId}
+                        onChange={setEditBudgetId}
+                        options={[{ value: '', label: 'No budget' }, ...editBudgets.map((b) => ({ value: b.id, label: b.name }))]}
+                      />
+                    )}
                     <input
                       type="number"
                       step="0.25"
@@ -762,6 +787,7 @@ export default function TimeClient({
                   setTimerClientId(v)
                   setTimerTaskId('')
                   setTimerNewTaskTitle('')
+                  setTimerBudgetId('')
                 }}
                 options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
               />
@@ -778,6 +804,13 @@ export default function TimeClient({
                   ...timerTasks.map((t) => ({ value: t.id, label: t.title })),
                 ]}
               />
+              {isAdmin && timerBudgets.length > 0 && (
+                <CustomSelect
+                  value={timerBudgetId}
+                  onChange={setTimerBudgetId}
+                  options={[{ value: '', label: 'No budget' }, ...timerBudgets.map((b) => ({ value: b.id, label: b.name }))]}
+                />
+              )}
             </div>
             {timerTaskId === NEW_TASK_VALUE && (
               <input
@@ -814,6 +847,7 @@ export default function TimeClient({
               setManualClientId(v)
               setManualTaskId('')
               setManualNewTaskTitle('')
+              setManualBudgetId('')
             }}
             options={[{ value: '', label: 'Select client…' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
           />
@@ -830,6 +864,13 @@ export default function TimeClient({
               ...manualTasks.map((t) => ({ value: t.id, label: t.title })),
             ]}
           />
+          {isAdmin && manualBudgets.length > 0 && (
+            <CustomSelect
+              value={manualBudgetId}
+              onChange={setManualBudgetId}
+              options={[{ value: '', label: 'No budget' }, ...manualBudgets.map((b) => ({ value: b.id, label: b.name }))]}
+            />
+          )}
           <DatePicker value={manualDate} onChange={setManualDate} placeholder="Date" allowClear={false} />
           <input
             type="number"

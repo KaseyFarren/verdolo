@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import ClientFiles from '@/components/ClientFiles'
+import ClientBudgets from '@/components/ClientBudgets'
 import ClientUpdateModal from '@/components/clients/ClientUpdateModal'
 import Button from '@/components/ui/Button'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -107,6 +108,7 @@ export default function ClientsClient({
   healthSnapshots,
   clientBurn,
   currency,
+  targetRateCents,
 }: {
   orgId: string
   userId: string
@@ -121,6 +123,7 @@ export default function ClientsClient({
   healthSnapshots: HealthSnapshot[]
   clientBurn: Record<string, ClientBurn>
   currency?: Currency
+  targetRateCents: number
 }) {
   const currencySign = currencySymbol(currency)
   const supabase = useMemo(() => createClient(), [])
@@ -554,6 +557,19 @@ export default function ClientsClient({
             onBlur={(e) => canEdit && updateClient(selected.id, { quick_note: e.target.value })}
           />
         </div>
+
+        {canEdit && (
+          <div className="rounded-lg border border-ink/10 bg-white p-4">
+            <ClientBudgets
+              supabase={supabase}
+              orgId={orgId}
+              clientId={selected.id}
+              canEdit={canEdit}
+              currencySign={currencySign}
+              targetRateCents={targetRateCents}
+            />
+          </div>
+        )}
 
         <div className="rounded-lg border border-ink/10 bg-white p-4">
           <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />

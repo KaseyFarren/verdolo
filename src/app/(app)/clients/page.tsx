@@ -52,9 +52,9 @@ export default async function ClientsPage() {
   // billing amounts are revenue - members (view-only on clients) don't get them, admins/owners do
   const visibleClients = canEdit ? clients ?? [] : stripBillingInfo(clients ?? [])
 
+  const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
   const clientBurn: Record<string, ClientBurn> = {}
   if (canEdit) {
-    const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
     for (const c of visibleClients) {
       // Each client's own billing cycle, not the shared 62-day fetch window - a client billed
       // on the 15th is mid-cycle on the 1st (see computeClientBurn in lib/burn.ts).
@@ -84,6 +84,7 @@ export default async function ClientsPage() {
       healthSnapshots={healthSnapshots ?? []}
       clientBurn={clientBurn}
       currency={org?.settings?.currency ?? 'usd'}
+      targetRateCents={targetRateCents}
     />
   )
 }
