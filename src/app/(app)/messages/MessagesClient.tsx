@@ -4,8 +4,11 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { getInitials, memberName } from '@/lib/agency'
-import { FileIcon, ImageFileIcon, MessageCircleIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIcon } from '@/components/ui/icons'
+import { getInitials, memberName, PRIORITY, todayKey } from '@/lib/agency'
+import { CheckSquareIcon, FileIcon, ImageFileIcon, MessageCircleIcon, PaperclipIcon, PdfFileIcon, PencilIcon, SheetFileIcon, TrashIcon, XIcon } from '@/components/ui/icons'
+import CustomSelect from '@/components/ui/CustomSelect'
+import DatePicker from '@/components/ui/DatePicker'
+import Button from '@/components/ui/Button'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -13,7 +16,7 @@ const PAGE_SIZE = 50
 const GROUP_WINDOW_MS = 5 * 60 * 1000
 
 const MESSAGE_COLUMNS =
-  'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids, parent_message_id, reply_count, last_reply_at'
+  'id, thread_id, sender_id, body, created_at, attachment_path, attachment_name, attachment_type, attachment_size_bytes, mentioned_user_ids, parent_message_id, reply_count, last_reply_at, edited_at, deleted_at'
 
 type Member = {
   user_id: string
@@ -23,6 +26,7 @@ type Member = {
 }
 
 type Reaction = { id: string; emoji: string; user_id: string }
+type TaskDraft = { title: string; due_date: string | null; priority: string; notes: string }
 
 type Message = {
   id: string
@@ -39,6 +43,8 @@ type Message = {
   parent_message_id: string | null
   reply_count: number
   last_reply_at: string | null
+  edited_at: string | null
+  deleted_at: string | null
   reactions: Reaction[]
 }
 
@@ -190,9 +196,24 @@ const MessageRow = memo(function MessageRow({
   memberMap,
   showThreadIndicator,
   allowThreadReply,
+  editing,
+  editDraft,
+  setEditDraft,
   onToggleReaction,
   onOpenAttachment,
   onOpenThread,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDelete,
+  taskDraftOpen,
+  taskDraftLoading,
+  taskDraft,
+  taskDraftSaving,
+  onStartTaskDraft,
+  onUpdateTaskDraft,
+  onConfirmTaskDraft,
+  onCancelTaskDraft,
 }: {
   m: Message
   grouped: boolean
@@ -203,9 +224,24 @@ const MessageRow = memo(function MessageRow({
   memberMap: Map<string, Member>
   showThreadIndicator: boolean
   allowThreadReply: boolean
+  editing: boolean
+  editDraft: string
+  setEditDraft: (v: string) => void
   onToggleReaction: (m: Message, emoji: string) => void
   onOpenAttachment: (m: Message) => void
   onOpenThread: (m: Message) => void
+  onStartEdit: (m: Message) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onDelete: (m: Message) => void
+  taskDraftOpen: boolean
+  taskDraftLoading: boolean
+  taskDraft: TaskDraft | null
+  taskDraftSaving: boolean
+  onStartTaskDraft: (m: Message) => void
+  onUpdateTaskDraft: (fields: Partial<TaskDraft>) => void
+  onConfirmTaskDraft: () => void
+  onCancelTaskDraft: () => void
 }) {
   const reactionGroups = useMemo(() => {
     const groups = new Map<string, Reaction[]>()
@@ -214,6 +250,8 @@ const MessageRow = memo(function MessageRow({
   }, [m.reactions])
 
   const bodyNodes = useMemo(() => renderBody(m, memberMap), [m, memberMap])
+  const isMine = m.sender_id === userId
+  const isDeleted = Boolean(m.deleted_at)
 
   return (
     <div>
@@ -242,85 +280,174 @@ const MessageRow = memo(function MessageRow({
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-semibold text-ink">{senderName}</span>
               <span className="text-[11px] text-sage">{timeLabel(m.created_at)}</span>
+              {m.edited_at && !isDeleted && <span className="text-[11px] text-sage">(edited)</span>}
             </div>
           )}
 
-          {m.body && <div className="text-sm text-ink whitespace-pre-wrap break-words">{bodyNodes}</div>}
-
-          {m.attachment_path &&
-            (m.attachment_type?.startsWith('image/') ? (
-              m.attachment_signed_url ? (
-                <img
-                  src={m.attachment_signed_url}
-                  alt={m.attachment_name ?? ''}
-                  className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-1.5' : ''}`}
-                  onClick={() => onOpenAttachment(m)}
-                />
-              ) : (
-                <div className={`text-xs text-sage ${m.body ? 'mt-1.5' : ''}`}>Loading image…</div>
-              )
-            ) : (
-              <button
-                onClick={() => onOpenAttachment(m)}
-                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left bg-sand hover:shadow-sm ${m.body ? 'mt-1.5' : ''}`}
-              >
-                <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
-                <span className="flex flex-col leading-tight">
-                  <span className="text-xs font-medium truncate max-w-[220px]">{m.attachment_name}</span>
-                  <span className="text-[10px] text-sage">{formatFileSize(m.attachment_size_bytes)}</span>
-                </span>
-              </button>
-            ))}
-
-          {reactionGroups.size > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {[...reactionGroups.entries()].map(([emoji, reacts]) => {
-                const mine = reacts.some((r) => r.user_id === userId)
-                return (
-                  <button
-                    key={emoji}
-                    onClick={() => onToggleReaction(m, emoji)}
-                    className={`text-xs rounded-full px-1.5 py-0.5 border flex items-center gap-1 ${
-                      mine ? 'bg-accent/10 border-accent text-accent' : 'bg-sand border-transparent text-ink'
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    <span>{reacts.length}</span>
-                  </button>
-                )
-              })}
+          {isDeleted ? (
+            <div className="text-sm text-sage italic">This message was deleted</div>
+          ) : editing ? (
+            <div className="flex flex-col gap-1.5 max-w-md">
+              <input
+                autoFocus
+                value={editDraft}
+                onChange={(e) => setEditDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    onSaveEdit()
+                  } else if (e.key === 'Escape') {
+                    onCancelEdit()
+                  }
+                }}
+                className="w-full rounded-lg border border-accent px-2 py-1 text-sm outline-none"
+              />
+              <div className="flex items-center gap-2 text-xs">
+                <button onClick={onSaveEdit} className="font-medium text-accent hover:underline">
+                  Save
+                </button>
+                <button onClick={onCancelEdit} className="text-sage hover:text-ink">
+                  Cancel
+                </button>
+              </div>
             </div>
-          )}
-
-          {showThreadIndicator && m.reply_count > 0 && (
-            <button
-              onClick={() => onOpenThread(m)}
-              className="mt-1 flex items-center gap-1.5 text-xs text-accent hover:underline"
-            >
-              <MessageCircleIcon size={13} />
-              <span className="font-medium">
-                {m.reply_count} {m.reply_count === 1 ? 'reply' : 'replies'}
-              </span>
-              {m.last_reply_at && <span className="text-sage font-normal">Last reply {lastActivityLabel(m.last_reply_at)}</span>}
-            </button>
-          )}
-        </div>
-
-        <div className="absolute -top-3 right-2 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-lg border border-ink/10 px-1 py-1 z-10">
-          {QUICK_EMOJIS.map((emoji) => (
-            <button key={emoji} onClick={() => onToggleReaction(m, emoji)} className="text-sm leading-none hover:scale-125 transition-transform px-0.5">
-              {emoji}
-            </button>
-          ))}
-          {allowThreadReply && (
+          ) : (
             <>
-              <span className="w-px h-4 bg-ink/10 mx-0.5" />
-              <button onClick={() => onOpenThread(m)} title="Reply in thread" className="text-sage hover:text-ink px-0.5">
-                <MessageCircleIcon size={15} />
-              </button>
+              {grouped && m.edited_at && (
+                <span className="text-[10px] text-sage">(edited) </span>
+              )}
+              {m.body && <div className="text-sm text-ink whitespace-pre-wrap break-words inline">{bodyNodes}</div>}
+
+              {m.attachment_path &&
+                (m.attachment_type?.startsWith('image/') ? (
+                  m.attachment_signed_url ? (
+                    <img
+                      src={m.attachment_signed_url}
+                      alt={m.attachment_name ?? ''}
+                      className={`rounded-lg max-w-[220px] max-h-[220px] object-cover cursor-pointer ${m.body ? 'mt-1.5' : ''}`}
+                      onClick={() => onOpenAttachment(m)}
+                    />
+                  ) : (
+                    <div className={`text-xs text-sage ${m.body ? 'mt-1.5' : ''}`}>Loading image…</div>
+                  )
+                ) : (
+                  <button
+                    onClick={() => onOpenAttachment(m)}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left bg-sand hover:shadow-sm ${m.body ? 'mt-1.5' : ''}`}
+                  >
+                    <AttachmentTypeIcon fileName={m.attachment_name ?? ''} size={16} />
+                    <span className="flex flex-col leading-tight">
+                      <span className="text-xs font-medium truncate max-w-[220px]">{m.attachment_name}</span>
+                      <span className="text-[10px] text-sage">{formatFileSize(m.attachment_size_bytes)}</span>
+                    </span>
+                  </button>
+                ))}
+
+              {reactionGroups.size > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {[...reactionGroups.entries()].map(([emoji, reacts]) => {
+                    const mine = reacts.some((r) => r.user_id === userId)
+                    return (
+                      <button
+                        key={emoji}
+                        onClick={() => onToggleReaction(m, emoji)}
+                        className={`text-xs rounded-full px-1.5 py-0.5 border flex items-center gap-1 ${
+                          mine ? 'bg-accent/10 border-accent text-accent' : 'bg-sand border-transparent text-ink'
+                        }`}
+                      >
+                        <span>{emoji}</span>
+                        <span>{reacts.length}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {showThreadIndicator && m.reply_count > 0 && (
+                <button
+                  onClick={() => onOpenThread(m)}
+                  className="mt-1 flex items-center gap-1.5 text-xs text-accent hover:underline"
+                >
+                  <MessageCircleIcon size={13} />
+                  <span className="font-medium">
+                    {m.reply_count} {m.reply_count === 1 ? 'reply' : 'replies'}
+                  </span>
+                  {m.last_reply_at && <span className="text-sage font-normal">Last reply {lastActivityLabel(m.last_reply_at)}</span>}
+                </button>
+              )}
+
+              {taskDraftOpen && (
+                <div className="mt-1.5 max-w-sm rounded-lg border border-ink/10 bg-sand p-2.5">
+                  {taskDraftLoading && <div className="text-xs text-sage py-1">Drafting task…</div>}
+                  {!taskDraftLoading && taskDraft && (
+                    <>
+                      <input
+                        autoFocus
+                        value={taskDraft.title}
+                        onChange={(e) => onUpdateTaskDraft({ title: e.target.value })}
+                        className="w-full rounded-md border border-ink/10 bg-white px-2 py-1.5 text-sm mb-2"
+                      />
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <DatePicker
+                          value={taskDraft.due_date || ''}
+                          onChange={(v) => onUpdateTaskDraft({ due_date: v || null })}
+                          placeholder="Due date"
+                          className="text-xs"
+                        />
+                        <CustomSelect
+                          value={taskDraft.priority}
+                          onChange={(v) => onUpdateTaskDraft({ priority: v })}
+                          options={PRIORITY.map((p) => ({ value: p, label: p }))}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="secondary" onClick={onCancelTaskDraft}>
+                          Cancel
+                        </Button>
+                        <Button variant="primary" className="flex-1" onClick={onConfirmTaskDraft} disabled={taskDraftSaving || !taskDraft.title.trim()}>
+                          {taskDraftSaving ? 'Adding…' : 'Add task'}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
+
+        {!isDeleted && !editing && (
+          <div className="absolute -top-3 right-2 hidden group-hover:flex items-center gap-0.5 bg-white shadow-md rounded-lg border border-ink/10 px-1 py-1 z-10">
+            {QUICK_EMOJIS.map((emoji) => (
+              <button key={emoji} onClick={() => onToggleReaction(m, emoji)} className="text-sm leading-none hover:scale-125 transition-transform px-0.5">
+                {emoji}
+              </button>
+            ))}
+            {allowThreadReply && (
+              <>
+                <span className="w-px h-4 bg-ink/10 mx-0.5" />
+                <button onClick={() => onOpenThread(m)} title="Reply in thread" className="text-sage hover:text-ink px-0.5">
+                  <MessageCircleIcon size={15} />
+                </button>
+              </>
+            )}
+            <span className="w-px h-4 bg-ink/10 mx-0.5" />
+            <button onClick={() => onStartTaskDraft(m)} title="Make this a task" className="text-sage hover:text-ink px-0.5">
+              <CheckSquareIcon size={14} />
+            </button>
+            {isMine && (
+              <>
+                <span className="w-px h-4 bg-ink/10 mx-0.5" />
+                <button onClick={() => onStartEdit(m)} title="Edit message" className="text-sage hover:text-ink px-0.5">
+                  <PencilIcon size={14} />
+                </button>
+                <button onClick={() => onDelete(m)} title="Delete message" className="text-sage hover:text-red-600 px-0.5">
+                  <TrashIcon size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -488,6 +615,14 @@ export default function MessagesClient({
   const [threadMentionCandidates, setThreadMentionCandidates] = useState<MentionOption[]>([])
   const [threadPendingFile, setThreadPendingFile] = useState<File | null>(null)
   const [threadSending, setThreadSending] = useState(false)
+
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+
+  const [taskDraftMessageId, setTaskDraftMessageId] = useState<string | null>(null)
+  const [taskDraftLoading, setTaskDraftLoading] = useState(false)
+  const [taskDraft, setTaskDraft] = useState<{ title: string; due_date: string | null; priority: string; notes: string } | null>(null)
+  const [taskDraftSaving, setTaskDraftSaving] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const threadScrollRef = useRef<HTMLDivElement>(null)
@@ -693,6 +828,25 @@ export default function MessagesClient({
         if (incoming.thread_id === activeThreadIdRef.current) {
           markRead(incoming.thread_id)
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, (payload) => {
+        const updated = payload.new as Omit<Message, 'reactions' | 'attachment_signed_url'>
+        const apply = (m: Message): Message =>
+          updated.deleted_at
+            ? {
+                ...m,
+                body: '',
+                edited_at: updated.edited_at,
+                deleted_at: updated.deleted_at,
+                attachment_path: null,
+                attachment_name: null,
+                attachment_type: null,
+                attachment_size_bytes: null,
+                attachment_signed_url: null,
+              }
+            : { ...m, body: updated.body, edited_at: updated.edited_at }
+        setMessagesByThread((prev) => patchMessage(prev, updated.thread_id, updated.id, apply))
+        setRepliesByParent((prev) => patchReplyMessage(prev, updated.id, apply))
       })
       .on(
         'postgres_changes',
@@ -964,6 +1118,121 @@ export default function MessagesClient({
     [activeThreadId, userId, supabase, orgId]
   )
 
+  function startEdit(m: Message) {
+    setEditingMessageId(m.id)
+    setEditDraft(m.body)
+  }
+
+  function cancelEdit() {
+    setEditingMessageId(null)
+    setEditDraft('')
+  }
+
+  const saveEdit = useCallback(async () => {
+    if (!editingMessageId) return
+    const body = editDraft.trim()
+    if (!body) {
+      toast.error('Message cannot be empty')
+      return
+    }
+    const editedAt = new Date().toISOString()
+    const apply = (m: Message) => ({ ...m, body, edited_at: editedAt })
+    setMessagesByThread((prev) => (activeThreadId ? patchMessage(prev, activeThreadId, editingMessageId, apply) : prev))
+    setRepliesByParent((prev) => patchReplyMessage(prev, editingMessageId, apply))
+    setEditingMessageId(null)
+    setEditDraft('')
+    const { error } = await supabase.from('messages').update({ body, edited_at: editedAt }).eq('id', editingMessageId)
+    if (error) toast.error('Could not save changes')
+  }, [editingMessageId, editDraft, activeThreadId, supabase])
+
+  const deleteMessage = useCallback(
+    async (message: Message) => {
+      const deletedAt = new Date().toISOString()
+      const apply = (m: Message) => ({
+        ...m,
+        body: '',
+        deleted_at: deletedAt,
+        attachment_path: null,
+        attachment_name: null,
+        attachment_type: null,
+        attachment_size_bytes: null,
+        attachment_signed_url: null,
+      })
+      setMessagesByThread((prev) => (activeThreadId ? patchMessage(prev, activeThreadId, message.id, apply) : prev))
+      setRepliesByParent((prev) => patchReplyMessage(prev, message.id, apply))
+      const { error } = await supabase
+        .from('messages')
+        .update({ body: '', deleted_at: deletedAt, attachment_path: null, attachment_name: null, attachment_type: null, attachment_size_bytes: null })
+        .eq('id', message.id)
+      if (error) toast.error('Could not delete message')
+    },
+    [activeThreadId, supabase]
+  )
+
+  const startTaskDraft = useCallback(
+    async (message: Message) => {
+      setTaskDraftMessageId(message.id)
+      setTaskDraft(null)
+      setTaskDraftLoading(true)
+      try {
+        const res = await fetch('/api/ai/task-from-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orgId,
+            text: message.body,
+            senderName: message.sender_id === userId ? 'You' : memberName(memberMap.get(message.sender_id)),
+            sentAt: message.created_at,
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.task) {
+          toast.error(json.error || 'Could not draft a task from that message')
+          setTaskDraft({ title: message.body.slice(0, 200), due_date: null, priority: 'Medium', notes: '' })
+          return
+        }
+        setTaskDraft(json.task)
+      } catch {
+        toast.error('Could not draft a task from that message')
+        setTaskDraft({ title: message.body.slice(0, 200), due_date: null, priority: 'Medium', notes: '' })
+      } finally {
+        setTaskDraftLoading(false)
+      }
+    },
+    [orgId, userId, memberMap]
+  )
+
+  function updateTaskDraft(fields: Partial<TaskDraft>) {
+    setTaskDraft((prev) => (prev ? { ...prev, ...fields } : prev))
+  }
+
+  function cancelTaskDraft() {
+    setTaskDraftMessageId(null)
+    setTaskDraft(null)
+  }
+
+  async function confirmTaskDraft() {
+    if (!taskDraft || !taskDraft.title.trim()) return
+    setTaskDraftSaving(true)
+    const { error } = await supabase.from('tasks').insert({
+      org_id: orgId,
+      client_id: null,
+      title: taskDraft.title.trim(),
+      due_date: taskDraft.due_date || todayKey(),
+      priority: taskDraft.priority,
+      notes: taskDraft.notes || '',
+      done: false,
+    })
+    setTaskDraftSaving(false)
+    if (error) {
+      toast.error('Could not add task')
+      return
+    }
+    toast.success('Task added')
+    setTaskDraftMessageId(null)
+    setTaskDraft(null)
+  }
+
   const openAttachment = useCallback(
     async (m: Message) => {
       if (!m.attachment_path) return
@@ -1089,6 +1358,13 @@ export default function MessagesClient({
         </aside>
 
         <section className="flex-1 min-w-0 rounded-2xl bg-white shadow-md flex flex-col overflow-hidden">
+          {activeThreadId && (
+            <div className="px-3 py-2.5 border-b border-ink/10">
+              <span className="text-sm font-semibold text-ink">
+                {activeIsTeam ? 'Team' : memberName(memberMap.get(activeContactId ?? ''))}
+              </span>
+            </div>
+          )}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-0.5">
             {loading && <div className="text-sm text-sage px-2">Loading…</div>}
             {!loading && messages.length === 0 && <div className="text-sm text-sage px-2">No messages yet. Say hi!</div>}
@@ -1115,9 +1391,24 @@ export default function MessagesClient({
                   memberMap={memberMap}
                   showThreadIndicator
                   allowThreadReply
+                  editing={editingMessageId === m.id}
+                  editDraft={editDraft}
+                  setEditDraft={setEditDraft}
                   onToggleReaction={toggleReaction}
                   onOpenAttachment={openAttachment}
                   onOpenThread={openThread}
+                  onStartEdit={startEdit}
+                  onSaveEdit={saveEdit}
+                  onCancelEdit={cancelEdit}
+                  onDelete={deleteMessage}
+                  taskDraftOpen={taskDraftMessageId === m.id}
+                  taskDraftLoading={taskDraftLoading}
+                  taskDraft={taskDraftMessageId === m.id ? taskDraft : null}
+                  taskDraftSaving={taskDraftSaving}
+                  onStartTaskDraft={startTaskDraft}
+                  onUpdateTaskDraft={updateTaskDraft}
+                  onConfirmTaskDraft={confirmTaskDraft}
+                  onCancelTaskDraft={cancelTaskDraft}
                 />
               )
             })}
@@ -1161,9 +1452,24 @@ export default function MessagesClient({
                     memberMap={memberMap}
                     showThreadIndicator={false}
                     allowThreadReply={false}
+                    editing={editingMessageId === openThreadParent.id}
+                    editDraft={editDraft}
+                    setEditDraft={setEditDraft}
                     onToggleReaction={toggleReaction}
                     onOpenAttachment={openAttachment}
                     onOpenThread={() => {}}
+                    onStartEdit={startEdit}
+                    onSaveEdit={saveEdit}
+                    onCancelEdit={cancelEdit}
+                    onDelete={deleteMessage}
+                    taskDraftOpen={taskDraftMessageId === openThreadParent.id}
+                    taskDraftLoading={taskDraftLoading}
+                    taskDraft={taskDraftMessageId === openThreadParent.id ? taskDraft : null}
+                    taskDraftSaving={taskDraftSaving}
+                    onStartTaskDraft={startTaskDraft}
+                    onUpdateTaskDraft={updateTaskDraft}
+                    onConfirmTaskDraft={confirmTaskDraft}
+                    onCancelTaskDraft={cancelTaskDraft}
                   />
                   <div className="flex items-center gap-2 my-2 px-2">
                     <span className="text-xs font-medium text-sage">
@@ -1185,9 +1491,24 @@ export default function MessagesClient({
                         memberMap={memberMap}
                         showThreadIndicator={false}
                         allowThreadReply={false}
+                        editing={editingMessageId === m.id}
+                        editDraft={editDraft}
+                        setEditDraft={setEditDraft}
                         onToggleReaction={toggleReaction}
                         onOpenAttachment={openAttachment}
                         onOpenThread={() => {}}
+                        onStartEdit={startEdit}
+                        onSaveEdit={saveEdit}
+                        onCancelEdit={cancelEdit}
+                        onDelete={deleteMessage}
+                        taskDraftOpen={taskDraftMessageId === m.id}
+                        taskDraftLoading={taskDraftLoading}
+                        taskDraft={taskDraftMessageId === m.id ? taskDraft : null}
+                        taskDraftSaving={taskDraftSaving}
+                        onStartTaskDraft={startTaskDraft}
+                        onUpdateTaskDraft={updateTaskDraft}
+                        onConfirmTaskDraft={confirmTaskDraft}
+                        onCancelTaskDraft={cancelTaskDraft}
                       />
                     )
                   })}

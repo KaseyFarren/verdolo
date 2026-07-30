@@ -180,6 +180,14 @@ Return ONLY valid JSON, no markdown:
 If no actionable tasks are found, return {"tasks":[]}.`
 }
 
+export function buildTaskFromMessagePrompt(params: { senderName: string; sentAt: string; today: string; text: string }) {
+  return `You are an agency operations assistant. A team member wants to turn one chat message into a task. Rewrite it as a single actionable task.
+Message from ${params.senderName}, sent ${params.sentAt}: """${params.text}"""
+Today's date is ${params.today}. Only set a due_date if the message clearly implies one (e.g. "by Friday", "next week") - resolve relative dates against the message's send date, not today. Otherwise leave it null. Set priority to High only if the message describes something urgent or blocking; default to Medium.
+Return ONLY valid JSON, no markdown:
+{"title":"short imperative title","due_date":"YYYY-MM-DD or null","priority":"High|Medium|Low","notes":"one sentence of context from the message, or empty string"}`
+}
+
 export type RiskSignals = {
   name: string
   contactOverdueDays: number | null
