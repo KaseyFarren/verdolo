@@ -21,6 +21,15 @@ function money(micros: number) {
   return dollars < 0.01 && dollars > 0 ? `<$0.01` : `$${dollars.toFixed(2)}`
 }
 
+// Per-generation cost is almost always sub-cent (a haiku call can be a few hundredths of a cent),
+// so the 2-decimal money() rounds nearly everything down to "<$0.01" - useless for comparing
+// routes against each other. This keeps enough precision to actually see the difference.
+function moneyPrecise(micros: number) {
+  const dollars = micros / 1_000_000
+  if (dollars === 0) return '$0.00'
+  return dollars < 0.01 ? `$${dollars.toFixed(5)}` : `$${dollars.toFixed(2)}`
+}
+
 function orgName(row: UsageRow) {
   const o = Array.isArray(row.orgs) ? row.orgs[0] : row.orgs
   return o?.name ?? 'Unknown org'
@@ -116,7 +125,7 @@ export default async function AdminAiUsagePage() {
                   <td className="py-2 font-medium text-ink">{route}</td>
                   <td className="py-2 font-mono text-xs text-ink/60">{r.model}</td>
                   <td className="py-2 text-ink/70">{r.generations.toLocaleString()}</td>
-                  <td className="py-2 text-ink/70">{money(r.costMicros / r.generations)}</td>
+                  <td className="py-2 text-ink/70">{moneyPrecise(r.costMicros / r.generations)}</td>
                   <td className="py-2 font-medium text-ink">{money(r.costMicros)}</td>
                 </tr>
               ))}
