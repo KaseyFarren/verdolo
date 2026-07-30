@@ -714,8 +714,8 @@ export default function DashboardClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-6 items-start pt-6 border-t border-ink/10">
-        <div className="rounded-2xl bg-white border border-ink/8 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-6 pt-6 border-t border-ink/10">
+        <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-medium text-ink/60">{dashLabel}&apos;s tasks</div>
             <button
@@ -754,7 +754,7 @@ export default function DashboardClient({
               </button>
             </div>
           )}
-          <div className="max-h-[520px] overflow-y-auto pr-1 -mr-1">
+          <div className="flex-1 min-h-0 max-h-[520px] overflow-y-auto pr-1 -mr-1">
           {dashPendingMine.length > 0 && dashPendingUnassigned.length > 0 && (
             <div className="text-xs font-medium text-sage/70 mb-1">Assigned</div>
           )}
@@ -861,7 +861,7 @@ export default function DashboardClient({
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col min-h-[160px]">
+          <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col flex-1 min-h-[160px]">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium text-ink/60">Quick notes</div>
               <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
