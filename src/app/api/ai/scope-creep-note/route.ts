@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rateLimit'
 import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
 import { currencySymbol, effectiveRate, todayKey } from '@/lib/agency'
 import { monthElapsedFraction } from '@/lib/period'
+import { burnDrivers } from '@/lib/burn'
 
 export const maxDuration = 60
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
   const { data: client } = await supabase
     .from('clients')
-    .select('id, name, retainer_cents, billing_mode, business, platform, service, notes, tone, talking_points, last_contacted')
+    .select('id, name, retainer_cents, retainer_hours, billing_mode, business, platform, service, notes, tone, talking_points, last_contacted')
     .eq('id', clientId)
     .eq('org_id', orgId)
     .single()
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
 
   const { data: entries } = await supabase
     .from('time_entries')
-    .select('duration_seconds')
+    .select('task_id, duration_seconds')
     .eq('org_id', orgId)
     .eq('client_id', clientId)
     .not('duration_seconds', 'is', null)
@@ -80,6 +81,16 @@ export async function POST(request: Request) {
     .lt('started_at', monthEnd)
 
   const hours = (entries || []).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
+
+  // Attributes this month's hours to the tasks that drove them, so the note can tell a
+  // recognizable one-off push apart from hours spread thin across many small items (see
+  // burnDrivers in lib/burn.ts). Only the tasks that actually appear need resolving.
+  const driverTaskIds = [...new Set((entries || []).map((e) => e.task_id).filter((id): id is string => !!id))]
+  const { data: driverTasks } = driverTaskIds.length
+    ? await supabase.from('tasks').select('id, title').eq('org_id', orgId).in('id', driverTaskIds)
+    : { data: [] }
+  const taskTitleMap = new Map((driverTasks || []).map((t) => [t.id, t.title]))
+  const drivers = burnDrivers(entries || [], taskTitleMap)
   // Mirrors profitabilityForMonth in ReportsClient.tsx - revenue and hours must describe the
   // same window (the calendar month), or a retainer client billed mid-month looks like it
   // made its full monthly revenue already, pushing effectiveRateCents above target even when
@@ -113,11 +124,15 @@ export async function POST(request: Request) {
   const dayOfMonth = Number(today.slice(8, 10))
   const daysInMonth = new Date(y, m, 0).getDate()
   const daysRemaining = Math.max(0, daysInMonth - dayOfMonth)
-  const hoursBudgetAtTarget = targetRateCents > 0 ? (client.retainer_cents || 0) / targetRateCents : 0
+  // Honors an explicit "included hours" figure (clients.retainer_hours) over the derived one,
+  // for agencies that sold a specific hour block rather than an implied target-rate conversion.
+  const hoursBudgetAtTarget = client.retainer_hours || (targetRateCents > 0 ? (client.retainer_cents || 0) / targetRateCents : 0)
   const projectedFullMonthHours = retainerFraction > 0 ? hours / retainerFraction : hours
   const hoursRemainingBudget = hoursBudgetAtTarget - hours
   const projectedOverageHours = Math.max(0, projectedFullMonthHours - hoursBudgetAtTarget)
   const projectedOverageCents = Math.round(projectedOverageHours * targetRateCents)
+  const burnPercent = hoursBudgetAtTarget > 0 ? (hours / hoursBudgetAtTarget) * 100 : null
+  const projectedBurnPercent = hoursBudgetAtTarget > 0 ? (projectedFullMonthHours / hoursBudgetAtTarget) * 100 : null
 
   try {
     const prompt = buildScopeCreepPrompt({
@@ -137,6 +152,9 @@ export async function POST(request: Request) {
       projectedFullMonthHours,
       projectedOverageHours,
       projectedOverageCents,
+      burnPercent,
+      projectedBurnPercent,
+      drivers,
       clientCtx: {
         name: client.name,
         business: client.business,

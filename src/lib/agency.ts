@@ -128,8 +128,10 @@ export function mrrCentsTotal(clients: { stage?: string | null; status?: string 
 // strips billing amounts before client rows are sent to a browser session that shouldn't see
 // revenue - server components serialize all props into the RSC payload regardless of what's
 // rendered, so this has to happen before the data leaves the server, not just in the UI
-export function stripBillingInfo<T extends { retainer_cents?: number | null; hourly_rate_cents?: number | null }>(clients: T[]): T[] {
-  return clients.map((c) => ({ ...c, retainer_cents: null, hourly_rate_cents: null }))
+export function stripBillingInfo<T extends { retainer_cents?: number | null; hourly_rate_cents?: number | null; retainer_hours?: number | null }>(
+  clients: T[],
+): T[] {
+  return clients.map((c) => ({ ...c, retainer_cents: null, hourly_rate_cents: null, retainer_hours: null }))
 }
 
 export function centsToDollars(cents?: number | null) {

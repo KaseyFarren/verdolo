@@ -50,6 +50,7 @@ type Client = {
   stage: string | null
   status: string | null
   retainer_cents: number | null
+  retainer_hours: number | null
   billing_mode: string | null
   hourly_rate_cents: number | null
   billing_day: number | null
@@ -66,6 +67,7 @@ type CompletedTask = { id: string; client_id: string | null; title: string; comp
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string; generated_by: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
+type ClientBurn = { hoursBudget: number; hoursLogged: number; percent: number; status: 'ok' | 'warn' | 'high' | 'over' }
 
 const STAGE_TOOLTIP = 'Pipeline stage - where this client sits in your funnel. Set manually, doesn’t change on its own.'
 const HEALTH_TOOLTIP = 'Contact health - how overdue this client is for a check-in, based on last contact vs. their cadence. Independent of pipeline stage.'
@@ -82,6 +84,7 @@ const emptyForm = {
   stage: 'Active',
   billing_mode: 'retainer',
   retainer: '',
+  retainer_hours: '',
   hourly_rate: '',
   billing_day: 1,
   contract_ends: '',
@@ -102,6 +105,7 @@ export default function ClientsClient({
   archivedTimeTotals,
   members,
   healthSnapshots,
+  clientBurn,
   currency,
 }: {
   orgId: string
@@ -115,6 +119,7 @@ export default function ClientsClient({
   archivedTimeTotals: { client_id: string | null; seconds: number }[]
   members: Member[]
   healthSnapshots: HealthSnapshot[]
+  clientBurn: Record<string, ClientBurn>
   currency?: Currency
 }) {
   const currencySign = currencySymbol(currency)
@@ -205,6 +210,7 @@ export default function ClientsClient({
       stage: form.stage as string,
       billing_mode: (form.billing_mode as string) || 'retainer',
       retainer_cents: isHourly ? 0 : dollarsToCents((form.retainer as string) || '0'),
+      retainer_hours: isHourly ? null : (form.retainer_hours ? Number(form.retainer_hours) : null),
       hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
       billing_day: Math.min(31, Math.max(1, Number(form.billing_day) || 1)),
       contract_ends: (form.contract_ends as string) || null,
@@ -368,6 +374,7 @@ export default function ClientsClient({
                 stage: editForm.stage,
                 billing_mode: editForm.billing_mode || 'retainer',
                 retainer_cents: isHourly ? 0 : dollarsToCents((editForm.retainer as string) || '0'),
+                retainer_hours: isHourly ? null : (editForm.retainer_hours ? Number(editForm.retainer_hours) : null),
                 hourly_rate_cents: isHourly ? dollarsToCents((editForm.hourly_rate as string) || '0') : 0,
                 billing_day: Math.min(31, Math.max(1, Number(editForm.billing_day) || 1)),
                 contract_ends: editForm.contract_ends || null,
@@ -453,6 +460,26 @@ export default function ClientsClient({
                       {(clientHoursSeconds(selected.id) / 3600).toFixed(1)}h logged
                     </Link>
                   )}
+                  {clientBurn[selected.id] && (
+                    <Tooltip
+                      content={`${clientBurn[selected.id].hoursLogged.toFixed(1)}h of ~${clientBurn[selected.id].hoursBudget.toFixed(1)}h supported by the retainer this billing cycle.`}
+                    >
+                      <span
+                        className="text-xs font-semibold rounded-full px-2 py-0.5"
+                        style={{
+                          color: clientBurn[selected.id].status === 'ok' ? '#5d6b5c' : clientBurn[selected.id].status === 'warn' ? '#cc9a3c' : '#e05070',
+                          background:
+                            clientBurn[selected.id].status === 'ok'
+                              ? '#5d6b5c18'
+                              : clientBurn[selected.id].status === 'warn'
+                                ? '#cc9a3c18'
+                                : '#e0507018',
+                        }}
+                      >
+                        {Math.round(clientBurn[selected.id].percent)}% burn
+                      </span>
+                    </Tooltip>
+                  )}
                 </div>
                 {selected.notes && <div className="text-xs text-sage mt-2 italic">{selected.notes}</div>}
               </div>
@@ -488,6 +515,7 @@ export default function ClientsClient({
                         stage,
                         billing_mode: selected.billing_mode || 'retainer',
                         retainer: selected.retainer_cents ? centsToDollars(selected.retainer_cents) : '',
+                        retainer_hours: selected.retainer_hours ?? '',
                         hourly_rate: selected.hourly_rate_cents ? centsToDollars(selected.hourly_rate_cents) : '',
                         billing_day: selected.billing_day || 1,
                         contract_ends: selected.contract_ends || '',
@@ -718,11 +746,22 @@ export default function ClientsClient({
                   </Tooltip>
                 )}
               </div>
-              <div className="text-xs text-sage mt-1.5 flex gap-2 flex-wrap">
+              <div className="text-xs text-sage mt-1.5 flex gap-2 flex-wrap items-center">
                 {c.business && <span>{c.business}</span>}
                 {c.platform && <span className="bg-ink/5 rounded px-1.5">{c.platform}</span>}
                 {c.last_contacted && <span>Last: {formatDate(c.last_contacted)}</span>}
                 {c.primary_contact_id && <span>{memberName(memberById(c.primary_contact_id))}</span>}
+                {clientBurn[c.id] && clientBurn[c.id].status !== 'ok' && (
+                  <span
+                    className="font-semibold rounded-full px-1.5 py-0.5"
+                    style={{
+                      color: clientBurn[c.id].status === 'warn' ? '#cc9a3c' : '#e05070',
+                      background: clientBurn[c.id].status === 'warn' ? '#cc9a3c18' : '#e0507018',
+                    }}
+                  >
+                    {Math.round(clientBurn[c.id].percent)}% burn
+                  </span>
+                )}
               </div>
             </div>
             <span className="text-sage/70">›</span>
@@ -950,6 +989,22 @@ function ClientForm({
           <div className="text-xs text-sage/70 mt-1">
             Day the retainer renews - drives how &quot;this month&quot; is prorated in Reports and Revenue. For a day that
             doesn&apos;t exist in a given month (e.g. 31 in April), the last day of that month is used instead.
+          </div>
+        </div>
+      )}
+      {form.billing_mode !== 'hourly' && (
+        <div className="mb-3">
+          <label className="block text-xs text-sage mb-1">Included team hours / month</label>
+          <input
+            type="number"
+            min={0}
+            className="w-24 rounded border border-ink/10 bg-white px-2 py-2 text-sm"
+            value={(form.retainer_hours as string) || ''}
+            onChange={(e) => setForm((f) => ({ ...f, retainer_hours: e.target.value }))}
+          />
+          <div className="text-xs text-sage/70 mt-1">
+            All team members combined. Leave blank to derive from the retainer and your target hourly rate
+            (Settings → General).
           </div>
         </div>
       )}

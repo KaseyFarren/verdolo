@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/health-snapshot", "schedule": "0 5 * * *" },
     { "path": "/api/cron/archive-cleanup", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/contract-expiry-tasks", "schedule": "0 6 * * *" }
+    { "path": "/api/cron/contract-expiry-tasks", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/burn-threshold-tasks", "schedule": "0 7 * * *" }
   ]
 }

@@ -22,6 +22,7 @@ import {
   type Currency,
 } from '@/lib/agency'
 import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, daysUntilRenewal, periodBounds, type PeriodValue } from '@/lib/period'
+import { computeClientBurn, burnDrivers, type BurnDriver } from '@/lib/burn'
 import MetricBar from '@/components/ui/MetricBar'
 import { XIcon } from '@/components/ui/icons'
 import DatePicker from '@/components/ui/DatePicker'
@@ -31,6 +32,7 @@ type Client = {
   id: string
   name: string
   retainer_cents: number | null
+  retainer_hours: number | null
   billing_mode: string | null
   hourly_rate_cents: number | null
   billing_day: number | null
@@ -39,6 +41,7 @@ type Client = {
 }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type Entry = { id: string; user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
+type CycleEntry = { client_id: string | null; task_id: string | null; duration_seconds: number | null; started_at: string }
 type Member = { user_id: string; invited_email: string | null; display_name: string | null; avatar_url: string | null; role?: string; title?: string | null }
 
 function Avatar({ member, index }: { member: Member; index: number }) {
@@ -71,6 +74,8 @@ export default function RevenueClient({
   members,
   tasks,
   archivedTaskTotals,
+  cycleEntries,
+  taskTitles,
   targetRateCents,
   currency,
 }: {
@@ -83,6 +88,8 @@ export default function RevenueClient({
   members: Member[]
   tasks: TaskRow[]
   archivedTaskTotals: ArchivedTaskTotal[]
+  cycleEntries: CycleEntry[]
+  taskTitles: Record<string, string>
   targetRateCents: number
   currency?: Currency
 }) {
@@ -236,6 +243,8 @@ export default function RevenueClient({
     return map
   }, [charges])
 
+  const taskTitleMap = useMemo(() => new Map(Object.entries(taskTitles)), [taskTitles])
+
   const clientRows = useMemo(() => {
     // Days between rangeStart (inclusive) and rangeEnd (exclusive) - used only to smooth the
     // retainer for the *rate* calc below, never shown as a $ figure.
@@ -290,6 +299,19 @@ export default function RevenueClient({
         const hours = seconds / 3600
         const rate = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
+        // Burn is scoped to this client's own billing cycle (cycleProgress above), not the
+        // selected period's range - only meaningful for "this month", where cycleProgress exists.
+        const cycleEntriesForClient = cycleProgress
+          ? cycleEntries.filter(
+              (e) =>
+                e.client_id === c.id &&
+                e.started_at >= `${cycleProgress.cycleStart}T00:00:00` &&
+                e.started_at < `${cycleProgress.cycleEnd}T00:00:00`,
+            )
+          : []
+        const cycleSeconds = cycleEntriesForClient.reduce((s, e) => s + (e.duration_seconds || 0), 0)
+        const burn = cycleProgress ? computeClientBurn(c, cycleSeconds, targetRateCents, today) : null
+        const drivers = burn ? burnDrivers(cycleEntriesForClient, taskTitleMap) : []
         return {
           client: c,
           isHourly,
@@ -305,11 +327,13 @@ export default function RevenueClient({
           billingDatesThisRange,
           cycleProgress: !isHourly ? cycleProgress : null,
           retainerRevenue,
+          burn,
+          drivers,
         }
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clientsState, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd])
+  }, [clientsState, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd, cycleEntries, taskTitleMap, today])
 
   const memberRows = useMemo(() => {
     return members
@@ -552,6 +576,18 @@ export default function RevenueClient({
                         Billed this period
                       </span>
                     )}
+                    {r.burn && (
+                      <span
+                        className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold align-middle"
+                        style={{
+                          color: r.burn.status === 'ok' ? '#5d6b5c' : r.burn.status === 'warn' ? '#cc9a3c' : '#e05070',
+                          background: r.burn.status === 'ok' ? '#5d6b5c18' : r.burn.status === 'warn' ? '#cc9a3c18' : '#e0507018',
+                        }}
+                        title={`${r.burn.hoursLogged.toFixed(1)}h of ~${r.burn.hoursBudget.toFixed(1)}h supported by the retainer, ${r.burn.cycle.elapsedDays} of ${r.burn.cycle.cycleLengthDays} days into this cycle.`}
+                      >
+                        {Math.round(r.burn.percent)}% burn
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-4 shrink-0">
                     <span className="text-sage w-14 text-right inline-flex items-center justify-end gap-1">
@@ -580,6 +616,27 @@ export default function RevenueClient({
                 </button>
                 {expanded && (
                   <div className="mx-4 pb-4 mt-1 pl-3 border-l-2 border-ink/10 space-y-2">
+                    {r.burn && (
+                      <div className="text-xs text-sage">
+                        <div>
+                          {r.burn.hoursLogged.toFixed(1)}h logged of ~{r.burn.hoursBudget.toFixed(1)}h supported by the retainer, day{' '}
+                          {r.burn.cycle.elapsedDays} of {r.burn.cycle.cycleLengthDays} in this cycle.
+                          {r.burn.projectedOverageHours > 0 &&
+                            ` At the current pace, on track to run about ${r.burn.projectedOverageHours.toFixed(1)}h over budget by cycle end.`}
+                        </div>
+                        {r.drivers.length > 0 && (
+                          <div className="mt-1">
+                            Top drivers:{' '}
+                            {r.drivers.map((d: BurnDriver, i: number) => (
+                              <span key={d.title}>
+                                {i > 0 && ', '}
+                                {d.title} {d.hours.toFixed(1)}h
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {clientCharges.length > 0 && (
                       <div className="space-y-1">
                         {clientCharges.map((c) => (

@@ -1,5 +1,7 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { stripBillingInfo } from '@/lib/agency'
+import { getOffsetDate, stripBillingInfo } from '@/lib/agency'
+import { billingCycleProgress } from '@/lib/period'
+import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import ClientsClient from './ClientsClient'
 
 export default async function ClientsPage() {
@@ -15,6 +17,7 @@ export default async function ClientsPage() {
     { data: archivedTimeTotals },
     { data: members },
     { data: healthSnapshots },
+    { data: cycleEntries },
   ] = await Promise.all([
     // .limit(2000) below is a defensive ceiling against pathological growth (e.g. a runaway
     // automation bug), not user-facing pagination - see supabase/migrations plan notes. Realistic
@@ -32,10 +35,39 @@ export default async function ClientsPage() {
       .eq('org_id', orgId)
       .gte('snapshot_date', new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10))
       .order('snapshot_date', { ascending: true }),
+    // Deliberately a separate query from the unbounded lifetime `timeEntries` above - burn is
+    // scoped to each client's own billing cycle (up to 62 days back), not all-time totals.
+    // Admin-gated below, same reasoning as stripBillingInfo: never fetch billing-adjacent rows
+    // for a session that can't see them.
+    canEdit
+      ? supabase
+          .from('time_entries')
+          .select('client_id, duration_seconds, started_at')
+          .eq('org_id', orgId)
+          .not('duration_seconds', 'is', null)
+          .gte('started_at', `${getOffsetDate(-62)}T00:00:00`)
+      : Promise.resolve({ data: [] }),
   ])
 
   // billing amounts are revenue - members (view-only on clients) don't get them, admins/owners do
   const visibleClients = canEdit ? clients ?? [] : stripBillingInfo(clients ?? [])
+
+  const clientBurn: Record<string, ClientBurn> = {}
+  if (canEdit) {
+    const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
+    for (const c of visibleClients) {
+      // Each client's own billing cycle, not the shared 62-day fetch window - a client billed
+      // on the 15th is mid-cycle on the 1st (see computeClientBurn in lib/burn.ts).
+      const cycle = billingCycleProgress(c.billing_day || 1)
+      const cycleStart = `${cycle.cycleStart}T00:00:00`
+      const cycleEnd = `${cycle.cycleEnd}T00:00:00`
+      const seconds = (cycleEntries ?? [])
+        .filter((e) => e.client_id === c.id && e.started_at >= cycleStart && e.started_at < cycleEnd)
+        .reduce((s, e) => s + (e.duration_seconds || 0), 0)
+      const burn = computeClientBurn(c, seconds, targetRateCents)
+      if (burn) clientBurn[c.id] = burn
+    }
+  }
 
   return (
     <ClientsClient
@@ -50,6 +82,7 @@ export default async function ClientsPage() {
       archivedTimeTotals={archivedTimeTotals ?? []}
       members={members ?? []}
       healthSnapshots={healthSnapshots ?? []}
+      clientBurn={clientBurn}
       currency={org?.settings?.currency ?? 'usd'}
     />
   )

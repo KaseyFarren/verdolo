@@ -1,6 +1,7 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { billingCycleElapsedFraction } from '@/lib/period'
+import { billingCycleElapsedFraction, billingCycleProgress } from '@/lib/period'
+import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import DashboardClient from './DashboardClient'
 
 // Retainer prorated by billing cycle + hourly billable hours × rate - same methodology as
@@ -20,6 +21,39 @@ function estimateMonthRevenueCents(
       : Math.round((c.retainer_cents || 0) * billingCycleElapsedFraction(c.billing_day || 1))
   }
   return total
+}
+
+export type BurnAlertClient = { clientId: string; name: string; percent: number; status: ClientBurn['status'] }
+
+// Clients at or over the 75% burn threshold for the dashboard's quiet alert strip - fully quiet
+// (returns []) when nobody is over threshold, so a healthy account sees nothing here at all.
+function clientsOverBudget(
+  billingClients: {
+    id: string
+    name: string
+    retainer_cents: number | null
+    retainer_hours: number | null
+    billing_mode: string | null
+    billing_day: number | null
+  }[],
+  cycleEntries: { client_id: string | null; duration_seconds: number | null; started_at: string }[],
+  targetRateCents: number,
+): BurnAlertClient[] {
+  return billingClients
+    .map((c) => {
+      // Each client's own billing cycle, not a shared window - a client billed on the 15th is
+      // mid-cycle on the 1st (see computeClientBurn / billingCycleProgress in lib/burn.ts).
+      const cycle = billingCycleProgress(c.billing_day || 1)
+      const cycleStart = `${cycle.cycleStart}T00:00:00`
+      const cycleEnd = `${cycle.cycleEnd}T00:00:00`
+      const seconds = cycleEntries
+        .filter((e) => e.client_id === c.id && e.started_at >= cycleStart && e.started_at < cycleEnd)
+        .reduce((s, e) => s + (e.duration_seconds || 0), 0)
+      const burn = computeClientBurn(c, seconds, targetRateCents)
+      return burn && burn.percent >= 75 ? { clientId: c.id, name: c.name, percent: burn.percent, status: burn.status } : null
+    })
+    .filter((b): b is BurnAlertClient => b !== null)
+    .sort((a, b) => b.percent - a.percent)
 }
 
 export default async function DashboardPage() {
@@ -46,6 +80,7 @@ export default async function DashboardPage() {
     { data: weekCompletedTasks },
     { data: billingClients },
     { data: monthEntries },
+    { data: cycleEntries },
   ] = await Promise.all([
     // .limit(2000) is a defensive ceiling against pathological growth, not user-facing pagination.
     // The active-tasks query below is intentionally left unbounded - the Today/Overdue/Upcoming
@@ -101,7 +136,7 @@ export default async function DashboardPage() {
     // billing rows entirely for members rather than fetching-then-hiding, since retainer/hourly
     // rate cents must never reach a non-admin session's RSC payload (see stripBillingInfo).
     isAdmin
-      ? supabase.from('clients').select('id, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId)
+      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId)
       : Promise.resolve({ data: [] }),
     isAdmin
       ? supabase
@@ -112,10 +147,23 @@ export default async function DashboardPage() {
           .gte('started_at', `${monthStart}T00:00:00`)
           .lt('started_at', `${monthEnd}T00:00:00`)
       : Promise.resolve({ data: [] }),
+    // 62 days covers any billing_day's current cycle in any calendar month - burn tracking is
+    // scoped per client's own billing cycle, not this shared calendar-month window (see
+    // clientsOverBudget above), so this is deliberately a separate query from monthEntries.
+    isAdmin
+      ? supabase
+          .from('time_entries')
+          .select('client_id, duration_seconds, started_at')
+          .eq('org_id', orgId)
+          .not('duration_seconds', 'is', null)
+          .gte('started_at', `${getOffsetDate(-62)}T00:00:00`)
+      : Promise.resolve({ data: [] }),
   ])
 
   const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? []) : 0
   const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
+  const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
+  const burnAlerts = isAdmin ? clientsOverBudget(billingClients ?? [], cycleEntries ?? [], targetRateCents) : []
 
   return (
     <DashboardClient
@@ -124,6 +172,7 @@ export default async function DashboardPage() {
       isAdmin={isAdmin}
       monthRevenueCents={monthRevenueCents}
       mrrCents={mrrCents}
+      burnAlerts={burnAlerts}
       currency={org?.settings?.currency ?? 'usd'}
       initialClients={clients ?? []}
       initialTasks={tasks ?? []}

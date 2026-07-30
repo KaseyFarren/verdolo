@@ -69,6 +69,7 @@ type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type WeekCompletedTask = { assigned_to: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
 type RiskClient = { clientId: string; name: string; riskLevel: 'high' | 'medium'; reason: string; action: string }
+type BurnAlert = { clientId: string; name: string; percent: number; status: 'ok' | 'warn' | 'high' | 'over' }
 
 const HEALTH_ORDER = ['green', 'amber', 'red', 'churned'] as const
 
@@ -85,6 +86,7 @@ export default function DashboardClient({
   isAdmin,
   monthRevenueCents,
   mrrCents,
+  burnAlerts,
   currency,
   initialClients,
   initialTasks,
@@ -105,6 +107,7 @@ export default function DashboardClient({
   isAdmin: boolean
   monthRevenueCents: number
   mrrCents: number
+  burnAlerts: BurnAlert[]
   currency?: Currency
   initialClients: Client[]
   initialTasks: Task[]
@@ -546,6 +549,34 @@ export default function DashboardClient({
           ),
         }
       : null,
+    isAdmin && burnAlerts.length > 0
+      ? {
+          key: 'burn',
+          node: (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-ink/60 flex items-center">
+                  Retainer burn
+                  <InfoTooltip content="Hours logged this billing cycle vs. the hours each retainer supports, at your target hourly rate (Settings → General) unless a client has an explicit included-hours figure." />
+                </div>
+                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
+                  See more →
+                </Link>
+              </div>
+              <div className="flex flex-col gap-1">
+                {burnAlerts.slice(0, 4).map((b) => (
+                  <div key={b.clientId} className="flex justify-between items-center py-1 text-sm">
+                    <span className="text-ink">{b.name}</span>
+                    <span className="font-medium" style={{ color: b.status === 'over' ? '#e05070' : '#cc9a3c' }}>
+                      {Math.round(b.percent)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ),
+        }
+      : null,
     isAdmin
       ? {
           key: 'risk',
@@ -662,11 +693,17 @@ export default function DashboardClient({
         ))}
       </div>
 
-      {(expiringContracts.length > 0 || (dashIsToday && isAdmin)) && (
+      {(expiringContracts.length > 0 || burnAlerts.length > 0 || (dashIsToday && isAdmin)) && (
         <div className="flex flex-col gap-1 mb-2 text-sm">
           {expiringContracts.length > 0 && (
             <span className="text-amber-700">
               Contract{expiringContracts.length !== 1 ? 's' : ''} expiring soon: {expiringContracts.map((c) => `${c.name} (${formatDate(c.contract_ends)})`).join(', ')}
+            </span>
+          )}
+          {burnAlerts.length > 0 && (
+            <span className="text-amber-700">
+              {burnAlerts.length} client{burnAlerts.length !== 1 ? 's' : ''} over 75% of retainer hours this cycle:{' '}
+              {burnAlerts.map((b) => `${b.name} (${Math.round(b.percent)}%)`).join(', ')}
             </span>
           )}
           {dashIsToday && isAdmin && (

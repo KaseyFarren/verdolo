@@ -244,6 +244,9 @@ export function buildScopeCreepPrompt(params: {
   projectedFullMonthHours?: number
   projectedOverageHours?: number
   projectedOverageCents?: number
+  burnPercent?: number | null
+  projectedBurnPercent?: number | null
+  drivers?: { title: string; hours: number; share: number }[]
   clientCtx?: ClientCtx
   brandVoice?: string | null
 }) {
@@ -266,6 +269,23 @@ export function buildScopeCreepPrompt(params: {
     params.hoursBudgetAtTarget !== undefined && params.projectedFullMonthHours !== undefined
       ? ` The retainer supports about ${params.hoursBudgetAtTarget.toFixed(1)}h this month at target rate. At the current daily pace, hours are on track to reach about ${params.projectedFullMonthHours.toFixed(1)}h by the end of ${params.periodLabel}, with ${params.daysRemaining} day(s) left. ${(params.hoursRemainingBudget ?? 0) > 0 ? `That leaves about ${(params.hoursRemainingBudget ?? 0).toFixed(1)}h of budget remaining this month before hours exceed what the retainer supports.` : `Hours logged already exceed that budget by about ${Math.abs(params.hoursRemainingBudget ?? 0).toFixed(1)}h.`} If this pace continues for the rest of the month, the account is on track to run about ${(params.projectedOverageHours ?? 0).toFixed(1)}h over that budget, worth roughly ${sign}${((params.projectedOverageCents ?? 0) / 100).toFixed(0)} of time beyond what the retainer covers.`
       : ''
+  const burnLine =
+    params.burnPercent !== undefined && params.burnPercent !== null
+      ? ` Retainer burn: ${params.burnPercent.toFixed(0)}% of this month's hour budget used so far${
+          params.projectedBurnPercent !== undefined && params.projectedBurnPercent !== null
+            ? `, projected to reach ${params.projectedBurnPercent.toFixed(0)}% by month end at the current pace`
+            : ''
+        }.`
+      : ''
+  // Concentration is the signal that separates a known one-off from real scope creep: hours
+  // piled onto one or two named tasks reads as a push to confirm, not a pattern; hours spread
+  // thin across many small items reads as creep. Handed to the model as the finished breakdown
+  // (see burnDrivers in lib/burn.ts) rather than left as arithmetic it has to get right itself,
+  // same discipline as the other deterministic figures above.
+  const driversLine =
+    params.drivers && params.drivers.length
+      ? ` Hours this month broke down as: ${params.drivers.map((d) => `${d.title} ${d.hours.toFixed(1)}h (${Math.round(d.share * 100)}%)`).join(', ')}. If one or two items make up most of that time, treat this as a possible known push to confirm with the account owner rather than asserting scope creep; if it is spread thin across many small items, that is the creep pattern.`
+      : ''
   const clientMessageSection = params.clientCtx
     ? `
 
@@ -277,6 +297,6 @@ Return ONLY valid JSON, no markdown:
 
 Respond with 1-2 short sentences only, no headers.`
   return `You are an agency operations assistant. A client's effective hourly rate is below the team's target rate - the account is consuming more time than its revenue supports at that target.
-Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate, prorated to date)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.${retainerLine}${projectionLine}
+Client: ${params.clientName}. Period: ${params.periodLabel}. Hours logged: ${params.hours.toFixed(1)}. Revenue: ${sign}${revenue}${params.isEstimatedRevenue ? ' (retainer estimate, prorated to date)' : ''}. Effective rate realized: ${sign}${effectiveRate}/hr, vs a target of ${sign}${targetRate}/hr.${retainerLine}${projectionLine}${burnLine}${driversLine}
 Tell the account owner what's going on using the numbers above and suggest one concrete next step (cap hours, have a scope conversation, or raise the retainer - only raise the retainer if told above that the current one falls short). Do not independently recompute a projected or "full month" rate yourself - use only the figures given above. Be direct, no fluff. Do not use em dashes.${clientMessageSection}`
 }
