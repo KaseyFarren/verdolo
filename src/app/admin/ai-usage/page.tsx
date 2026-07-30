@@ -88,7 +88,7 @@ export default async function AdminAiUsagePage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-xl border border-ink/10 bg-white p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-ink/40">Total spend</div>
-          <div className="mt-1 font-heading text-2xl font-bold text-ink">{money(totalCostMicros)}</div>
+          <div className="mt-1 font-heading text-2xl font-bold text-ink">{moneyPrecise(totalCostMicros)}</div>
         </div>
         <div className="rounded-xl border border-ink/10 bg-white p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-ink/40">Generations</div>
@@ -126,7 +126,7 @@ export default async function AdminAiUsagePage() {
                   <td className="py-2 font-mono text-xs text-ink/60">{r.model}</td>
                   <td className="py-2 text-ink/70">{r.generations.toLocaleString()}</td>
                   <td className="py-2 text-ink/70">{moneyPrecise(r.costMicros / r.generations)}</td>
-                  <td className="py-2 font-medium text-ink">{money(r.costMicros)}</td>
+                  <td className="py-2 font-medium text-ink">{moneyPrecise(r.costMicros)}</td>
                 </tr>
               ))}
             </tbody>
