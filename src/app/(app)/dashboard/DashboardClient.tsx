@@ -754,6 +754,7 @@ export default function DashboardClient({
               </button>
             </div>
           )}
+          <div className="max-h-[520px] overflow-y-auto pr-1 -mr-1">
           {dashPendingMine.length > 0 && dashPendingUnassigned.length > 0 && (
             <div className="text-xs font-medium text-sage/70 mb-1">Assigned</div>
           )}
@@ -843,6 +844,7 @@ export default function DashboardClient({
               ))}
             </>
           )}
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
