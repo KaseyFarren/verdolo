@@ -106,7 +106,7 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
 
       const result = await callClaude(
         apiKey,
-        { model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }] },
+        { model: 'claude-haiku-4-5-20251001', max_tokens: 1500, messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }] },
         { orgId, route: 'risk-scan' }
       )
       const txt = extractText(result)
