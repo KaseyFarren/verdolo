@@ -1,6 +1,7 @@
+import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Reads the current calendar month's ai_usage_log rows and aggregates in JS. Fine at current
+// Reads one calendar month's ai_usage_log rows and aggregates in JS. Fine at current
 // scale (a few thousand generations/month across all orgs); if usage grows large enough that
 // this row count becomes a real page-load cost, replace with a Postgres aggregate (group by
 // org_id/route) instead of raising the limit.
@@ -35,15 +36,34 @@ function orgName(row: UsageRow) {
   return o?.name ?? 'Unknown org'
 }
 
-export default async function AdminAiUsagePage() {
+export default async function AdminAiUsagePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>
+}) {
   const admin = createAdminClient()
+  const { month } = await searchParams
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+  // month param is "YYYY-MM"; anything malformed falls back to the current month.
+  const parsed = month && /^\d{4}-\d{2}$/.test(month) ? month.split('-').map(Number) : null
+  const year = parsed ? parsed[0] : now.getFullYear()
+  const monthIndex = parsed ? parsed[1] - 1 : now.getMonth()
+
+  const monthStart = new Date(year, monthIndex, 1)
+  const monthEnd = new Date(year, monthIndex + 1, 1)
+  const isCurrentMonth = monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth()
+
+  const prevMonth = new Date(year, monthIndex - 1, 1)
+  const nextMonth = new Date(year, monthIndex + 1, 1)
+  const monthParam = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   const { data: rows } = await admin
     .from('ai_usage_log')
     .select('org_id, route, model, input_tokens, output_tokens, cost_micros, orgs(name)')
-    .gte('created_at', monthStart)
+    .gte('created_at', monthStart.toISOString())
+    .lt('created_at', monthEnd.toISOString())
     .order('created_at', { ascending: false })
     .limit(ROW_LIMIT)
 
@@ -76,13 +96,31 @@ export default async function AdminAiUsagePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-xl font-bold text-ink">AI usage & cost</h1>
-        <p className="mt-1 text-sm text-ink/60">
-          This calendar month, across all orgs. Actual Anthropic API spend - not AI-credit counts (each
-          org&apos;s credit cap is a generation count, not a dollar cap; a `tasks-from-doc` call on a large
-          document can cost far more per credit than a short `one-message` call).
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-xl font-bold text-ink">AI usage & cost</h1>
+          <p className="mt-1 text-sm text-ink/60">
+            {monthLabel}, across all orgs. Actual Anthropic API spend - not AI-credit counts (each
+            org&apos;s credit cap is a generation count, not a dollar cap; a `tasks-from-doc` call on a large
+            document can cost far more per credit than a short `one-message` call).
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-sm">
+          <Link
+            href={`/admin/ai-usage?month=${monthParam(prevMonth)}`}
+            className="rounded-lg border border-ink/10 bg-white px-3 py-1.5 font-medium text-ink/70 hover:text-ink transition-colors"
+          >
+            ← Prev
+          </Link>
+          {!isCurrentMonth && (
+            <Link
+              href={`/admin/ai-usage?month=${monthParam(nextMonth)}`}
+              className="rounded-lg border border-ink/10 bg-white px-3 py-1.5 font-medium text-ink/70 hover:text-ink transition-colors"
+            >
+              Next →
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
