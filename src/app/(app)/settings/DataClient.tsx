@@ -135,14 +135,21 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
     if (!isAdmin) return
     const ok = await confirm({
       title: 'Delete all org data?',
-      message: 'This permanently deletes every client, task, and note for this org. This cannot be undone.',
+      message: 'This permanently deletes every client, task, message, time entry, and uploaded file for this org. This cannot be undone.',
       confirmLabel: 'Delete everything',
       danger: true,
     })
     if (!ok) return
-    await supabase.from('tasks').delete().eq('org_id', orgId)
-    await supabase.from('client_notes').delete().eq('org_id', orgId)
-    await supabase.from('clients').delete().eq('org_id', orgId)
+    const res = await fetch('/api/data/reset-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Could not reset org data' }))
+      toast.error(error || 'Could not reset org data')
+      return
+    }
     toast.success('All org data deleted')
   }
 
@@ -203,7 +210,7 @@ export default function DataClient({ orgId, isAdmin }: { orgId: string; isAdmin:
         </Row>
       )}
       {isAdmin && (
-        <Row title="Reset all data" subtitle="Delete tasks, clients, and notes for this org">
+        <Row title="Reset all data" subtitle="Delete everything for this org - clients, tasks, messages, time entries, reports, and uploaded files">
           <button className="text-xs text-red-600" onClick={resetAll}>
             Reset
           </button>
