@@ -4,7 +4,7 @@ export const metadata = { title: 'Terms of Service - Verdolo' }
 
 export default function TermsPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12">
+    <main className="mx-auto max-w-2xl px-5 py-12">
       <Link href="/" className="text-sm text-sage hover:text-ink underline">
         ← Back
       </Link>

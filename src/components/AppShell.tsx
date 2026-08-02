@@ -80,7 +80,7 @@ export default function AppShell({
           className="flex min-h-screen bg-cream text-ink"
           style={accentColor ? ({ '--accent': accentColor } as React.CSSProperties) : undefined}
         >
-          <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-4 bg-green text-cream shadow-md">
+          <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center justify-between px-5 bg-green text-cream shadow-md">
             <button
               id="mobile-nav-toggle"
               onClick={() => setMobileOpen(true)}
@@ -172,7 +172,7 @@ export default function AppShell({
             <motion.div
               key={pathname}
               data-app-content
-              className={`mx-auto px-4 md:px-6 py-6 md:py-8 ${
+              className={`mx-auto px-5 md:px-6 py-6 md:py-8 ${
                 pathname === '/tasks' || pathname === '/dashboard' || pathname === '/reports' || pathname === '/messages' || pathname === '/time' ? 'max-w-6xl' : 'max-w-3xl'
               }`}
               initial={{ opacity: 0, y: 6 }}

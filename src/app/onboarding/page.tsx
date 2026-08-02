@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
   if (memberships && memberships.length > 0) redirect('/dashboard')
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4 bg-cream text-ink">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-5 bg-cream text-ink">
       <div className="mb-2 flex justify-center">
         <Logo size={24} />
       </div>

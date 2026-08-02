@@ -73,7 +73,7 @@ export default function TaskDetailModal({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-4 pt-[8vh] overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-5 pt-[8vh] overflow-y-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
