@@ -48,3 +48,7 @@ NEXT_SESSION.md
 
 # supabase CLI local link state (which project ref you're linked to is per-machine)
 supabase/.temp
+
+# personal planning docs (not part of the app)
+/90-DAY-PLAN.md
+/business-planning/

@@ -9,6 +9,7 @@ import ClientFiles from '@/components/ClientFiles'
 import ClientBudgets from '@/components/ClientBudgets'
 import ClientUpdateModal from '@/components/clients/ClientUpdateModal'
 import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import PeriodSelector from '@/components/ui/PeriodSelector'
@@ -351,7 +352,7 @@ export default function ClientsClient({
     })
 
     return (
-      <div>
+      <div className="max-w-3xl">
         <button className="flex items-center gap-1 text-sm font-medium text-sage hover:text-ink transition-colors mb-5" onClick={() => setSelectedId(null)}>
           <span aria-hidden>←</span> Clients
         </button>
@@ -390,7 +391,7 @@ export default function ClientsClient({
             currencySign={currencySign}
           />
         ) : (
-          <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="rounded-2xl border border-ink/8 bg-white p-5">
             <div className="flex gap-4 items-start">
               <div className="relative shrink-0">
                 <Avatar name={selected.name} index={clients.indexOf(selected)} size={48} />
@@ -543,7 +544,7 @@ export default function ClientsClient({
           </div>
         )}
 
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <div className="text-xs font-semibold tracking-wide text-sage mb-3">Quick note</div>
           <textarea
             className="w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm min-h-[70px] disabled:opacity-60"
@@ -559,7 +560,7 @@ export default function ClientsClient({
         </div>
 
         {canEdit && (
-          <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="rounded-2xl border border-ink/8 bg-white p-5">
             <ClientBudgets
               supabase={supabase}
               orgId={orgId}
@@ -571,11 +572,11 @@ export default function ClientsClient({
           </div>
         )}
 
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />
         </div>
 
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="text-xs font-semibold tracking-wide text-sage">Activity</div>
             <div className="flex gap-2 text-xs text-sage">
@@ -731,13 +732,15 @@ export default function ClientsClient({
         if (filteredClients.length === 0 && clients.length > 0) {
           return <div className="text-sm text-sage py-6">No clients match your search.</div>
         }
-        return filteredClients.map((c) => {
+        return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {filteredClients.map((c) => {
         const i = clients.indexOf(c)
         const stage = getStage(c)
         const health = clientHealthKey(c, today)
         const dotColor = HEALTH_COLOR[health]
         return (
-          <div key={c.id} className="flex items-center gap-3 py-3 border-b border-ink/10 cursor-pointer" onClick={() => setSelectedId(c.id)}>
+          <Card key={c.id} className="flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedId(c.id)}>
             <div className="relative shrink-0">
               <Avatar name={c.name} index={i} size={38} />
               <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white" style={{ background: dotColor }} />
@@ -781,9 +784,11 @@ export default function ClientsClient({
               </div>
             </div>
             <span className="text-sage/70">›</span>
-          </div>
+          </Card>
         )
-        })
+        })}
+        </div>
+        )
       })()}
     </div>
   )
@@ -824,7 +829,7 @@ function ClientForm({
   currencySign: string
 }) {
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
+    <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-5">
       <div className="text-sm font-semibold mb-4">{title}</div>
 
       <div className="text-xs font-semibold tracking-wide text-sage mb-2">Basics</div>

@@ -259,7 +259,7 @@ export default function BillingClient({
             subscribe to continue using Verdolo.
           </div>
         ) : (
-          <div className="rounded-lg border border-ink/10 bg-white p-4 text-sm text-sage">
+          <div className="rounded-2xl border border-ink/8 bg-white p-5 text-sm text-sage">
             {subscriptionStatus === 'trialing'
               ? `Your organization is on a free trial (${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left).`
               : 'Your organization has an active subscription.'}{' '}
@@ -274,7 +274,7 @@ export default function BillingClient({
     <div>
       <div className="text-xs font-semibold tracking-wide text-sage mb-2">Billing</div>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-4 mb-5">
+      <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-5">
         {subscriptionStatus === 'trialing' && !trialExpired && (
           <div className="text-sm mb-1">
             <span className="text-green font-semibold">Free trial</span> - {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
@@ -315,7 +315,7 @@ export default function BillingClient({
       </div>
 
       {hasSubscription && subscriptionStatus !== 'canceled' && (
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <div className="text-xs font-semibold tracking-wide text-sage mb-2">Seats</div>
           <div className="flex items-center gap-2">
             <input

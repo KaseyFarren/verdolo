@@ -30,7 +30,7 @@ export default function DivergingBarChart({
             <button
               key={item.id}
               type="button"
-              className="flex items-center w-full gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-sand/40 focus:bg-sand/40 focus:outline-none"
+              className="flex items-center w-full gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-sand/60 focus:bg-sand/60 focus:outline-none"
               onPointerEnter={() => setHoveredId(item.id)}
               onPointerLeave={() => setHoveredId((v) => (v === item.id ? null : v))}
               onFocus={() => setHoveredId(item.id)}

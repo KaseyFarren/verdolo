@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 import CustomSelect from '@/components/ui/CustomSelect'
 
 export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; canInviteOwner: boolean }) {
@@ -37,17 +38,17 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
 
   return (
     <section data-tour="invite-teammate">
-      <h2 className="mb-2 font-medium text-ink">Invite a teammate</h2>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="email"
-          placeholder="teammate@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
-        />
-        <div className="w-32">
+      <h2 className="mb-2 text-sm font-medium text-sage uppercase tracking-wide">Invite a teammate</h2>
+      <Card>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
+          <input
+            type="email"
+            placeholder="teammate@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm"
+          />
           <CustomSelect
             value={role}
             onChange={(v) => setRole(v as 'member' | 'admin' | 'owner')}
@@ -57,11 +58,11 @@ export default function InviteForm({ orgId, canInviteOwner }: { orgId: string; c
               ...(canInviteOwner ? [{ value: 'owner', label: 'Owner' }] : []),
             ]}
           />
-        </div>
-        <Button type="submit" variant="primary" disabled={status === 'loading'}>
-          {status === 'loading' ? 'Sending…' : 'Invite'}
-        </Button>
-      </form>
+          <Button type="submit" variant="primary" className="w-full" disabled={status === 'loading'}>
+            {status === 'loading' ? 'Sending…' : 'Invite'}
+          </Button>
+        </form>
+      </Card>
     </section>
   )
 }

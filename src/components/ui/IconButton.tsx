@@ -1,6 +1,7 @@
 'use client'
 
 import { motion, type HTMLMotionProps } from 'motion/react'
+import { BUTTON_MOTION } from './motion'
 
 const TONES = {
   sage: 'text-sage hover:text-ink hover:bg-sand',
@@ -26,9 +27,7 @@ export default function IconButton({
       <motion.button
         type="button"
         aria-label={label}
-        whileTap={{ scale: 0.92 }}
-        whileHover={{ scale: 1.06 }}
-        transition={{ duration: 0.12 }}
+        {...BUTTON_MOTION}
         className={`inline-flex items-center justify-center rounded-full p-1.5 text-sm leading-none transition-colors disabled:opacity-40 disabled:pointer-events-none ${TONES[tone]} ${className}`}
         {...props}
       >

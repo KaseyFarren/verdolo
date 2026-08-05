@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import {
   AVATAR_COLORS,
@@ -468,44 +469,44 @@ export default function RevenueClient({
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3" data-tour="revenue-summary">
-        <div className="rounded-2xl bg-white shadow-md p-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3" data-tour="revenue-summary">
+        <Card>
           <div className="text-xs text-sage mb-1">Total revenue</div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(totals.revenue)}</div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-5">
+        </Card>
+        <Card>
           <div className="text-xs text-sage mb-1">
             MRR <InfoTooltip content="Monthly recurring revenue - sum of active clients' monthly retainers" />
           </div>
           <div className="text-2xl font-heading font-bold">{fmtMoney(mrrCents)}</div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-5">
+        </Card>
+        <Card>
           <div className="text-xs text-sage mb-1">Hours logged</div>
           <div className="text-2xl font-heading font-bold">{totals.hours.toFixed(1)}</div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-5">
+        </Card>
+        <Card>
           <div className="text-xs text-sage mb-1">
             Blended rate <InfoTooltip content="Total revenue divided by total hours logged, across all clients" />
           </div>
           <div className="text-2xl font-heading font-bold">{totals.rate ? `${currencySign}${centsToDollars(totals.rate)}/hr` : '-'}</div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-5">
+        </Card>
+        <Card>
           <div className="text-xs text-sage mb-1">
             vs. target rate <InfoTooltip content="Blended rate compared to the target hourly rate set in Settings → General" />
           </div>
           <div className={`text-2xl font-heading font-bold ${totals.rateDeltaCents !== null && totals.rateDeltaCents < 0 ? 'text-red-600' : ''}`}>
             {totals.rateDeltaCents !== null ? formatRateDelta(totals.rateDeltaCents) : '-'}
           </div>
-        </div>
-        <div className="rounded-2xl bg-white shadow-md p-5">
+        </Card>
+        <Card>
           <div className="text-xs text-sage mb-1">
             Billable utilization <InfoTooltip content="Share of logged hours marked billable" />
           </div>
           <div className="text-2xl font-heading font-bold">{utilization !== null ? `${utilization.toFixed(0)}%` : '-'}</div>
-        </div>
+        </Card>
       </div>
       {targetRateCents === 0 && (
-        <div className="text-xs text-sage bg-white rounded-xl shadow-md p-3 mb-3">
+        <div className="text-xs text-sage bg-white rounded-2xl border border-ink/8 p-3 mb-3">
           Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here - set a target hourly rate in Settings → General to
           see how your blended rate compares (no target set yet).
         </div>
@@ -604,7 +605,7 @@ export default function RevenueClient({
                     <span className="font-medium w-16 text-right">{fmtMoney(r.totalRevenue)}</span>
                     <span
                       className={`shrink-0 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
-                        expanded ? 'bg-ink text-white rotate-180' : 'bg-sand text-sage group-hover:bg-clay/20 group-hover:text-ink'
+                        expanded ? 'bg-ink text-white rotate-180' : 'bg-sand text-sage group-hover:bg-ink/10 group-hover:text-ink'
                       }`}
                       title={expanded ? 'Hide billing details' : 'View billing details'}
                     >
@@ -688,11 +689,11 @@ export default function RevenueClient({
       {memberRows.length === 0 ? (
         <div className="text-sm text-sage py-4">No time logged or tasks assigned this month.</div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {memberRows.map((r, i) => {
             const stats = taskStatsByMember.get(r.member.user_id) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
             return (
-              <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
+              <Card key={r.member.user_id}>
                 <div className="flex flex-wrap items-center gap-4">
                   <Avatar member={r.member} index={i} />
                   <div className="min-w-0">
@@ -728,7 +729,7 @@ export default function RevenueClient({
                     <span className={stats.completedLate > 0 ? 'text-amber-700' : 'text-sage'}>completed late</span>
                   </div>
                 </div>
-              </div>
+              </Card>
             )
           })}
         </div>

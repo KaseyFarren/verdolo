@@ -121,7 +121,7 @@ export default function MembersList({
           onChange={(e) => setSearch(e.target.value)}
         />
       )}
-      <ul className="divide-y divide-white/10 rounded-2xl border border-ink/10 overflow-hidden">
+      <ul className="divide-y divide-ink/8 rounded-2xl border border-ink/8 bg-white overflow-hidden">
       {filteredRows.length === 0 && <li className="px-3 py-4 text-sm text-sage">No teammates match your search.</li>}
       {filteredRows.map((m) => {
         const isSelf = m.user_id === currentUserId

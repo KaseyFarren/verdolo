@@ -762,7 +762,7 @@ export default function TimeClient({
       <h1 className="text-xl font-semibold mb-5">Time</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-      <div className="rounded-lg border border-ink/10 bg-white p-4" data-tour="start-timer">
+      <div className="rounded-2xl border border-ink/8 bg-white p-5" data-tour="start-timer">
         {running ? (
           <div>
             <div className="text-2xl font-mono font-semibold mb-1">
@@ -838,7 +838,7 @@ export default function TimeClient({
         )}
       </div>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-4">
+      <div className="rounded-2xl border border-ink/8 bg-white p-5">
         <div className="text-xs font-semibold tracking-wide text-sage mb-2">Log time manually</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
           <CustomSelect
@@ -1022,7 +1022,7 @@ export default function TimeClient({
         </div>
       </div>
       {showClearOld && (
-        <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
+        <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-4">
           <div className="text-xs text-sage mb-2">
             Permanently delete entries logged before a chosen date. Client and teammate totals stay accurate - only the individual entry
             detail is removed. The current month can&apos;t be cleared this way.
@@ -1062,7 +1062,7 @@ export default function TimeClient({
             disabled={entriesPage === 0}
             className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
           >
-            ← Newer
+            Newer
           </button>
           <span className="text-xs text-sage">
             Page {entriesPage + 1} of {totalEntriesPages}
@@ -1073,7 +1073,7 @@ export default function TimeClient({
             disabled={entriesPage >= totalEntriesPages - 1}
             className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
           >
-            Older →
+            Older
           </button>
         </div>
       )}

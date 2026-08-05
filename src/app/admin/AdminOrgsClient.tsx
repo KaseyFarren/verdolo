@@ -154,7 +154,7 @@ export default function AdminOrgsClient({ orgs, orphanedUsers }: { orgs: AdminOr
           </thead>
           <tbody>
             {filtered.map((org) => (
-              <tr key={org.id} className="border-b border-ink/5 last:border-0 hover:bg-sand/50">
+              <tr key={org.id} className="border-b border-ink/5 last:border-0 hover:bg-sand/60">
                 <td className="px-3 py-2">
                   <Link href={`/admin/orgs/${org.id}`} className="font-medium hover:underline">
                     {org.name}

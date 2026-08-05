@@ -110,14 +110,14 @@ export default async function AdminAiUsagePage({
             href={`/admin/ai-usage?month=${monthParam(prevMonth)}`}
             className="rounded-lg border border-ink/10 bg-white px-3 py-1.5 font-medium text-ink/70 hover:text-ink transition-colors"
           >
-            ← Prev
+            Prev
           </Link>
           {!isCurrentMonth && (
             <Link
               href={`/admin/ai-usage?month=${monthParam(nextMonth)}`}
               className="rounded-lg border border-ink/10 bg-white px-3 py-1.5 font-medium text-ink/70 hover:text-ink transition-colors"
             >
-              Next →
+              Next
             </Link>
           )}
         </div>

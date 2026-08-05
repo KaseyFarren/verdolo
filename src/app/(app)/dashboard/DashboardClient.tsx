@@ -9,7 +9,9 @@ import { ensureAutoAndRecurringTasks } from '@/lib/taskGen'
 import { useTaskTimer } from '@/lib/useTaskTimer'
 import Button from '@/components/ui/Button'
 import IconButton from '@/components/ui/IconButton'
-import { CheckIcon, ClockIcon, PauseIcon, PencilIcon, PlayIcon, RefreshIcon, SparkleIcon, TrophyIcon } from '@/components/ui/icons'
+import Card from '@/components/ui/Card'
+import { BUTTON_MOTION } from '@/components/ui/motion'
+import { BarChartIcon, CheckIcon, CheckSquareIcon, ClockIcon, PauseIcon, PencilIcon, PlayIcon, RefreshIcon, SparkleIcon, TrophyIcon } from '@/components/ui/icons'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
@@ -72,6 +74,7 @@ type RiskClient = { clientId: string; name: string; riskLevel: 'high' | 'medium'
 type BurnAlert = { clientId: string; name: string; percent: number; status: 'ok' | 'warn' | 'high' | 'over' }
 
 const HEALTH_ORDER = ['green', 'amber', 'red', 'churned'] as const
+const MotionLink = motion.create(Link)
 
 function formatHoursMins(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -484,7 +487,7 @@ export default function DashboardClient({
       key: 'team',
       node: (
         <>
-          <div className="text-sm font-medium text-ink/60 mb-2">{isAdmin ? 'Team today' : 'My time today'}</div>
+          <div className="text-sm font-medium text-ink/60 uppercase tracking-wide mb-2">{isAdmin ? 'Team today' : 'My time today'}</div>
           {teamToday.length === 0 ? (
             <div className="text-sm text-sage">No time logged yet today.</div>
           ) : (
@@ -503,7 +506,7 @@ export default function DashboardClient({
           key: 'week',
           node: (
             <>
-              <div className="text-sm font-medium text-ink/60 mb-2">This week</div>
+              <div className="text-sm font-medium text-ink/60 uppercase tracking-wide mb-2">This week</div>
               {topHoursLabel && (
                 <div className="flex justify-between items-start gap-2 py-1 text-sm">
                   <span className="text-ink min-w-0 pr-2 inline-flex items-center gap-1.5">
@@ -530,10 +533,10 @@ export default function DashboardClient({
           node: (
             <>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60">Revenue</div>
-                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
-                  See more →
-                </Link>
+                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">Revenue</div>
+                <MotionLink {...BUTTON_MOTION} href="/revenue" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
+                  See more
+                </MotionLink>
               </div>
               <div className="flex gap-6">
                 <div>
@@ -555,13 +558,13 @@ export default function DashboardClient({
           node: (
             <>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60 flex items-center">
+                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
                   Retainer burn
                   <InfoTooltip content="Hours logged this billing cycle vs. the hours each retainer supports, at your target hourly rate (Settings → General) unless a client has an explicit included-hours figure." />
                 </div>
-                <Link href="/revenue" className="text-xs text-sage hover:text-ink">
-                  See more →
-                </Link>
+                <MotionLink {...BUTTON_MOTION} href="/revenue" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
+                  See more
+                </MotionLink>
               </div>
               <div className="flex flex-col gap-1">
                 {burnAlerts.slice(0, 4).map((b) => (
@@ -583,7 +586,7 @@ export default function DashboardClient({
           node: (
             <>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60 flex items-center">
+                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
                   At risk
                   <InfoTooltip content="AI-ranked clients with a warning sign - overdue contact, an expiring contract, overdue tasks, or no recent activity." />
                 </div>
@@ -628,13 +631,13 @@ export default function DashboardClient({
       node: (
         <>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-ink/60 flex items-center">
+            <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
               Client health
               <InfoTooltip content="How overdue each client is for a check-in, based on last contact vs. their cadence - separate from pipeline stage (Lead/Trial/Active/etc.)." />
             </div>
-            <Link href="/clients" className="text-xs text-sage hover:text-ink">
-              See more →
-            </Link>
+            <MotionLink {...BUTTON_MOTION} href="/clients" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
+              See more
+            </MotionLink>
           </div>
           {clientHealth.length === 0 ? (
             <div className="text-sm text-sage">No clients yet.</div>
@@ -661,7 +664,7 @@ export default function DashboardClient({
 
   return (
     <div>
-      <div className="flex justify-between items-start mb-5">
+      <div className="flex justify-between items-start mb-6">
         <div>
           <div className="font-heading text-2xl font-bold text-ink">Dashboard</div>
           <div className="text-sm text-sage mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
@@ -675,26 +678,29 @@ export default function DashboardClient({
         <ProgressRing done={ringDone} total={ringTotal} />
       </div>
 
-      <div className="flex gap-2 mb-5 pt-5 border-t border-ink/10">
+      <div className="h-px w-full mb-6 bg-gradient-to-r from-transparent via-ink/10 to-transparent" />
+
+      <div className="flex gap-2 mb-6">
         {[
           ['Yesterday', yesterday],
           ['Today', today],
           ['Tomorrow', tomorrow],
         ].map(([label, date]) => (
-          <button
+          <motion.button
             key={date}
+            {...BUTTON_MOTION}
             onClick={() => setDashDate(date)}
-            className={`flex-1 rounded-xl py-2 text-sm border transition-colors ${
+            className={`flex-1 rounded-lg py-2 text-sm border transition-colors ${
               dashDate === date ? 'border-accent bg-accent text-white font-medium shadow-md' : 'border-ink/10 bg-white text-sage hover:text-ink'
             }`}
           >
             {label}
-          </button>
+          </motion.button>
         ))}
       </div>
 
       {(expiringContracts.length > 0 || burnAlerts.length > 0 || (dashIsToday && isAdmin)) && (
-        <div className="flex flex-col gap-1 mb-2 text-sm">
+        <div className="flex flex-col gap-2 mb-6 text-sm">
           {expiringContracts.length > 0 && (
             <span className="text-amber-700">
               Contract{expiringContracts.length !== 1 ? 's' : ''} expiring soon: {expiringContracts.map((c) => `${c.name} (${formatDate(c.contract_ends)})`).join(', ')}
@@ -707,26 +713,36 @@ export default function DashboardClient({
             </span>
           )}
           {dashIsToday && isAdmin && (
-            <Link href="/reports" className="text-sage hover:text-ink w-fit">
-              {hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'} →
-            </Link>
+            <MotionLink
+              {...BUTTON_MOTION}
+              href="/reports"
+              className="inline-flex items-center gap-1.5 w-fit rounded-full border border-sage/15 bg-sage/8 pl-2.5 pr-3 py-1.5 text-xs font-medium text-sage hover:text-ink hover:bg-sage/12 transition-colors"
+            >
+              <BarChartIcon size={12} className="shrink-0" />
+              {hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'}
+             
+            </MotionLink>
           )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-6 pt-6 border-t border-ink/10">
-        <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col">
+      <div className="h-px w-full mb-6 bg-gradient-to-r from-transparent via-ink/10 to-transparent" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-6">
+        <Card className="flex flex-col">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-ink/60">{dashLabel}&apos;s tasks</div>
-            <button
-              className="text-xs text-sage hover:text-ink"
+            <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">{dashLabel}&apos;s tasks</div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="!px-0"
               onClick={() => {
                 setShowAddTask((v) => !v)
                 if (!showAddTask) setTaskForm((f) => ({ ...f, title: '', notes: '', dueDate: dashDate }))
               }}
             >
               {showAddTask ? 'Cancel' : '+ Add'}
-            </button>
+            </Button>
           </div>
           {showAddTask && (
             <AddTaskForm
@@ -740,20 +756,22 @@ export default function DashboardClient({
               onCancel={() => setShowAddTask(false)}
             />
           )}
-          {dashPending.length === 0 && dashCompleted.length === 0 && !showAddTask && (
-            <div className="text-sm text-sage py-3">
-              No tasks for {dashLabel.toLowerCase()}.{' '}
-              <button
-                className="text-accent underline"
+          {dashPending.length === 0 && dashCompleted.length === 0 && !showAddTask ? (
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sage">
+              <CheckSquareIcon size={22} className="opacity-25" />
+              <div className="text-sm">No tasks for {dashLabel.toLowerCase()}.</div>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => {
                   setShowAddTask(true)
                   setTaskForm((f) => ({ ...f, title: '', notes: '', dueDate: dashDate }))
                 }}
               >
-                Add one →
-              </button>
+                + Add a task
+              </Button>
             </div>
-          )}
+          ) : (
           <div className="flex-1 min-h-0 max-h-[520px] overflow-y-auto pr-1 -mr-1">
           {dashPendingMine.length > 0 && dashPendingUnassigned.length > 0 && (
             <div className="text-xs font-medium text-sage/70 mb-1">Assigned</div>
@@ -845,7 +863,8 @@ export default function DashboardClient({
             </>
           )}
           </div>
-        </div>
+          )}
+        </Card>
 
         <div className="flex flex-col gap-4">
           <div className="@container">
@@ -853,17 +872,17 @@ export default function DashboardClient({
               {statBlocks.map((block, i) => {
                 const isOddOut = statBlocks.length % 2 === 1 && i === statBlocks.length - 1
                 return (
-                  <div key={block.key} className={`rounded-2xl bg-white border border-ink/8 p-5 ${isOddOut ? '@lg:col-span-2' : ''}`}>
+                  <Card key={block.key} className={isOddOut ? '@lg:col-span-2' : ''}>
                     {block.node}
-                  </div>
+                  </Card>
                 )
               })}
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white border border-ink/8 p-5 flex flex-col flex-1 min-h-[160px]">
+          <Card className="flex flex-col flex-1 min-h-[160px]">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-ink/60">Quick notes</div>
+              <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">Quick notes</div>
               <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
             </div>
             <textarea
@@ -872,7 +891,7 @@ export default function DashboardClient({
               value={note}
               onChange={(e) => updateNote(e.target.value)}
             />
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -912,13 +931,18 @@ export default function DashboardClient({
                     <span className="text-green font-semibold inline-flex items-center gap-1">
                       <CheckIcon size={12} /> Sent
                     </span>
-                    <button className="text-sage hover:text-ink hover:underline" onClick={() => undoSent(c)}>
+                    <Button variant="ghost" size="sm" className="!px-0" onClick={() => undoSent(c)}>
                       Undo
-                    </button>
+                    </Button>
                     {!c.awaiting_reply && (
-                      <button title="Mark awaiting reply" className="text-amber-700 hover:text-amber-800" onClick={() => markAwaitingReply(c)}>
+                      <motion.button
+                        {...BUTTON_MOTION}
+                        title="Mark awaiting reply"
+                        className="text-amber-700 hover:text-amber-800"
+                        onClick={() => markAwaitingReply(c)}
+                      >
                         <ClockIcon size={13} />
-                      </button>
+                      </motion.button>
                     )}
                   </div>
                 )}
@@ -985,13 +1009,19 @@ function ProgressRing({ done, total, size = 60 }: { done: number; total: number;
   return (
     <div className="flex flex-col items-center gap-1 w-16 shrink-0">
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <defs>
+          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={allComplete ? '#2a4a2c' : '#e98a4f'} />
+            <stop offset="100%" stopColor={allComplete ? '#16271a' : '#dd6b2c'} />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(26,26,23,0.08)" strokeWidth={6} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={allComplete ? '#1f3320' : '#dd6b2c'}
+          stroke="url(#ringGradient)"
           strokeWidth={6}
           strokeDasharray={circ}
           strokeDashoffset={offset}

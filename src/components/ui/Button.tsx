@@ -1,6 +1,7 @@
 'use client'
 
 import { motion, type HTMLMotionProps } from 'motion/react'
+import { BUTTON_MOTION } from './motion'
 
 const VARIANTS = {
   primary: 'bg-accent text-white font-medium shadow-md hover:brightness-110',
@@ -29,9 +30,7 @@ export default function Button({
 } & Omit<HTMLMotionProps<'button'>, 'ref'>) {
   return (
     <motion.button
-      whileTap={{ scale: 0.96 }}
-      whileHover={{ scale: 1.015 }}
-      transition={{ duration: 0.12 }}
+      {...BUTTON_MOTION}
       className={`rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...props}
     >

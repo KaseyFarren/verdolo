@@ -1008,7 +1008,7 @@ export default function TasksClient({
 
           {view === 'calendar' && (
             <>
-              <div className="rounded-lg border border-ink/10 bg-white p-4 mb-4">
+              <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <button onClick={prevMonth} className="text-sage px-2">
                     ‹
@@ -1161,7 +1161,7 @@ export default function TasksClient({
             <div>
               <p className="text-sm text-sage mb-4">Repeats on a schedule you choose - daily, weekdays, or a specific day each week.</p>
               {showAddRecurring && (
-                <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
+                <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-3">
                   <input
                     className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                     placeholder="e.g. Check emails"
@@ -1215,7 +1215,7 @@ export default function TasksClient({
               {recurring.map((r) => (
                 <div key={r.id} className="border-b border-ink/10 py-2">
                   {editingRecurringId === r.id ? (
-                    <div className="rounded-lg border border-ink/10 bg-white p-4">
+                    <div className="rounded-2xl border border-ink/8 bg-white p-5">
                       <input
                         className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                         value={(editRecurringForm.title as string) || ''}
@@ -1326,7 +1326,7 @@ export default function TasksClient({
             <div>
               <p className="text-sm text-sage mb-4">Applied automatically to every client, every day - including clients you add later.</p>
               {showAddDefault && (
-                <div className="rounded-lg border border-ink/10 bg-white p-4 mb-3">
+                <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-3">
                   <input
                     className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                     placeholder="e.g. Daily check-in"
@@ -1363,7 +1363,7 @@ export default function TasksClient({
               {defaults.map((d) => (
                 <div key={d.id} className="border-b border-ink/10 py-2">
                   {editingDefaultId === d.id ? (
-                    <div className="rounded-lg border border-ink/10 bg-white p-4">
+                    <div className="rounded-2xl border border-ink/8 bg-white p-5">
                       <input
                         className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
                         value={(editDefaultForm.title as string) || ''}

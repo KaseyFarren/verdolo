@@ -18,6 +18,7 @@ import {
 } from '@/lib/agency'
 import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays, periodBounds, type Period, type PeriodValue } from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
+import Card from '@/components/ui/Card'
 import DatePicker from '@/components/ui/DatePicker'
 import MonthPicker from '@/components/ui/MonthPicker'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -565,7 +566,7 @@ export default function ReportsClient({
                 </div>
               ) : (
                 <button
-                  className="w-full rounded-xl border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                  className="w-full rounded-lg border border-ink/10 bg-white py-2 text-sm text-sage shadow-md disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                   onClick={generateRecap}
                   disabled={loadingRecap || !hasApiKey}
                 >
@@ -591,7 +592,7 @@ export default function ReportsClient({
                   {clientReports.map((r) => {
                     const health = clientHealthKey(r.client, todayKey())
                     return (
-                    <div key={r.client.id} className="rounded-2xl bg-white border border-ink/8 p-5">
+                    <Card key={r.client.id}>
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full shrink-0" style={{ background: HEALTH_COLOR[health] }} />
@@ -664,7 +665,7 @@ export default function ReportsClient({
                           )}
                         </div>
                       </div>
-                    </div>
+                    </Card>
                     )
                   })}
                 </div>
@@ -699,7 +700,7 @@ export default function ReportsClient({
             </div>
 
             {showBackfill && (
-              <div className="rounded-xl bg-white shadow-md p-4 mb-4">
+              <div className="rounded-2xl bg-white border border-ink/8 p-4 mb-4">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <div className="flex gap-1 bg-sand/60 rounded-full p-1 w-fit">
                     {(['week', 'month'] as const).map((t) => (
@@ -771,7 +772,7 @@ export default function ReportsClient({
                         }`}
                       >
                         <button
-                          className="flex w-full justify-between items-center text-left p-4 hover:bg-sand/40 transition-colors"
+                          className="flex w-full justify-between items-center text-left p-4 hover:bg-sand/60 transition-colors"
                           onClick={() => toggleExpanded(key)}
                         >
                           <span className="text-xs font-semibold text-sage flex items-center gap-2">
@@ -817,7 +818,7 @@ export default function ReportsClient({
           </div>
 
           {targetRateCents === 0 && (
-            <div className="text-sm text-sage bg-white rounded-xl shadow-md p-3 mb-4">
+            <div className="text-sm text-sage bg-white rounded-2xl border border-ink/8 p-3 mb-4">
               Verdolo doesn&apos;t track expenses, so there&apos;s no real cost/margin here - set a target hourly rate in Settings → General to
               see how each account&apos;s effective rate compares (no target set yet).
             </div>

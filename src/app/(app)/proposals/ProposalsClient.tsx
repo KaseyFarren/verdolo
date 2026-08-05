@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 import CustomSelect from '@/components/ui/CustomSelect'
 import { centsToDollars, currencySymbol, dollarsToCents, formatDate, type Currency } from '@/lib/agency'
 
@@ -264,7 +265,7 @@ export default function ProposalsClient({
       </div>
 
       {showAdd && (
-        <div className="rounded-2xl bg-white shadow-md p-5 mb-5 space-y-3">
+        <Card className="mb-5 space-y-3">
           {!editingId && (
             <div className="flex gap-1.5">
               <button
@@ -336,7 +337,7 @@ export default function ProposalsClient({
           >
             {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create proposal'}
           </Button>
-        </div>
+        </Card>
       )}
 
       {proposals.length > 0 && (
@@ -359,13 +360,13 @@ export default function ProposalsClient({
       {sorted.length === 0 ? (
         <div className="text-sm text-sage py-8 text-center">{proposals.length === 0 ? 'No proposals yet.' : 'No proposals match these filters.'}</div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {sorted.map((p) => {
             const style = STATUS_STYLE[p.status]
             const isOpen = expanded.has(p.id)
             const hasDetails = !!p.notes || !!p.doc_url
             return (
-              <div key={p.id} className="rounded-2xl bg-white shadow-md p-5">
+              <Card key={p.id}>
                 <div className="flex justify-between items-start gap-3">
                   <button
                     type="button"
@@ -425,7 +426,7 @@ export default function ProposalsClient({
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             )
           })}
         </div>

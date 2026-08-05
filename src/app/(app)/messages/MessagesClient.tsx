@@ -260,7 +260,7 @@ const MessageRow = memo(function MessageRow({
           <span className="text-xs text-sage bg-sand rounded-full px-3 py-1">{dateLabel(m.created_at)}</span>
         </div>
       )}
-      <div className={`group relative flex gap-2.5 px-2 rounded-lg hover:bg-sand/50 ${grouped ? 'py-0.5' : 'pt-2.5 pb-0.5'}`}>
+      <div className={`group relative flex gap-2.5 px-2 rounded-lg hover:bg-sand/60 ${grouped ? 'py-0.5' : 'pt-2.5 pb-0.5'}`}>
         <div className="w-8 shrink-0 flex justify-center">
           {!grouped ? (
             avatarUrl ? (

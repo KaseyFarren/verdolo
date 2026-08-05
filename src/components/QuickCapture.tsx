@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { todayKey } from '@/lib/agency'
 import { markSelfAssigned } from '@/lib/selfNotify'
 import Button from '@/components/ui/Button'
+import { BUTTON_MOTION } from '@/components/ui/motion'
+import { PlusIcon } from '@/components/ui/icons'
 
 export default function QuickCapture({ orgId, userId }: { orgId: string; userId: string }) {
   const router = useRouter()
@@ -58,13 +60,12 @@ export default function QuickCapture({ orgId, userId }: { orgId: string; userId:
   return (
     <>
       <motion.button
-        whileTap={{ scale: 0.92 }}
-        whileHover={{ scale: 1.05 }}
+        {...BUTTON_MOTION}
         onClick={() => setOpen(true)}
         title="Quick add (⌘K)"
-        className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-accent text-white text-2xl leading-none shadow-lg flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-accent text-white shadow-lg flex items-center justify-center"
       >
-        +
+        <PlusIcon size={22} />
       </motion.button>
       <AnimatePresence>
         {open && (

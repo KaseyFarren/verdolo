@@ -21,16 +21,19 @@ export default async function TeamPage() {
         <p className="text-sm text-sage">{org?.name} · signed in as {user.email} ({role})</p>
       </div>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-medium text-sage">Members</h2>
-        <MembersList orgId={orgId} members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+        <section>
+          <h2 className="mb-2 text-sm font-medium text-sage uppercase tracking-wide">Members</h2>
+          <MembersList orgId={orgId} members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
+        </section>
 
-      {(members?.length ?? 0) === 1 && (
-        <p className="mb-2 text-sm text-sage">You&apos;re the only one here so far - invite a teammate to start collaborating.</p>
-      )}
-
-      <InviteForm orgId={orgId} canInviteOwner={role === 'owner'} />
+        <div>
+          {(members?.length ?? 0) === 1 && (
+            <p className="mb-2 text-sm text-sage">You&apos;re the only one here so far - invite a teammate to start collaborating.</p>
+          )}
+          <InviteForm orgId={orgId} canInviteOwner={role === 'owner'} />
+        </div>
+      </div>
     </>
   )
 }
