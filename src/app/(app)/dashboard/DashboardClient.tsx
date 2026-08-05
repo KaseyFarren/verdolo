@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button'
 import IconButton from '@/components/ui/IconButton'
 import Card from '@/components/ui/Card'
 import { BUTTON_MOTION } from '@/components/ui/motion'
-import { BarChartIcon, CheckIcon, CheckSquareIcon, ClockIcon, PauseIcon, PencilIcon, PlayIcon, RefreshIcon, SparkleIcon, TrophyIcon } from '@/components/ui/icons'
+import { BarChartIcon, CheckIcon, CheckSquareIcon, ClockIcon, PauseIcon, PencilIcon, PlayIcon, RefreshIcon, SparkleIcon, TrashIcon, TrophyIcon } from '@/components/ui/icons'
 import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
@@ -63,6 +63,9 @@ type Task = {
   is_auto: boolean
   auto_type: string | null
   skipped: boolean
+  recurring_id?: string | null
+  default_template_id?: string | null
+  parent_task_id?: string | null
 }
 type Recurring = { id: string; title: string; client_id: string | null; priority: string; frequency: string; notes: string | null }
 type DefaultTemplate = { id: string; title: string; priority: string; assigned_to: string | null; notes: string | null; auto_type: string | null; paused: boolean }
@@ -324,6 +327,33 @@ export default function DashboardClient({
       return
     }
     if (data) setTasks((prev) => prev.map((t) => (t.id === id ? (data as Task) : t)))
+  }
+
+  function deleteTask(id: string) {
+    const removed = tasks.find((t) => t.id === id)
+    if (!removed) return
+    // deleting a parent cascades to its subtasks in the DB (on delete cascade); mirror that in
+    // the optimistic local state and Undo path so subtask rows don't linger until the next fetch
+    const removedSubtasks = tasks.filter((t) => t.parent_task_id === id)
+    // A generated instance (recurring / default / auto) can't be hard-deleted - the generator
+    // recreates it on the next load, so the "deleted" task reappears. Mark it skipped instead:
+    // it's hidden everywhere, won't count as completed (done stays false), and the surviving row
+    // blocks regeneration via the unique constraint. One-off tasks are still truly deleted.
+    const isGenerated = !!(removed.recurring_id || removed.is_auto || removed.default_template_id)
+    setTasks((prev) => prev.filter((t) => t.id !== id && t.parent_task_id !== id))
+    const timeoutId = setTimeout(async () => {
+      if (isGenerated) await supabase.from('tasks').update({ skipped: true }).eq('id', id)
+      else await supabase.from('tasks').delete().eq('id', id)
+    }, 5000)
+    toast('Task deleted', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId)
+          setTasks((prev) => [...prev, removed, ...removedSubtasks])
+        },
+      },
+    })
   }
 
   async function toggleTask(t: Task) {
@@ -799,6 +829,7 @@ export default function DashboardClient({
                 }}
                 cancelEdit={() => setEditingTaskId(null)}
                 save={() => updateTask(t.id, editForm)}
+                del={() => deleteTask(t.id)}
               />
             ))}
           </AnimatePresence>
@@ -828,6 +859,7 @@ export default function DashboardClient({
                     }}
                     cancelEdit={() => setEditingTaskId(null)}
                     save={() => updateTask(t.id, editForm)}
+                    del={() => deleteTask(t.id)}
                   />
                 ))}
               </AnimatePresence>
@@ -858,6 +890,7 @@ export default function DashboardClient({
                   }}
                   cancelEdit={() => setEditingTaskId(null)}
                   save={() => updateTask(t.id, editForm)}
+                  del={() => deleteTask(t.id)}
                 />
               ))}
             </>
@@ -1082,6 +1115,7 @@ function SimpleTaskRow({
   startEdit,
   cancelEdit,
   save,
+  del,
 }: {
   t: Task
   clientName?: string
@@ -1099,6 +1133,7 @@ function SimpleTaskRow({
   startEdit: () => void
   cancelEdit: () => void
   save: () => void
+  del: () => void
 }) {
   if (isEditing) {
     return (
@@ -1153,6 +1188,7 @@ function SimpleTaskRow({
           ))}
         {!t.done && !isTimerRunning && <QuickAddTime onAdd={addManualTime} />}
         <IconButton label="Edit" tone="sage" icon={<PencilIcon />} onClick={startEdit} />
+        <IconButton label="Delete" tone="red" icon={<TrashIcon />} onClick={del} />
       </div>
     </motion.div>
   )
