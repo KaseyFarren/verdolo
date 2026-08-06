@@ -59,14 +59,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests - please slow down and try again in a moment' }, { status: 429 })
   }
 
-  const credit = await checkAndConsumeAiCredit(orgId)
-  if (!credit.allowed) {
-    return NextResponse.json(
-      { error: `You've used all ${credit.limit} AI generations included in your ${credit.tierName} plan this month. More seats raise your monthly allowance.` },
-      { status: 402 }
-    )
-  }
-
   const { start, end } = resolvePeriod(periodType, rawPeriodStart)
   const today = todayKey()
   const [{ data: clients }, { data: messages }, { data: doneTasks }] = await Promise.all([
@@ -82,6 +74,26 @@ export async function POST(request: Request) {
     const health = stage === 'Churned' ? 'Churned' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
     return `- ${c.name} (${stage}): ${msgCount} msgs, ${done} tasks done, health: ${health}, last: ${c.last_contacted || 'never'}`
   })
+
+  // No client data to summarize (e.g. a fresh org, or right after "reset all data") - skip the
+  // AI call entirely rather than let the model invent plausible-sounding clients and numbers,
+  // and don't burn an AI credit on a recap that has nothing real to report.
+  if (summaries.length === 0) {
+    const recap = `No client data yet for this ${periodType} - add clients to start generating recaps.`
+    await supabase
+      .from('reports')
+      .upsert({ org_id: orgId, period_type: periodType, period_start: start, period_end: end, content: recap }, { onConflict: 'org_id,period_type,period_start' })
+    revalidateTag(`reports:${orgId}`, { expire: 0 })
+    return NextResponse.json({ recap, periodType, periodStart: start, periodEnd: end })
+  }
+
+  const credit = await checkAndConsumeAiCredit(orgId)
+  if (!credit.allowed) {
+    return NextResponse.json(
+      { error: `You've used all ${credit.limit} AI generations included in your ${credit.tierName} plan this month. More seats raise your monthly allowance.` },
+      { status: 402 }
+    )
+  }
 
   try {
     const prompt = buildRecapPrompt({ periodType, periodStart: start, periodEnd: end, today, clientSummaries: summaries, brandVoice })
