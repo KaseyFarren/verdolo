@@ -24,8 +24,7 @@ import {
 } from '@/lib/agency'
 import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, daysUntilRenewal, periodBounds, type PeriodValue } from '@/lib/period'
 import { computeClientBurn, burnDrivers, type BurnDriver } from '@/lib/burn'
-import MetricBar from '@/components/ui/MetricBar'
-import { XIcon } from '@/components/ui/icons'
+import { AlertTriangleIcon, XIcon } from '@/components/ui/icons'
 import DatePicker from '@/components/ui/DatePicker'
 import InfoTooltip from '@/components/ui/InfoTooltip'
 
@@ -60,6 +59,22 @@ function Avatar({ member, index }: { member: Member; index: number }) {
 
 function formatHours(seconds: number) {
   return (seconds / 3600).toFixed(1)
+}
+
+// A stat with a thin share-of-team indicator underneath, rather than the old full-height
+// filled pill - that pattern went visually dead (an inert beige lozenge) whenever the value
+// was 0, which is the common case for a teammate with no hours logged yet.
+function StatMeter({ label, value, max, display }: { label: string; value: number; max: number; display: string }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
+  return (
+    <div className="text-right min-w-[72px]">
+      <div className="text-xs text-sage mb-1">{label}</div>
+      <div className="text-sm font-semibold text-ink whitespace-nowrap">{display}</div>
+      <div className="h-1 rounded-full bg-sand overflow-hidden mt-1.5">
+        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
 }
 
 type TaskRow = { assigned_to: string; done: boolean; completed_at: string | null; original_due_date: string | null }
@@ -694,33 +709,30 @@ export default function RevenueClient({
             const stats = taskStatsByMember.get(r.member.user_id) || { completed: 0, completedLate: 0, overdueIncomplete: 0 }
             return (
               <Card key={r.member.user_id}>
-                <div className="flex flex-wrap items-center gap-4">
-                  <Avatar member={r.member} index={i} />
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold">{memberName(r.member)}</div>
-                    {r.member.role && (
-                      <div className="text-xs text-sage capitalize">
-                        {r.member.role}
-                        {r.member.title && ` · ${r.member.title}`}
-                      </div>
-                    )}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar member={r.member} index={i} />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">{memberName(r.member)}</div>
+                      {r.member.role && (
+                        <div className="text-xs text-sage capitalize truncate">
+                          {r.member.role}
+                          {r.member.title && ` · ${r.member.title}`}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="sm:ml-auto flex gap-2 shrink-0">
-                    <div className="w-28">
-                      <div className="text-xs text-sage mb-1">Hours</div>
-                      <MetricBar value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
-                    </div>
-                    <div className="w-28">
-                      <div className="text-xs text-sage mb-1">Revenue</div>
-                      <MetricBar value={r.revenue} max={maxMemberRevenue} display={fmtMoney(Math.round(r.revenue))} />
-                    </div>
+                  <div className="flex gap-5 shrink-0">
+                    <StatMeter label="Hours" value={r.seconds} max={maxMemberSeconds} display={`${formatHours(r.seconds)}h`} />
+                    <StatMeter label="Revenue" value={r.revenue} max={maxMemberRevenue} display={fmtMoney(Math.round(r.revenue))} />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 mt-3 sm:pl-12">
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-ink/8">
                   <div className="rounded-lg bg-sand px-3 py-1.5 text-xs">
                     <span className="font-semibold">{stats.completed}</span> <span className="text-sage">completed</span>
                   </div>
-                  <div className={`rounded-lg px-3 py-1.5 text-xs ${stats.overdueIncomplete > 0 ? 'bg-red-100' : 'bg-sand'}`}>
+                  <div className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs ${stats.overdueIncomplete > 0 ? 'bg-red-100' : 'bg-sand'}`}>
+                    {stats.overdueIncomplete > 0 && <AlertTriangleIcon size={13} className="text-red-600 shrink-0" />}
                     <span className={`font-semibold ${stats.overdueIncomplete > 0 ? 'text-red-600' : ''}`}>{stats.overdueIncomplete}</span>{' '}
                     <span className={stats.overdueIncomplete > 0 ? 'text-red-600' : 'text-sage'}>overdue</span>
                   </div>
