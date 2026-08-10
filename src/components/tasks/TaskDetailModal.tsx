@@ -8,7 +8,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import Button from '@/components/ui/Button'
 import { XIcon } from '@/components/ui/icons'
 import { PRIORITY, memberName } from '@/lib/agency'
-import type { Budget, Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
+import type { Budget, Client, Member, Phase, Project, Task } from '@/app/(app)/tasks/TasksClient'
 
 // Full view/edit surface for a single task, opened by clicking the task name in the list. Every
 // field is editable here at once (the list row also allows quick per-cell inline edits, this is
@@ -19,6 +19,8 @@ export default function TaskDetailModal({
   clients,
   members,
   budgets,
+  projects = [],
+  phases = [],
   isAdmin,
   effectiveAssignees,
   onSave,
@@ -29,12 +31,17 @@ export default function TaskDetailModal({
   clients: Client[]
   members: Member[]
   budgets: Budget[]
+  /** Optional - the Tasks page passes org-wide projects/phases; a project-scoped surface can omit these. */
+  projects?: Project[]
+  phases?: Phase[]
   isAdmin: boolean
   effectiveAssignees: (t: Task) => string[]
   onSave: (fields: {
     title: string
     client_id: string | null
     budget_id: string | null
+    project_id: string | null
+    phase_id: string | null
     assignee_ids: string[]
     due_date: string
     priority: string
@@ -47,6 +54,8 @@ export default function TaskDetailModal({
   const [title, setTitle] = useState(task.title)
   const [clientId, setClientId] = useState(task.client_id || '')
   const [budgetId, setBudgetId] = useState(task.budget_id || '')
+  const [projectId, setProjectId] = useState(task.project_id || '')
+  const [phaseId, setPhaseId] = useState(task.phase_id || '')
   const [assigneeIds, setAssigneeIds] = useState<string[]>(effectiveAssignees(task))
   const [dueDate, setDueDate] = useState(task.due_date)
   const [priority, setPriority] = useState(task.priority)
@@ -54,6 +63,7 @@ export default function TaskDetailModal({
   const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours != null ? String(task.estimated_hours) : '')
 
   const clientBudgets = budgets.filter((b) => b.client_id === clientId)
+  const projectPhases = phases.filter((p) => p.project_id === projectId)
 
   function save() {
     if (!title.trim()) return
@@ -61,6 +71,8 @@ export default function TaskDetailModal({
       title: title.trim(),
       client_id: clientId || null,
       budget_id: budgetId || null,
+      project_id: projectId || null,
+      phase_id: projectId ? phaseId || null : null,
       assignee_ids: assigneeIds,
       due_date: dueDate,
       priority,
@@ -119,6 +131,25 @@ export default function TaskDetailModal({
               <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Assigned to</div>
               <MultiSelect value={assigneeIds} onChange={setAssigneeIds} options={members.map((m) => ({ value: m.user_id, label: memberName(m) }))} />
             </div>
+            {projects.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Project</div>
+                <CustomSelect
+                  value={projectId}
+                  onChange={(v) => {
+                    setProjectId(v)
+                    setPhaseId('')
+                  }}
+                  options={[{ value: '', label: 'No project' }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                />
+              </div>
+            )}
+            {projectId && projectPhases.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Phase</div>
+                <CustomSelect value={phaseId} onChange={setPhaseId} options={[{ value: '', label: 'No phase' }, ...projectPhases.map((p) => ({ value: p.id, label: p.name }))]} />
+              </div>
+            )}
             {isAdmin && clientBudgets.length > 0 && (
               <div>
                 <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Budget</div>

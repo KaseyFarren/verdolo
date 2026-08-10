@@ -30,6 +30,8 @@ export type Task = {
   id: string
   client_id: string | null
   budget_id?: string | null
+  project_id?: string | null
+  phase_id?: string | null
   assigned_to: string | null
   assignee_ids: string[]
   parent_task_id: string | null
@@ -50,6 +52,8 @@ export type Task = {
   sort_order: number
 }
 export type Budget = { id: string; client_id: string; name: string }
+export type Project = { id: string; name: string; client_id: string | null }
+export type Phase = { id: string; project_id: string; name: string }
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
 type Recurring = {
   id: string
@@ -152,6 +156,8 @@ export default function TasksClient({
   initialRecurringSubtasks,
   members,
   budgets,
+  projects,
+  phases,
   excludeWeekends,
 }: {
   orgId: string
@@ -165,6 +171,8 @@ export default function TasksClient({
   initialRecurringSubtasks: TemplateSubtask[]
   members: Member[]
   budgets: Budget[]
+  projects: Project[]
+  phases: Phase[]
   excludeWeekends: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -675,6 +683,7 @@ export default function TasksClient({
     if (filter === 'assignee:mine') return effectiveAssignees(t).includes(userId)
     if (filter === 'assignee:unassigned') return effectiveAssignees(t).length === 0
     if (filter.startsWith('assignee:')) return effectiveAssignees(t).includes(filter.slice('assignee:'.length))
+    if (filter.startsWith('project:')) return t.project_id === filter.slice('project:'.length)
     if (filter !== 'all' && filter !== 'today' && filter !== 'overdue' && filter !== 'completed') return t.client_id === filter
     return true
   }
@@ -787,6 +796,7 @@ export default function TasksClient({
         t={t}
         clients={clients}
         members={members}
+        projects={projects}
         updateField={(field, value) => {
           if (field === 'assignee_ids') {
             const assigneeIds = value as string[]
@@ -875,6 +885,14 @@ export default function TasksClient({
           {
             label: 'Clients',
             options: clients.map((c) => ({ value: c.id, label: c.name })),
+          },
+        ]
+      : []),
+    ...(projects.length > 0
+      ? [
+          {
+            label: 'Projects',
+            options: projects.map((p) => ({ value: `project:${p.id}`, label: p.name })),
           },
         ]
       : []),
@@ -1000,6 +1018,8 @@ export default function TasksClient({
               clients={clients}
               members={members}
               budgets={budgets}
+              projects={projects}
+              phases={phases}
               isAdmin={isAdmin}
               effectiveAssignees={effectiveAssignees}
               onSave={(fields) => updateTask(detailTask.id, { ...fields, assigned_to: deriveAssignedTo(fields.assignee_ids) })}

@@ -18,6 +18,7 @@ export default async function ClientsPage() {
     { data: members },
     { data: healthSnapshots },
     { data: cycleEntries },
+    { data: projects },
   ] = await Promise.all([
     // .limit(2000) below is a defensive ceiling against pathological growth (e.g. a runaway
     // automation bug), not user-facing pagination - see supabase/migrations plan notes. Realistic
@@ -47,6 +48,7 @@ export default async function ClientsPage() {
           .not('duration_seconds', 'is', null)
           .gte('started_at', `${getOffsetDate(-62)}T00:00:00`)
       : Promise.resolve({ data: [] }),
+    supabase.from('projects').select('id, client_id, name, status').eq('org_id', orgId).not('client_id', 'is', null).order('name'),
   ])
 
   // billing amounts are revenue - members (view-only on clients) don't get them, admins/owners do
@@ -82,6 +84,7 @@ export default async function ClientsPage() {
       archivedTimeTotals={archivedTimeTotals ?? []}
       members={members ?? []}
       healthSnapshots={healthSnapshots ?? []}
+      projects={projects ?? []}
       clientBurn={clientBurn}
       currency={org?.settings?.currency ?? 'usd'}
       targetRateCents={targetRateCents}

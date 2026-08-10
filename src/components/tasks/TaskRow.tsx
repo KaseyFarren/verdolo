@@ -10,7 +10,7 @@ import IconButton from '@/components/ui/IconButton'
 import { AlertTriangleIcon, CheckIcon, MoonIcon, PauseIcon, PlayIcon, SkipForwardIcon, TrashIcon } from '@/components/ui/icons'
 import QuickAddTime from '@/components/QuickAddTime'
 import { PRIORITY, priorityColor, todayKey } from '@/lib/agency'
-import type { Client, Member, Task } from '@/app/(app)/tasks/TasksClient'
+import type { Client, Member, Project, Task } from '@/app/(app)/tasks/TasksClient'
 
 // Every column is minmax(0, ...) so the whole grid ALWAYS fits its container and never triggers
 // horizontal scrolling - when space is tight the flexible (title/client) columns give first, then
@@ -40,6 +40,7 @@ export default function TaskRow({
   t,
   clients,
   members,
+  projects,
   updateField,
   onOpenDetail,
   complete,
@@ -62,6 +63,8 @@ export default function TaskRow({
   t: Task
   clients: Client[]
   members: Member[]
+  /** Optional so existing callers (DashboardClient's SimpleTaskRow) don't need to thread projects through. */
+  projects?: Project[]
   updateField: (field: string, value: unknown) => void
   onOpenDetail: () => void
   complete: () => void
@@ -152,6 +155,11 @@ export default function TaskRow({
           >
             {t.title}
           </button>
+          {t.project_id && projects && (
+            <span className="text-[10px] text-sage bg-sand rounded-full px-1.5 py-0.5 shrink-0 truncate max-w-[90px]" title={projects.find((p) => p.id === t.project_id)?.name}>
+              {projects.find((p) => p.id === t.project_id)?.name}
+            </span>
+          )}
           {t.estimated_hours != null && (
             <span className="text-[10px] text-sage/70 shrink-0" title="Estimated time">
               {t.estimated_hours}h

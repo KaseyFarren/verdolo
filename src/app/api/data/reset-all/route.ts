@@ -55,6 +55,8 @@ export async function POST(request: Request) {
     'integration_connections',
     'recurring_templates',
     'default_task_templates',
+    'project_phases',
+    'projects',
     'quick_notes',
     'client_charges',
     'client_files',

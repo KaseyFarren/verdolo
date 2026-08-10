@@ -5,6 +5,7 @@ import { DndContext, DragOverlay, PointerSensor, closestCenter, useDroppable, us
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
 import TaskCard from './TaskCard'
+import { orderBetween } from '@/lib/sortOrder'
 import type { Client, Member, Task, TaskStatus } from '@/app/(app)/tasks/TasksClient'
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
@@ -27,15 +28,6 @@ function sortColumn(items: Task[]): Task[] {
 
 function sortDoneByRecency(items: Task[]): Task[] {
   return [...items].sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''))
-}
-
-// Fractional position between the two neighbors the card lands between, so a drop never needs to
-// renumber the rest of the column (see supabase/migrations/0071_task_status_and_order.sql).
-function orderBetween(before: number | undefined, after: number | undefined): number {
-  if (before !== undefined && after !== undefined) return (before + after) / 2
-  if (before !== undefined) return before + 1
-  if (after !== undefined) return after - 1
-  return 0
 }
 
 function Column({

@@ -107,6 +107,7 @@ export default function ClientsClient({
   archivedTimeTotals,
   members,
   healthSnapshots,
+  projects,
   clientBurn,
   currency,
   targetRateCents,
@@ -122,6 +123,7 @@ export default function ClientsClient({
   archivedTimeTotals: { client_id: string | null; seconds: number }[]
   members: Member[]
   healthSnapshots: HealthSnapshot[]
+  projects: { id: string; client_id: string | null; name: string; status: string }[]
   clientBurn: Record<string, ClientBurn>
   currency?: Currency
   targetRateCents: number
@@ -571,6 +573,29 @@ export default function ClientsClient({
             />
           </div>
         )}
+
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold tracking-wide text-sage">Projects</div>
+            <Link href="/projects" className="text-xs text-accent font-medium">
+              Manage projects
+            </Link>
+          </div>
+          {(() => {
+            const clientProjects = projects.filter((p) => p.client_id === selected.id)
+            if (clientProjects.length === 0) return <div className="text-sm text-sage py-2">No projects yet for this client.</div>
+            return (
+              <div className="flex flex-col gap-1">
+                {clientProjects.map((p) => (
+                  <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center justify-between rounded-md px-2 py-1.5 -mx-2 hover:bg-sand text-sm">
+                    <span className="truncate">{p.name}</span>
+                    <span className="text-xs text-sage capitalize shrink-0 ml-2">{p.status.replace('_', ' ')}</span>
+                  </Link>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
 
         <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />

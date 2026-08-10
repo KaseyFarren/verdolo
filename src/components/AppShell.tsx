@@ -17,6 +17,7 @@ import {
   ClockIcon,
   DollarSignIcon,
   FileIcon,
+  FolderIcon,
   HomeIcon,
   LockIcon,
   LogOutIcon,
@@ -30,6 +31,7 @@ import {
 const NAV = [
   { href: '/dashboard', icon: HomeIcon, label: 'Dashboard', tour: 'nav-dashboard' },
   { href: '/tasks', icon: CheckSquareIcon, label: 'Tasks' },
+  { href: '/projects', icon: FolderIcon, label: 'Projects' },
   { href: '/clients', icon: UsersIcon, label: 'Clients', tour: 'nav-clients' },
   { href: '/proposals', icon: FileIcon, label: 'Proposals', tour: 'nav-proposals' },
   { href: '/time', icon: ClockIcon, label: 'Time', tour: 'nav-time' },

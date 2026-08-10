@@ -348,3 +348,32 @@ export function RefreshIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
+
+export function FolderIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h9A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18Z" />
+    </svg>
+  )
+}
+
+export function GripVerticalIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function ChevronDownIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
