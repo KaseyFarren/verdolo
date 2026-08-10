@@ -688,7 +688,12 @@ export default function TasksClient({
   // Sort by dropdown. Completed tasks always sort to the bottom unless the Done filter is picked.
   function applySort(items: Task[]): Task[] {
     const sorted = [...items]
-    if (sortBy === 'due') sorted.sort((a, b) => a.due_date.localeCompare(b.due_date) || a.title.localeCompare(b.title))
+    if (sortBy === 'due') sorted.sort((a, b) => {
+      if (!a.due_date && !b.due_date) return a.title.localeCompare(b.title)
+      if (!a.due_date) return 1
+      if (!b.due_date) return -1
+      return a.due_date.localeCompare(b.due_date) || a.title.localeCompare(b.title)
+    })
     else if (sortBy === 'priority') return applyDoneLast(sortTasks(sorted))
     else if (sortBy === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title))
     else if (sortBy === 'client') sorted.sort((a, b) => clientName(a.client_id).localeCompare(clientName(b.client_id)) || a.title.localeCompare(b.title))

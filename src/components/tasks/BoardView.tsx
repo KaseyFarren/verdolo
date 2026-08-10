@@ -22,7 +22,7 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 const DONE_DISPLAY_LIMIT = 30
 
 function sortColumn(items: Task[]): Task[] {
-  return [...items].sort((a, b) => a.sort_order - b.sort_order || a.due_date.localeCompare(b.due_date))
+  return [...items].sort((a, b) => a.sort_order - b.sort_order || (a.due_date || '').localeCompare(b.due_date || ''))
 }
 
 function sortDoneByRecency(items: Task[]): Task[] {
