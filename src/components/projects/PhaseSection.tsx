@@ -55,7 +55,7 @@ export default function PhaseSection({
   }
 
   return (
-    <div className="mb-5">
+    <div className="rounded-2xl bg-white border border-ink/8 p-5 mb-5">
       <div className="flex items-center gap-2 mb-1.5">
         {renaming ? (
           <input
