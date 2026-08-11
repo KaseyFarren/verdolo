@@ -19,6 +19,21 @@ export default function NotificationSound({ orgId, userId }: { orgId: string; us
   useEffect(() => {
     const supabase = createClient()
 
+    // Client messages ping every active team member, not just @mentions - unlike internal team
+    // chatter, a client waiting on a reply is worth interrupting other tabs for. sender_id alone
+    // doesn't say whether a message came from a client (that lives on message_threads.kind), so
+    // preload which user_ids belong to this org's clients once and check against that set.
+    let clientNameByUserId = new Map<string, string>()
+    supabase
+      .from('client_users')
+      .select('user_id, clients(name)')
+      .eq('org_id', orgId)
+      .eq('status', 'active')
+      .then(({ data }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        clientNameByUserId = new Map((data ?? []).map((c: any) => [c.user_id, c.clients?.name ?? 'A client']))
+      })
+
     function ping() {
       const audio = audioRef.current
       if (!audio) return
@@ -56,7 +71,11 @@ export default function NotificationSound({ orgId, userId }: { orgId: string; us
       .channel(`notifications-org-${orgId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, (payload) => {
         const incoming = payload.new as { sender_id: string; mentioned_user_ids: string[] | null; body: string }
-        if (incoming.sender_id !== userId && incoming.mentioned_user_ids?.includes(userId)) {
+        const clientName = clientNameByUserId.get(incoming.sender_id)
+        if (clientName) {
+          ping()
+          desktop(`New message from ${clientName}`, truncate(incoming.body || ''), '/messages')
+        } else if (incoming.sender_id !== userId && incoming.mentioned_user_ids?.includes(userId)) {
           ping()
           desktop('You were mentioned', truncate(incoming.body || ''), '/messages')
         }
