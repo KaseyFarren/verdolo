@@ -1,4 +1,4 @@
-import { getClientContext } from '@/lib/client-portal'
+import { requireClientContext } from '@/lib/client-portal'
 import { formatDate } from '@/lib/agency'
 
 type PortalTask = { id: string; title: string; done: boolean; due_date: string | null; phase_id: string | null }
@@ -8,7 +8,7 @@ type PortalProject = { id: string; name: string; description: string | null; sta
 const STATUS_LABEL: Record<string, string> = { active: 'Active', on_hold: 'On hold', completed: 'Completed', archived: 'Archived' }
 
 export default async function PortalPage() {
-  const { supabase, clientId } = await getClientContext()
+  const { supabase, clientId } = await requireClientContext()
 
   const { data: projects } = await supabase
     .from('projects')

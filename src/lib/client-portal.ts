@@ -48,3 +48,15 @@ export const getClientContext = cache(async () => {
     clientName: (membership.clients as any)?.name as string,
   }
 })
+
+// Same shape as requireOrgContext() on the team side: getClientContext() alone is safe to call
+// from the shell layout (needs clientName even if billing lapsed, so "Sign out" still works),
+// but every page that actually reads/writes client data must go through this paywall check -
+// orgs_select requires is_org_member, so a client can't be shown a billing page directly; they
+// land on a plain "unavailable" page instead.
+export async function requireClientContext() {
+  const ctx = await getClientContext()
+  const { data: hasAccess } = await ctx.supabase.rpc('client_org_has_active_access', { target_client_id: ctx.clientId })
+  if (!hasAccess) redirect('/portal/unavailable')
+  return ctx
+}

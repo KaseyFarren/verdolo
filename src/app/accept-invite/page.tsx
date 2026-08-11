@@ -26,6 +26,7 @@ export default function AcceptInvitePage() {
   const router = useRouter()
   const [status, setStatus] = useState<Status>('idle')
   const [email, setEmail] = useState<string | null>(null)
+  const [inviteKind, setInviteKind] = useState<'team' | 'client' | null>(null)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -78,6 +79,10 @@ export default function AcceptInvitePage() {
     if (sessionUserId) {
       const { data } = await supabase.rpc('has_pending_invite')
       hasPendingInvite = data === true
+      if (hasPendingInvite) {
+        const { data: kind } = await supabase.rpc('pending_invite_kind')
+        setInviteKind(kind === 'client' ? 'client' : 'team')
+      }
     }
 
     window.history.replaceState(null, '', url.pathname)
@@ -145,7 +150,11 @@ export default function AcceptInvitePage() {
   return (
     <Shell>
       <h1 className="text-xl font-semibold text-center">Set up your account</h1>
-      <p className="text-sm text-sage text-center">You&apos;ve been invited to join a team on Verdolo. Choose a password to finish joining.</p>
+      <p className="text-sm text-sage text-center">
+        {inviteKind === 'client'
+          ? "You've been invited to view your project on Verdolo. Choose a password to finish setting up."
+          : "You've been invited to join a team on Verdolo. Choose a password to finish joining."}
+      </p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input type="email" value={email} readOnly className="rounded border border-ink/10 bg-sand px-3 py-2 text-sm text-sage" />
         <input
