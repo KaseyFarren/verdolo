@@ -5,7 +5,7 @@ import { apiError } from '@/lib/apiError'
 
 export async function POST(request: Request) {
   const { origin } = new URL(request.url)
-  const { email, clientId } = await request.json()
+  const { email, clientId, name } = await request.json()
 
   if (!email || !clientId) {
     return NextResponse.json({ error: 'email and clientId are required' }, { status: 400 })
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     user_id: invited.user.id,
     status: 'invited',
     invited_email: email,
+    display_name: name || null,
   })
 
   if (memberError) {

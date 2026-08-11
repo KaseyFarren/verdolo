@@ -22,7 +22,7 @@ export const getClientContext = cache(async () => {
 
   const { data: membership } = await supabase
     .from('client_users')
-    .select('org_id, client_id, clients(name)')
+    .select('org_id, client_id, display_name, clients(name)')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
@@ -44,6 +44,7 @@ export const getClientContext = cache(async () => {
     user,
     orgId: membership.org_id as string,
     clientId: membership.client_id as string,
+    contactName: membership.display_name as string | null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     clientName: (membership.clients as any)?.name as string,
   }

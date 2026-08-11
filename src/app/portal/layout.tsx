@@ -2,7 +2,11 @@ import PortalShell from '@/components/PortalShell'
 import { getClientContext } from '@/lib/client-portal'
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const { clientName } = await getClientContext()
+  const { clientName, contactName } = await getClientContext()
 
-  return <PortalShell clientName={clientName}>{children}</PortalShell>
+  return (
+    <PortalShell clientName={clientName} contactName={contactName}>
+      {children}
+    </PortalShell>
+  )
 }

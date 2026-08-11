@@ -577,6 +577,7 @@ export default function MessagesClient({
   dmThreadByUser,
   clients,
   clientThreadByClient,
+  clientUsers,
   lastMessageAtByThread: initialLastMessageAt,
   lastReadAtByThread: initialLastReadAt,
   lastMentionAtByThread: initialLastMentionAt,
@@ -588,6 +589,7 @@ export default function MessagesClient({
   dmThreadByUser: Record<string, string>
   clients: { id: string; name: string }[]
   clientThreadByClient: Record<string, string>
+  clientUsers: { user_id: string; invited_email: string | null; display_name: string | null }[]
   lastMessageAtByThread: Record<string, string>
   lastReadAtByThread: Record<string, string>
   lastMentionAtByThread: Record<string, string>
@@ -596,6 +598,9 @@ export default function MessagesClient({
   const memberMap = useMemo(() => new Map(members.map((m) => [m.user_id, m])), [members])
   const contacts = useMemo(() => members.filter((m) => m.user_id !== userId), [members, userId])
   const clientMap = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
+  // Client senders aren't org_members, so memberMap alone leaves them as memberName()'s '-'
+  // fallback - this covers that lookup for messages sent from a client thread.
+  const clientUserMap = useMemo(() => new Map(clientUsers.map((c) => [c.user_id, c])), [clientUsers])
 
   const [dmThreads, setDmThreads] = useState(dmThreadByUser)
   const [clientThreads, setClientThreads] = useState(clientThreadByClient)
@@ -1207,7 +1212,7 @@ export default function MessagesClient({
           body: JSON.stringify({
             orgId,
             text: message.body,
-            senderName: message.sender_id === userId ? 'You' : memberName(memberMap.get(message.sender_id)),
+            senderName: senderLabel(message.sender_id),
             sentAt: message.created_at,
           }),
         })
@@ -1225,7 +1230,7 @@ export default function MessagesClient({
         setTaskDraftLoading(false)
       }
     },
-    [orgId, userId, memberMap]
+    [orgId, userId, memberMap, clientUserMap]
   )
 
   function updateTaskDraft(fields: Partial<TaskDraft>) {
@@ -1274,7 +1279,9 @@ export default function MessagesClient({
 
   function senderLabel(senderId: string) {
     if (senderId === userId) return 'You'
-    return memberName(memberMap.get(senderId))
+    const member = memberMap.get(senderId)
+    if (member) return memberName(member)
+    return memberName(clientUserMap.get(senderId))
   }
 
   function senderAvatar(senderId: string) {
