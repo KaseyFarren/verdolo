@@ -103,12 +103,13 @@ export default function AcceptInvitePage() {
       toast.error(error.message)
       return
     }
-    // Flips this user's org_members row from 'invited' to 'active' now that setup is actually
-    // complete - before this, they didn't count against the org's seat limit or show up in
-    // member pickers.
+    // Flips this user's org_members or client_users row from 'invited' to 'active' now that
+    // setup is actually complete - before this, they didn't count against the org's seat limit
+    // (team) or show up as reachable (client) yet.
     await supabase.rpc('accept_own_invite')
+    const { data: clientId } = await supabase.rpc('my_client_id')
     setSaving(false)
-    router.push('/dashboard')
+    router.push(clientId ? '/portal' : '/dashboard')
     router.refresh()
   }
 

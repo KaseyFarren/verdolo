@@ -51,7 +51,15 @@ export const getOrgContext = cache(async () => {
     .eq('status', 'active')
     .maybeSingle()
 
-  if (!membership) redirect('/onboarding')
+  if (!membership) {
+    const { data: clientMembership } = await supabase
+      .from('client_users')
+      .select('client_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle()
+    redirect(clientMembership ? '/portal' : '/onboarding')
+  }
 
   return {
     supabase,

@@ -19,6 +19,15 @@ export default async function OnboardingPage() {
 
   if (memberships && memberships.length > 0) redirect('/dashboard')
 
+  const { data: clientMemberships } = await supabase
+    .from('client_users')
+    .select('client_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .limit(1)
+
+  if (clientMemberships && clientMemberships.length > 0) redirect('/portal')
+
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-5 bg-cream text-ink">
       <div className="mb-2 flex justify-center">
