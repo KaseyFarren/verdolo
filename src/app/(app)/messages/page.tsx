@@ -4,7 +4,7 @@ import MessagesClient from './MessagesClient'
 export default async function MessagesPage() {
   const { supabase, user, orgId } = await requireOrgContext()
 
-  const [{ data: teamThread }, { data: members }, { data: dmThreads }] = await Promise.all([
+  const [{ data: teamThread }, { data: members }, { data: dmThreads }, { data: clients }, { data: clientThreads }] = await Promise.all([
     supabase.from('message_threads').select('id').eq('org_id', orgId).eq('kind', 'team').single(),
     supabase
       .from('org_members')
@@ -16,7 +16,13 @@ export default async function MessagesPage() {
       .select('thread_id, message_threads!inner(id, kind, org_id)')
       .eq('user_id', user.id)
       .eq('message_threads.org_id', orgId),
+    supabase.from('clients').select('id, name').eq('org_id', orgId).order('name'),
+    // Only threads that already exist - unlike DMs/team, clicking a client with none yet lazily
+    // creates it via get_or_create_client_thread(), same as opening a first-time DM.
+    supabase.from('message_threads').select('id, client_id').eq('org_id', orgId).eq('kind', 'client'),
   ])
+
+  const clientThreadByClient = Object.fromEntries((clientThreads ?? []).filter((t) => t.client_id).map((t) => [t.client_id as string, t.id]))
 
   const dmThreadIds = (dmThreads ?? []).map((row) => row.thread_id)
   const { data: otherParticipants } =
@@ -33,7 +39,7 @@ export default async function MessagesPage() {
     dmThreadByUser.set(row.user_id, row.thread_id)
   }
 
-  const allThreadIds = [teamThread?.id, ...dmThreadIds].filter((id): id is string => Boolean(id))
+  const allThreadIds = [teamThread?.id, ...dmThreadIds, ...Object.values(clientThreadByClient)].filter((id): id is string => Boolean(id))
 
   // last-message and last-mention per thread are denormalized (message_threads.last_message_at,
   // message_mentions) so this stays bounded by thread/mention count instead of scanning every
@@ -70,6 +76,8 @@ export default async function MessagesPage() {
       teamThreadId={teamThread?.id ?? null}
       members={members ?? []}
       dmThreadByUser={Object.fromEntries(dmThreadByUser)}
+      clients={clients ?? []}
+      clientThreadByClient={clientThreadByClient}
       lastMessageAtByThread={lastMessageAtByThread}
       lastReadAtByThread={lastReadAtByThread}
       lastMentionAtByThread={lastMentionAtByThread}

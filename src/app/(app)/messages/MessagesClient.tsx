@@ -575,6 +575,8 @@ export default function MessagesClient({
   teamThreadId,
   members,
   dmThreadByUser,
+  clients,
+  clientThreadByClient,
   lastMessageAtByThread: initialLastMessageAt,
   lastReadAtByThread: initialLastReadAt,
   lastMentionAtByThread: initialLastMentionAt,
@@ -584,6 +586,8 @@ export default function MessagesClient({
   teamThreadId: string | null
   members: Member[]
   dmThreadByUser: Record<string, string>
+  clients: { id: string; name: string }[]
+  clientThreadByClient: Record<string, string>
   lastMessageAtByThread: Record<string, string>
   lastReadAtByThread: Record<string, string>
   lastMentionAtByThread: Record<string, string>
@@ -591,10 +595,13 @@ export default function MessagesClient({
   const supabase = useMemo(() => createClient(), [])
   const memberMap = useMemo(() => new Map(members.map((m) => [m.user_id, m])), [members])
   const contacts = useMemo(() => members.filter((m) => m.user_id !== userId), [members, userId])
+  const clientMap = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
 
   const [dmThreads, setDmThreads] = useState(dmThreadByUser)
+  const [clientThreads, setClientThreads] = useState(clientThreadByClient)
   const [activeThreadId, setActiveThreadId] = useState<string | null>(teamThreadId)
   const [activeContactId, setActiveContactId] = useState<string | null>(null)
+  const [activeClientId, setActiveClientId] = useState<string | null>(null)
   const [messagesByThread, setMessagesByThread] = useState<Record<string, Message[]>>({})
   const [hasMoreOlderByThread, setHasMoreOlderByThread] = useState<Record<string, boolean>>({})
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -942,11 +949,13 @@ export default function MessagesClient({
 
   function openTeamChannel() {
     setActiveContactId(null)
+    setActiveClientId(null)
     setActiveThreadId(teamThreadId)
   }
 
   async function openDm(contact: Member) {
     setActiveContactId(contact.user_id)
+    setActiveClientId(null)
     const existing = dmThreads[contact.user_id]
     if (existing) {
       setActiveThreadId(existing)
@@ -958,6 +967,23 @@ export default function MessagesClient({
       return
     }
     setDmThreads((prev) => ({ ...prev, [contact.user_id]: data }))
+    setActiveThreadId(data)
+  }
+
+  async function openClientThread(client: { id: string; name: string }) {
+    setActiveContactId(null)
+    setActiveClientId(client.id)
+    const existing = clientThreads[client.id]
+    if (existing) {
+      setActiveThreadId(existing)
+      return
+    }
+    const { data, error } = await supabase.rpc('get_or_create_client_thread', { target_client_id: client.id })
+    if (error || !data) {
+      toast.error('Could not open that conversation')
+      return
+    }
+    setClientThreads((prev) => ({ ...prev, [client.id]: data }))
     setActiveThreadId(data)
   }
 
@@ -1273,6 +1299,7 @@ export default function MessagesClient({
   const threadReplies = openThreadParentId ? repliesByParent[openThreadParentId] ?? [] : []
 
   const visibleContacts = contacts.filter((c) => passesSidebarFilter(dmThreads[c.user_id]))
+  const visibleClients = clients.filter((c) => passesSidebarFilter(clientThreads[c.id]))
   const teamVisible = passesSidebarFilter(teamThreadId)
 
   return (
@@ -1355,13 +1382,44 @@ export default function MessagesClient({
               </button>
             )
           })}
+
+          {clients.length > 0 && (
+            <>
+              <div className="px-3 pt-3 pb-1 text-xs font-medium text-sage tracking-wide">Clients</div>
+              {visibleClients.length === 0 && (
+                <div className="px-3 py-2 text-xs text-sage">{sidebarFilter === 'unread' ? 'No unread conversations' : 'No unread mentions'}</div>
+              )}
+              {visibleClients.map((c) => {
+                const active = activeClientId === c.id
+                const threadId = clientThreads[c.id]
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => openClientThread(c)}
+                    className={`w-full text-left rounded-lg px-3 py-2 mb-1 text-sm flex items-center gap-2 transition-colors ${
+                      active ? 'bg-accent text-white font-medium' : 'text-ink hover:bg-sand'
+                    }`}
+                  >
+                    <span className="h-5 w-5 rounded-full bg-green/15 text-green text-[10px] font-medium flex items-center justify-center shrink-0">
+                      {getInitials(c.name)}
+                    </span>
+                    <span className="truncate flex-1">{c.name}</span>
+                    {!active && hasUnreadMention(threadId) && (
+                      <span className="h-4 w-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">@</span>
+                    )}
+                    {!active && !hasUnreadMention(threadId) && unread(threadId) && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
+                  </button>
+                )
+              })}
+            </>
+          )}
         </aside>
 
         <section className="flex-1 min-w-0 rounded-2xl bg-white shadow-md flex flex-col overflow-hidden">
           {activeThreadId && (
             <div className="px-3 py-2.5 border-b border-ink/10">
               <span className="text-sm font-semibold text-ink">
-                {activeIsTeam ? 'Team' : memberName(memberMap.get(activeContactId ?? ''))}
+                {activeIsTeam ? 'Team' : activeClientId ? clientMap.get(activeClientId)?.name : memberName(memberMap.get(activeContactId ?? ''))}
               </span>
             </div>
           )}
