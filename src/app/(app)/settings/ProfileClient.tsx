@@ -46,6 +46,12 @@ export default function ProfileClient({
     setNotifPermission(result)
     if (result === 'granted') {
       new Notification('Desktop notifications on', { body: "You'll be notified about mentions and new tasks.", icon: '/icon.png' })
+      // Also play the ping sound right here, inside this click. Chrome only allows audio
+      // playback outside a user gesture once the site has enough accumulated engagement -
+      // a websocket-triggered ping (the real notification path) never has a gesture to spend,
+      // so this click is the one chance to both confirm the sound to the user immediately and
+      // count toward that engagement threshold for future, gesture-less pings.
+      new Audio('/sounds/notification.mp3').play().catch(() => {})
     } else if (result === 'denied') {
       toast.error('Blocked - allow notifications for this site in your browser settings')
     }
