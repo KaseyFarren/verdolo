@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import ClientFiles from '@/components/ClientFiles'
 import ClientBudgets from '@/components/ClientBudgets'
+import ClientPortalAccess from '@/components/ClientPortalAccess'
+import ClientChat from '@/components/ClientChat'
 import ClientUpdateModal from '@/components/clients/ClientUpdateModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -600,6 +602,17 @@ export default function ClientsClient({
         <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <ClientFiles supabase={supabase} orgId={orgId} clientId={selected.id} canEdit={canEdit} />
         </div>
+
+        <div className="rounded-2xl border border-ink/8 bg-white p-5">
+          <div className="text-xs font-semibold tracking-wide text-sage mb-2">Client chat</div>
+          <ClientChat key={selected.id} supabase={supabase} orgId={orgId} userId={userId} clientId={selected.id} />
+        </div>
+
+        {canEdit && (
+          <div className="rounded-2xl border border-ink/8 bg-white p-5">
+            <ClientPortalAccess supabase={supabase} clientId={selected.id} />
+          </div>
+        )}
 
         <div className="rounded-2xl border border-ink/8 bg-white p-5">
           <div className="flex items-center justify-between mb-3">
