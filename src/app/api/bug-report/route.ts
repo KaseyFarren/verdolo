@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/apiError'
 import { rateLimit } from '@/lib/rateLimit'
+import { sendEmail } from '@/lib/email'
 
 const MAX_DESCRIPTION_LENGTH = 4000
 
@@ -11,35 +12,27 @@ async function notifyOwners(report: {
   pageUrl: string | null
   orgName: string | null
 }) {
-  const apiKey = process.env.RESEND_API_KEY
   const recipients = (process.env.APP_OWNER_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean)
-  if (!apiKey || recipients.length === 0) {
-    console.error('[bug-report] RESEND_API_KEY or APP_OWNER_EMAILS not configured - skipping email')
+  if (recipients.length === 0) {
+    console.error('[bug-report] APP_OWNER_EMAILS not configured - skipping email')
     return
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || 'Verdolo Bug Reports <bugs@verdolo.com>',
-      to: recipients,
-      subject: `Bug report${report.orgName ? ` - ${report.orgName}` : ''}`,
-      text: [
-        `From: ${report.userEmail ?? 'unknown'}`,
-        `Org: ${report.orgName ?? 'unknown'}`,
-        `Page: ${report.pageUrl ?? 'unknown'}`,
-        '',
-        report.description,
-      ].join('\n'),
-    }),
+  await sendEmail({
+    from: 'Verdolo Bug Reports <bugs@verdolo.com>',
+    to: recipients,
+    subject: `Bug report${report.orgName ? ` - ${report.orgName}` : ''}`,
+    text: [
+      `From: ${report.userEmail ?? 'unknown'}`,
+      `Org: ${report.orgName ?? 'unknown'}`,
+      `Page: ${report.pageUrl ?? 'unknown'}`,
+      '',
+      report.description,
+    ].join('\n'),
   })
-  if (!res.ok) {
-    console.error('[bug-report] Resend send failed:', res.status, await res.text())
-  }
 }
 
 export async function POST(request: Request) {

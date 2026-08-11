@@ -49,12 +49,17 @@ export default function ThreadChat({
   threadId,
   userId,
   otherPartyLabel,
+  notifyClientId,
 }: {
   supabase: SupabaseClient
   orgId: string
   threadId: string
   userId: string
   otherPartyLabel?: string
+  // Set only from the portal side (a client sending) - fires a best-effort email to the team
+  // after a successful send. Team-side callers (ClientChat) omit this; a teammate replying
+  // shouldn't trigger a "client messaged you" alert to themselves/other teammates.
+  notifyClientId?: string
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [body, setBody] = useState('')
@@ -145,6 +150,14 @@ export default function ThreadChat({
     if (error) {
       setBody(trimmed)
       setPendingFile(file)
+      return
+    }
+    if (notifyClientId) {
+      fetch('/api/notify/client-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: notifyClientId }),
+      }).catch(() => {})
     }
   }
 
