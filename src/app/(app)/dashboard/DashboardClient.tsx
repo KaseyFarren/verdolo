@@ -16,6 +16,7 @@ import AddTaskForm, { type TaskFormState } from '@/components/tasks/AddTaskForm'
 import TaskEditForm from '@/components/tasks/TaskEditForm'
 import QuickAddTime from '@/components/QuickAddTime'
 import InfoTooltip from '@/components/ui/InfoTooltip'
+import type { WeekStats } from '@/lib/stats'
 import {
   AVATAR_COLORS,
   centsToDollars,
@@ -107,6 +108,7 @@ export default function DashboardClient({
   hasRecapThisWeek,
   initialSentToday,
   weekCompletedTasks,
+  yourWeekStats,
 }: {
   orgId: string
   userId: string
@@ -128,6 +130,7 @@ export default function DashboardClient({
   hasRecapThisWeek: boolean
   initialSentToday: string[]
   weekCompletedTasks: WeekCompletedTask[]
+  yourWeekStats: WeekStats
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [clients, setClients] = useState<Client[]>(initialClients)
@@ -527,6 +530,41 @@ export default function DashboardClient({
                 <span className="font-medium text-ink shrink-0">{formatHoursMins(r.seconds)}</span>
               </div>
             ))
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'yourWeek',
+      node: (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">Your week</div>
+            {yourWeekStats.streakDays > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-ink">
+                <TrophyIcon size={14} className="shrink-0" /> {yourWeekStats.streakDays} day streak
+              </span>
+            )}
+          </div>
+          <div className="flex justify-between items-center py-1 text-sm">
+            <span className="text-ink">Points</span>
+            <span className="font-medium text-ink">{yourWeekStats.points}</span>
+          </div>
+          <div className="flex justify-between items-center py-1 text-sm">
+            <span className="text-ink">Tasks completed</span>
+            <span className="font-medium text-ink">{yourWeekStats.tasksCompleted}</span>
+          </div>
+          <div className="flex justify-between items-center py-1 text-sm">
+            <span className="text-ink">Hours logged</span>
+            <span className="font-medium text-ink">
+              {yourWeekStats.hoursLogged.toFixed(1)}h{yourWeekStats.utilizationPercent !== null && ` (${yourWeekStats.utilizationPercent}%)`}
+            </span>
+          </div>
+          {yourWeekStats.medianReplyMinutes !== null && (
+            <div className="flex justify-between items-center py-1 text-sm">
+              <span className="text-ink">Median reply time</span>
+              <span className="font-medium text-ink">{formatHoursMins(Math.round(yourWeekStats.medianReplyMinutes * 60))}</span>
+            </div>
           )}
         </>
       ),

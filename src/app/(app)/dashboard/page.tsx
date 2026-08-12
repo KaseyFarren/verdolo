@@ -2,6 +2,7 @@ import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
 import { billingCycleElapsedFraction, billingCycleProgress } from '@/lib/period'
 import { computeClientBurn, type ClientBurn } from '@/lib/burn'
+import { weekStats } from '@/lib/stats'
 import DashboardClient from './DashboardClient'
 
 // Retainer prorated by billing cycle + hourly billable hours × rate - same methodology as
@@ -81,6 +82,10 @@ export default async function DashboardPage() {
     { data: billingClients },
     { data: monthEntries },
     { data: cycleEntries },
+    { data: historyTasksForStats },
+    { data: historyTimeEntriesForStats },
+    { data: clientUsers },
+    { data: weekClientMessages },
   ] = await Promise.all([
     // .limit(2000) is a defensive ceiling against pathological growth, not user-facing pagination.
     // The active-tasks query below is intentionally left unbounded - the Today/Overdue/Upcoming
@@ -110,7 +115,11 @@ export default async function DashboardPage() {
       .not('duration_seconds', 'is', null)
       .gte('started_at', `${weekAnchor}T00:00:00`)
       .lt('started_at', `${tomorrow}T00:00:00`),
-    supabase.from('org_members').select('user_id, invited_email, display_name, avatar_url').eq('org_id', orgId).eq('status', 'active'),
+    supabase
+      .from('org_members')
+      .select('user_id, invited_email, display_name, avatar_url, target_hours_per_week')
+      .eq('org_id', orgId)
+      .eq('status', 'active'),
     supabase.from('quick_notes').select('content').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
     supabase
       .from('reports')
@@ -158,12 +167,52 @@ export default async function DashboardPage() {
           .not('duration_seconds', 'is', null)
           .gte('started_at', `${getOffsetDate(-62)}T00:00:00`)
       : Promise.resolve({ data: [] }),
+    // 35-day lookback for the "Your week" card's streak (org-wide select - weekStats filters
+    // to this user's own assignments via effectiveAssignees, same dual-write convention as
+    // TasksClient's own effectiveAssignees).
+    supabase
+      .from('tasks')
+      .select('assigned_to, assignee_ids, completed_at')
+      .eq('org_id', orgId)
+      .eq('done', true)
+      .gte('completed_at', `${getOffsetDate(-35)}T00:00:00`)
+      .limit(2000),
+    supabase
+      .from('time_entries')
+      .select('started_at, duration_seconds')
+      .eq('org_id', orgId)
+      .eq('user_id', user.id)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', `${getOffsetDate(-35)}T00:00:00`),
+    // Distinguishes a client's messages from a teammate's in weekClientMessages below - no
+    // per-row sender-role column on messages itself (see computeReplyLatenciesMinutes).
+    supabase.from('client_users').select('user_id').eq('org_id', orgId).eq('status', 'active'),
+    supabase
+      .from('messages')
+      .select('thread_id, sender_id, created_at, message_threads!inner(kind)')
+      .eq('org_id', orgId)
+      .eq('message_threads.kind', 'client')
+      .gte('created_at', `${weekAnchor}T00:00:00`)
+      .lt('created_at', `${tomorrow}T00:00:00`),
   ])
 
   const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? []) : 0
   const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
   const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
   const burnAlerts = isAdmin ? clientsOverBudget(billingClients ?? [], cycleEntries ?? [], targetRateCents) : []
+  const excludeWeekends = org?.settings?.exclude_weekends ?? true
+
+  const yourWeekStats = weekStats({
+    userId: user.id,
+    today,
+    weekAnchor,
+    excludeWeekends,
+    targetHoursPerWeek: members?.find((m) => m.user_id === user.id)?.target_hours_per_week ?? null,
+    historyTasks: historyTasksForStats ?? [],
+    historyTimeEntries: historyTimeEntriesForStats ?? [],
+    weekClientMessages: (weekClientMessages ?? []).map((m) => ({ thread_id: m.thread_id, sender_id: m.sender_id, created_at: m.created_at })),
+    clientUserIds: new Set((clientUsers ?? []).map((c) => c.user_id)),
+  })
 
   return (
     <DashboardClient
@@ -183,10 +232,11 @@ export default async function DashboardPage() {
       members={members ?? []}
       initialNote={noteRow?.content ?? ''}
       hasApiKey={!!process.env.ANTHROPIC_API_KEY}
-      excludeWeekends={org?.settings?.exclude_weekends ?? true}
+      excludeWeekends={excludeWeekends}
       hasRecapThisWeek={!!reports?.some((r) => r.period_start === weekAnchor)}
       initialSentToday={[...new Set((sentTodayRows ?? []).map((r) => r.client_id).filter((id): id is string => !!id))]}
       weekCompletedTasks={weekCompletedTasks ?? []}
+      yourWeekStats={yourWeekStats}
     />
   )
 }
