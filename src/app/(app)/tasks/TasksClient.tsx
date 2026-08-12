@@ -14,6 +14,7 @@ import AddTaskFormMulti from '@/components/tasks/AddTaskFormMulti'
 import ImportTasksModal from '@/components/tasks/ImportTasksModal'
 import TaskDetailModal from '@/components/tasks/TaskDetailModal'
 import Button from '@/components/ui/Button'
+import Pager from '@/components/ui/Pager'
 import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
@@ -191,6 +192,7 @@ export default function TasksClient({
   // months' worth of completed tasks doesn't dump onto the screen the moment you open the tab.
   const [expandedDoneGroups, setExpandedDoneGroups] = useState<Set<string>>(new Set())
   const [calMonth, setCalMonth] = useState(todayKey().slice(0, 7))
+  const [tasksPage, setTasksPage] = useState(0)
   const [showAddTask, setShowAddTask] = useState(false)
   const [showImportTasks, setShowImportTasks] = useState(false)
   const [taskMode, setTaskMode] = useState<'quick' | 'detailed'>('quick')
@@ -235,6 +237,10 @@ export default function TasksClient({
   useEffect(() => {
     setTasks(initialTasks)
   }, [initialTasks])
+
+  useEffect(() => {
+    setTasksPage(0)
+  }, [filter, sortBy, selectedDate, view])
 
   const today = todayKey()
 
@@ -775,6 +781,12 @@ export default function TasksClient({
   }
 
   const filteredList = filteredTasks()
+  // Bounded window into filteredList so the rendered list stays a fixed size regardless of how
+  // many tasks match the current filter - aggregates (overdueCount, pendingCount, completeAll,
+  // calendar dots) still run over the full filtered/visible set, only the render is paged.
+  const TASKS_PER_PAGE = 25
+  const totalTasksPages = Math.max(1, Math.ceil(filteredList.length / TASKS_PER_PAGE))
+  const pagedList = filteredList.slice(tasksPage * TASKS_PER_PAGE, (tasksPage + 1) * TASKS_PER_PAGE)
   const detailTask = detailTaskId ? tasks.find((t) => t.id === detailTaskId) ?? null : null
   // members only ever fetch their own + unassigned tasks (RLS-scoped); split those apart with
   // a header so "shared/unclaimed" work reads distinctly from "assigned to me". Admins/owners
@@ -1113,7 +1125,7 @@ export default function TasksClient({
             <>
               {filteredList.length === 0 && <div className="text-sm text-sage py-6 text-center">No completed tasks yet.</div>}
               {filteredList.length > 0 &&
-                doneGroups(filteredList).map((g) => {
+                doneGroups(pagedList).map((g) => {
                   const isOpen = expandedDoneGroups.has(g.key)
                   return (
                     <div key={g.key} className="border-b border-ink/10">
@@ -1136,6 +1148,7 @@ export default function TasksClient({
                     </div>
                   )
                 })}
+              <Pager page={tasksPage} totalPages={totalTasksPages} onChange={setTasksPage} />
             </>
           )}
 
@@ -1144,7 +1157,7 @@ export default function TasksClient({
               {filteredList.length === 0 && <div className="text-sm text-sage py-6 text-center">No tasks here.</div>}
               {filteredList.length > 0 &&
                 (() => {
-                  const { mine, unassigned } = splitBucket(filteredList)
+                  const { mine, unassigned } = splitBucket(pagedList)
                   const pendingCount = filteredList.filter((t) => !t.done).length
                   return (
                     <div>
@@ -1166,6 +1179,7 @@ export default function TasksClient({
                     </div>
                   )
                 })()}
+              <Pager page={tasksPage} totalPages={totalTasksPages} onChange={setTasksPage} />
             </>
           )}
 

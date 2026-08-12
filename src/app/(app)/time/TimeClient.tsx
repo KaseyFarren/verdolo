@@ -11,6 +11,7 @@ import MetricBar from '@/components/ui/MetricBar'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import IconButton from '@/components/ui/IconButton'
+import Pager from '@/components/ui/Pager'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -1054,29 +1055,7 @@ export default function TimeClient({
           )
         })}
       </div>
-      {totalEntriesPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <button
-            type="button"
-            onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
-            disabled={entriesPage === 0}
-            className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
-          >
-            Newer
-          </button>
-          <span className="text-xs text-sage">
-            Page {entriesPage + 1} of {totalEntriesPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setEntriesPage((p) => Math.min(totalEntriesPages - 1, p + 1))}
-            disabled={entriesPage >= totalEntriesPages - 1}
-            className="text-xs text-sage hover:text-ink disabled:opacity-40 disabled:pointer-events-none"
-          >
-            Older
-          </button>
-        </div>
-      )}
+      <Pager page={entriesPage} totalPages={totalEntriesPages} onChange={setEntriesPage} prevLabel="Newer" nextLabel="Older" />
     </div>
   )
 }

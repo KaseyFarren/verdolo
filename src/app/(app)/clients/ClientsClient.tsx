@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import Pager from '@/components/ui/Pager'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import Tooltip from '@/components/ui/Tooltip'
 import { CheckIcon, ClockIcon, MessageCircleIcon, PauseIcon, PencilIcon, PlayIcon, SparkleIcon, XIcon } from '@/components/ui/icons'
@@ -179,6 +180,10 @@ export default function ClientsClient({
   const [noteInput, setNoteInput] = useState('')
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('')
+  const [clientsPage, setClientsPage] = useState(0)
+  useEffect(() => {
+    setClientsPage(0)
+  }, [search, stageFilter])
   const [timelineType, setTimelineType] = useState<'all' | 'note' | 'task' | 'message'>('all')
   const [timelinePeriod, setTimelinePeriod] = useState<PeriodValue>({ period: 'all_time' })
   const [showUpdateModal, setShowUpdateModal] = useState(false)
@@ -721,6 +726,19 @@ export default function ClientsClient({
     )
   }
 
+  const clientsSearchQuery = search.trim().toLowerCase()
+  const filteredClients = clients.filter((c) => {
+    if (stageFilter && getStage(c) !== stageFilter) return false
+    if (clientsSearchQuery && !c.name.toLowerCase().includes(clientsSearchQuery) && !(c.business ?? '').toLowerCase().includes(clientsSearchQuery)) return false
+    return true
+  })
+  // Bounded window into filteredClients, matching the pattern in TimeClient/TasksClient - the
+  // grid stays a fixed size no matter how many clients an org has. `clients.indexOf(c)` below
+  // (avatar colour) still runs against the full array so colours don't shift when paging/filtering.
+  const CLIENTS_PER_PAGE = 24
+  const totalClientsPages = Math.max(1, Math.ceil(filteredClients.length / CLIENTS_PER_PAGE))
+  const pagedClients = filteredClients.slice(clientsPage * CLIENTS_PER_PAGE, (clientsPage + 1) * CLIENTS_PER_PAGE)
+
   return (
     <div>
       {/* The tour spotlights this whole region: it holds the "+ New client" button and, once open,
@@ -728,7 +746,10 @@ export default function ClientsClient({
       <div data-tour="clients-add-region">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-xl font-semibold">
-            Clients <span className="text-sm font-normal text-sage">({clients.length})</span>
+            Clients{' '}
+            <span className="text-sm font-normal text-sage">
+              ({filteredClients.length === clients.length ? clients.length : `${filteredClients.length} of ${clients.length}`})
+            </span>
           </h1>
           {canEdit && !showAdd && (
             <Button variant="primary" data-tour="add-client-button" onClick={() => setShowAdd(true)}>
@@ -761,18 +782,13 @@ export default function ClientsClient({
 
       {clients.length === 0 && !showAdd && <div className="text-sm text-sage py-6">No clients yet.</div>}
       {(() => {
-        const q = search.trim().toLowerCase()
-        const filteredClients = clients.filter((c) => {
-          if (stageFilter && getStage(c) !== stageFilter) return false
-          if (q && !c.name.toLowerCase().includes(q) && !(c.business ?? '').toLowerCase().includes(q)) return false
-          return true
-        })
         if (filteredClients.length === 0 && clients.length > 0) {
           return <div className="text-sm text-sage py-6">No clients match your search.</div>
         }
         return (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {filteredClients.map((c) => {
+        {pagedClients.map((c) => {
         const i = clients.indexOf(c)
         const stage = getStage(c)
         const health = clientHealthKey(c, today)
@@ -826,6 +842,8 @@ export default function ClientsClient({
         )
         })}
         </div>
+        <Pager page={clientsPage} totalPages={totalClientsPages} onChange={setClientsPage} />
+        </>
         )
       })()}
     </div>
