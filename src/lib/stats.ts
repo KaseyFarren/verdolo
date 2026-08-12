@@ -2,15 +2,8 @@ import { isWeekend } from './agency'
 import { addDays } from './period'
 
 // Personal "Your week" dashboard card - recomputed on every read from rows the caller already
-// fetched, same convention as burn.ts. No points/streak table: nothing here is stored, so
-// changing the scoring later needs no backfill.
-
-export const POINTS = {
-  perTaskCompleted: 10,
-  perHourLogged: 5,
-  perClientReply: 15,
-  utilizationBonusAt100: 25,
-}
+// fetched, same convention as burn.ts. No streak table: nothing here is stored, so changing
+// the scoring later needs no backfill.
 
 // Old rows only have `assigned_to`; new/edited rows carry the full `assignee_ids` array - same
 // dual-write convention as TasksClient.tsx's effectiveAssignees.
@@ -86,7 +79,6 @@ export type WeekStats = {
   medianReplyMinutes: number | null
   repliesHandled: number
   streakDays: number
-  points: number
 }
 
 export function weekStats(input: {
@@ -121,12 +113,6 @@ export function weekStats(input: {
   for (const e of historyTimeEntries) if (e.duration_seconds) activeDates.add(e.started_at.slice(0, 10))
   const streakDays = computeStreakDays(activeDates, today, excludeWeekends, 35)
 
-  const points =
-    tasksCompleted * POINTS.perTaskCompleted +
-    Math.round(hoursLogged) * POINTS.perHourLogged +
-    replyLatencies.length * POINTS.perClientReply +
-    (utilizationPercent !== null && utilizationPercent >= 100 ? POINTS.utilizationBonusAt100 : 0)
-
   return {
     tasksCompleted,
     hoursLogged,
@@ -135,6 +121,5 @@ export function weekStats(input: {
     medianReplyMinutes,
     repliesHandled: replyLatencies.length,
     streakDays,
-    points,
   }
 }

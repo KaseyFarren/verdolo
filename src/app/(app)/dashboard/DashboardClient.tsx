@@ -547,10 +547,6 @@ export default function DashboardClient({
             )}
           </div>
           <div className="flex justify-between items-center py-1 text-sm">
-            <span className="text-ink">Points</span>
-            <span className="font-medium text-ink">{yourWeekStats.points}</span>
-          </div>
-          <div className="flex justify-between items-center py-1 text-sm">
             <span className="text-ink">Tasks completed</span>
             <span className="font-medium text-ink">{yourWeekStats.tasksCompleted}</span>
           </div>
