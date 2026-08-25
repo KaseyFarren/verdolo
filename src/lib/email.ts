@@ -5,7 +5,19 @@ import 'server-only'
  * rather than let a failed/misconfigured send fail the request it's attached to (see bug-report
  * and client-message-alert routes).
  */
-export async function sendEmail({ to, subject, text, from }: { to: string | string[]; subject: string; text: string; from?: string }) {
+export async function sendEmail({
+  to,
+  subject,
+  text,
+  html,
+  from,
+}: {
+  to: string | string[]
+  subject: string
+  text?: string
+  html?: string
+  from?: string
+}) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
     console.error('[email] RESEND_API_KEY not configured - skipping send')
@@ -20,6 +32,7 @@ export async function sendEmail({ to, subject, text, from }: { to: string | stri
       to,
       subject,
       text,
+      html,
     }),
   })
   if (!res.ok) {

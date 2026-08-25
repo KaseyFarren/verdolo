@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/apiError'
 import { rateLimit } from '@/lib/rateLimit'
 import { sendEmail } from '@/lib/email'
+import { renderEmail } from '@/lib/emailTemplate'
 
 const MAX_DESCRIPTION_LENGTH = 4000
 
@@ -21,6 +22,8 @@ async function notifyOwners(report: {
     return
   }
 
+  const escapedDescription = report.description.replace(/</g, '&lt;').replace(/\n/g, '<br />')
+
   await sendEmail({
     from: 'Verdolo Bug Reports <bugs@verdolo.com>',
     to: recipients,
@@ -32,6 +35,16 @@ async function notifyOwners(report: {
       '',
       report.description,
     ].join('\n'),
+    html: renderEmail({
+      preheader: `Bug report${report.orgName ? ` from ${report.orgName}` : ''}`,
+      heading: 'New bug report',
+      bodyHtml: `
+        <p style="margin:0 0 4px 0; color:#5d6b5c;">From: ${report.userEmail ?? 'unknown'}</p>
+        <p style="margin:0 0 4px 0; color:#5d6b5c;">Org: ${report.orgName ?? 'unknown'}</p>
+        <p style="margin:0 0 16px 0; color:#5d6b5c;">Page: ${report.pageUrl ?? 'unknown'}</p>
+        <p style="margin:0;">${escapedDescription}</p>
+      `,
+    }),
   })
 }
 
