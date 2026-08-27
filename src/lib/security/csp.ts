@@ -38,6 +38,9 @@ export function buildCsp(nonce: string): string {
     SUPABASE_WS,
     'https://www.facebook.com',
     'https://connect.facebook.net',
+    'https://www.google-analytics.com',
+    'https://*.google-analytics.com',
+    'https://*.analytics.google.com',
     ...(isDev ? ['ws://localhost:*', 'http://localhost:*'] : []),
   ].join(' ')
 
