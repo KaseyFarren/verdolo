@@ -174,7 +174,7 @@ export default function AppShell({
             <motion.div
               key={pathname}
               data-app-content
-              className={`mx-auto px-5 md:px-6 py-6 md:py-8 ${pathname === '/settings' ? 'max-w-5xl' : 'max-w-6xl'}`}
+              className="mx-auto px-5 md:px-6 py-6 md:py-8 max-w-6xl"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}

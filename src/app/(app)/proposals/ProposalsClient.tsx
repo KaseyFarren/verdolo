@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -21,6 +22,10 @@ type Proposal = {
   sent_at: string | null
   decided_at: string | null
   created_at: string
+  share_token: string | null
+  share_revoked_at: string | null
+  accepted_at: string | null
+  accepted_by_name: string | null
 }
 type Client = { id: string; name: string }
 
@@ -231,6 +236,16 @@ export default function ProposalsClient({
     toast.success('Proposal updated')
   }
 
+  async function copyLink(p: Proposal) {
+    if (!p.share_token) return
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/proposal/${p.share_token}`)
+      toast.success('Link copied')
+    } catch {
+      toast.error('Could not copy - open the document to copy the link manually')
+    }
+  }
+
   async function deleteProposal(p: Proposal) {
     const ok = await confirm({ title: `Delete "${p.title}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true })
     if (!ok) return
@@ -384,9 +399,22 @@ export default function ProposalsClient({
                       {clientName(p.client_id)}
                       {p.amount_cents > 0 && ` · ${currencySign}${centsToDollars(p.amount_cents).toLocaleString()}`} · {formatDate(p.created_at.slice(0, 10))}
                     </div>
+                    {p.status === 'signed' && p.accepted_by_name && (
+                      <div className="text-xs text-green mt-0.5">
+                        Accepted by {p.accepted_by_name}{p.accepted_at && ` on ${formatDate(p.accepted_at.slice(0, 10))}`}
+                      </div>
+                    )}
                   </button>
                   {canEdit && (
                     <div className="flex items-center gap-2 shrink-0">
+                      <Link href={`/proposals/${p.id}`} className="text-xs text-sage hover:text-ink">
+                        Document
+                      </Link>
+                      {p.share_token && !p.share_revoked_at && (
+                        <button className="text-xs text-sage hover:text-ink" onClick={() => copyLink(p)}>
+                          Copy link
+                        </button>
+                      )}
                       {p.status === 'draft' && (
                         <button className="text-xs text-sage hover:text-ink" onClick={() => setStatus(p, 'sent')}>
                           Mark sent

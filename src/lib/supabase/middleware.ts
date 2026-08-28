@@ -11,6 +11,9 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/reset-password',
   '/confirm-signup',
+  // Trailing slash matters - this is a startsWith() match below, and a bare '/proposal' would
+  // also make '/proposals' (the authed tracker) public.
+  '/proposal/',
 ]
 
 export async function updateSession(request: NextRequest) {
