@@ -16,6 +16,17 @@ function clamp(v: number, lo: number, hi: number) {
 
 type Rect = { top: number; left: number; width: number; height: number }
 
+// Every dialog in the app (Import tasks, New project, Confirm, etc.) shares this backdrop shape,
+// with a click-to-dismiss handler on the backdrop itself. If a step's target opens one of these and
+// the visitor doesn't finish it - clicks Next/Previous, or closes the tour outright - it would
+// otherwise sit open over whatever the next step tries to spotlight, blocking it entirely. Clicking
+// the backdrop directly (not a child) fires that dismiss handler, so this is a safe no-op when
+// nothing is open and a real close when something is.
+function dismissStrayModal() {
+  const backdrop = document.querySelector<HTMLElement>('.fixed.inset-0.z-50')
+  backdrop?.click()
+}
+
 // Mounted once in AppShell for every role. Activates either as the owner's automatic first-run tour
 // or via replay (any role, from Settings). Instead of a blocking overlay it uses a box-shadow
 // "spotlight" - the page stays fully interactive, the cutout is rounded, and the guide card is
@@ -63,6 +74,7 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
   }, [orgId, role])
 
   const finish = useCallback(async () => {
+    dismissStrayModal()
     setActive(false)
     localStorage.removeItem(tourStepKey(orgId))
     localStorage.removeItem(tourReplayKey(orgId))
@@ -85,6 +97,7 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
         return
       }
       if (index < 0) return
+      dismissStrayModal()
       localStorage.setItem(tourStepKey(orgId), String(index))
       // Soft-transition only when the FULL destination (including any ?view= query) matches where
       // we already are - otherwise a step that just changes the query (e.g. Profile -> General
@@ -142,6 +155,19 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
     let marked: Element | null = null
     function loop() {
       if (cancelled) return
+      // A dialog (Import tasks, New project, ...) is covering the page - its own overlay sits well
+      // below the tour's z-index, so the "anchor" would still resolve underneath it and the
+      // spotlight would end up drawn around whatever happens to be at that position inside the
+      // dialog instead. Go blank instead of chasing a target the visitor can't actually see or
+      // reach right now; goToStep's dismissStrayModal() clears it the moment they move on.
+      if (document.querySelector('.fixed.inset-0.z-50')) {
+        marked?.removeAttribute('data-tour-active')
+        marked = null
+        setRect(null)
+        positionCard(null)
+        raf = requestAnimationFrame(loop)
+        return
+      }
       const el = document.querySelector(step!.selector)
       if (el) {
         // Flag the spotlighted element so CSS can force-show controls that are otherwise

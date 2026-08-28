@@ -21,13 +21,16 @@ export default async function TeamPage() {
         <p className="text-sm text-sage">{org?.name} · signed in as {user.email} ({role})</p>
       </div>
 
+      {/* min-w-0 on the left column - without it a CSS grid track won't shrink below its content's
+          intrinsic width, so on a narrower viewport (e.g. the tour reserving its right-hand rail)
+          the whole row overflows past the grid instead of the member rows truncating as designed. */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
-        <section>
+        <section className="min-w-0">
           <h2 className="mb-2 text-sm font-medium text-sage uppercase tracking-wide">Members</h2>
           <MembersList orgId={orgId} members={members ?? []} currentUserId={user.id} canManage={isAdminRole(role)} canManageOwners={role === 'owner'} />
         </section>
 
-        <div>
+        <div className="min-w-0">
           {(members?.length ?? 0) === 1 && (
             <p className="mb-2 text-sm text-sage">You&apos;re the only one here so far - invite a teammate to start collaborating.</p>
           )}
