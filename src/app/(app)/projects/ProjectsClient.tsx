@@ -140,7 +140,7 @@ export default function ProjectsClient({
     <div className="max-w-5xl mx-auto p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <h1 className="text-xl font-semibold">Projects</h1>
-        <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+        <Button variant="primary" size="sm" data-tour="new-project-button" onClick={() => setShowForm(true)}>
           <PlusIcon size={14} className="inline -mt-0.5 mr-1" /> New project
         </Button>
       </div>

@@ -209,7 +209,6 @@ export default function TourProvider({ orgId, role }: { orgId: string; role?: Ro
             boxShadow: '0 0 0 9999px rgba(20, 20, 18, 0.55)',
             pointerEvents: 'none',
             zIndex: 100000,
-            transition: 'all 0.15s ease',
           }}
         />
       )}

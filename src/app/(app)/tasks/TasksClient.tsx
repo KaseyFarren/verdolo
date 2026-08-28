@@ -962,6 +962,7 @@ export default function TasksClient({
           {TASK_NAV.map((item) => (
             <button
               key={item.value}
+              data-tour={item.value === 'board' ? 'tasks-board-tab' : undefined}
               onClick={() => {
                 setView(item.value)
                 setShowAddTask(false)
@@ -996,7 +997,7 @@ export default function TasksClient({
               {/* invisible (not unmounted) when hidden so the row height stays constant as the add-form opens/closes */}
               <div className={`flex items-center gap-2 ${headerAction.open ? 'invisible pointer-events-none' : ''}`}>
                 {view === 'list' && (
-                  <Button variant="secondary" size="lg" className="rounded-full" onClick={() => setShowImportTasks(true)}>
+                  <Button variant="secondary" size="lg" className="rounded-full" data-tour="import-from-doc" onClick={() => setShowImportTasks(true)}>
                     <span className="inline-flex items-center gap-1.5">
                       <UploadCloudIcon size={14} />
                       Import from doc

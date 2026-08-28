@@ -65,13 +65,29 @@ const TOUR_STEPS: TourStep[] = [
     advanceOn: '[data-tour-advance="save-client"]',
   },
   {
+    path: '/proposals',
+    selector: '[data-tour="new-proposal-button"]',
+    title: 'Send a proposal',
+    description:
+      'Click "+ New proposal" to draft one for a client and track it here - Draft, Sent, Signed or Declined - right through to close.',
+    roles: MANAGERS,
+  },
+  {
     path: '/tasks',
     selector: '[data-tour="add-task-region"]',
     title: 'Add your first task',
     description:
-      'Hit "+ New task", then Add task to save it - that moves the tour on. Quick mode just needs a title; detailed mode lets you set a client, assignee, due date and priority. This is your day-to-day to-do list.',
+      'Hit "+ New task", then Add task to save it - that moves the tour on. Quick mode just needs a title; detailed mode lets you set a client, one or more assignees, due date and priority. This is your day-to-day to-do list.',
     roles: ALL,
     advanceOn: '[data-tour-advance="add-task"]',
+  },
+  {
+    path: '/tasks',
+    selector: '[data-tour="import-from-doc"]',
+    title: 'Import tasks from a doc',
+    description:
+      'Paste a transcript or upload a file here and Verdolo\'s AI turns it into a batch of draft tasks you review before adding - handy after a call or when you\'re handed a scope doc.',
+    roles: ALL,
   },
   {
     path: '/tasks',
@@ -100,11 +116,44 @@ const TOUR_STEPS: TourStep[] = [
     advanceOn: '[data-tour="task-checkbox"]',
   },
   {
+    path: '/tasks',
+    selector: '[data-tour="add-subtask"]',
+    title: 'Break a task into subtasks',
+    description:
+      'Click "+ Add subtask" under any task to split it into smaller steps - the parent can\'t be completed until they\'re all done.',
+    roles: ALL,
+  },
+  {
+    path: '/tasks',
+    selector: '[data-tour="tasks-board-tab"]',
+    title: 'Switch to board view',
+    description:
+      'Click "Board" for a Kanban view - drag tasks between columns to update their status. Same tasks as the list, just a different way to work through them.',
+    roles: ALL,
+    advanceOn: '[data-tour="tasks-board-tab"]',
+  },
+  {
+    path: '/projects',
+    selector: '[data-tour="new-project-button"]',
+    title: 'Group work into projects',
+    description:
+      'Click "+ New project" to create one, then break it into phases inside - tasks slot into a phase so you can track progress project-by-project, not just client-by-client.',
+    roles: ALL,
+  },
+  {
     path: '/time',
     selector: '[data-tour="start-timer"]',
     title: 'Track your time',
     description:
       'Pick a client (and optionally a task) and hit Start, or use "Log time manually" below to backfill hours you already worked. Time logged here powers your effective-rate and profitability reporting.',
+    roles: ALL,
+  },
+  {
+    path: '/messages',
+    selector: '[data-tour="message-composer"]',
+    title: 'Message your team',
+    description:
+      'The team channel is open by default - type here to post, or start a DM from the list on the left. Type @ to mention someone, or turn any message into a task.',
     roles: ALL,
   },
   {

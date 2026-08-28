@@ -496,6 +496,7 @@ function MessageComposer({
           e.preventDefault()
           onSubmit()
         }}
+        data-tour="message-composer"
         className="border-t border-ink/10 p-3 flex gap-2 items-center"
       >
         <label className="shrink-0 text-sage hover:text-ink cursor-pointer p-1.5">

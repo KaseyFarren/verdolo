@@ -277,7 +277,7 @@ export default function TaskRow({
         </div>
       )}
       {!isSubtask && !isAddingSubtask && (
-        <button type="button" onClick={onAddSubtask} className="pl-6 text-xs text-sage hover:text-ink py-1">
+        <button type="button" data-tour="add-subtask" onClick={onAddSubtask} className="pl-6 text-xs text-sage hover:text-ink py-1">
           + Add subtask
         </button>
       )}
