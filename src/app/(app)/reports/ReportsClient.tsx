@@ -868,11 +868,6 @@ export default function ReportsClient({
             <div className="font-heading text-base font-bold text-ink mb-1">
               Revenue <InfoTooltip content="Total revenue across all clients in each period" />
             </div>
-            {trendGranularity === 'week' && (
-              <div className="text-xs text-sage mb-2">
-                A retainer shows up in full on the week it renews, not spread evenly - other weeks only show billables and hourly work.
-              </div>
-            )}
             {trendBuckets.every((b) => b.totalRevenueCents === 0) ? (
               <div className="text-sm text-sage py-3">No revenue yet in this range.</div>
             ) : (
@@ -891,13 +886,7 @@ export default function ReportsClient({
               </div>
               {trendGranularity === 'month' && pMonth === todayKey().slice(0, 7) && (
                 <div className="text-xs text-sage mb-2">
-                  This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
-                </div>
-              )}
-              {trendGranularity === 'week' && (
-                <div className="text-xs text-sage mb-2">
-                  Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in - unlike
-                  the Revenue chart above, so a week showing $0 revenue there can still show a healthy rate here.
+                  This month&apos;s retainer revenue reflects the days elapsed so far, spread evenly across the month.
                 </div>
               )}
               {trendBuckets.every((b) => !b.hasData) ? (
@@ -932,7 +921,7 @@ export default function ReportsClient({
                 </div>
                 {pMonth === todayKey().slice(0, 7) && (
                   <div className="text-xs text-sage mb-2">
-                    This month&apos;s retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
+                    This month&apos;s retainer revenue reflects the days elapsed so far, spread evenly across the month - it&apos;ll reach full value by month end.
                   </div>
                 )}
                 <DivergingBarChart
