@@ -1,25 +1,25 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { billingCycleElapsedFraction, billingCycleProgress, clientChurnedBefore } from '@/lib/period'
+import { billingCycleProgress, clientChurnedBefore, smoothedRetainerRevenueCents } from '@/lib/period'
 import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import { weekStats } from '@/lib/stats'
 import DashboardClient from './DashboardClient'
 
-// Retainer prorated by billing cycle + hourly billable hours × rate - same methodology as
-// Reports' profitabilityForMonth, just summed to one number instead of broken out per client.
-// Kept server-side only: billing rows (retainer_cents, hourly_rate_cents) never reach the
-// client bundle for non-admin sessions.
+// Retainer smoothed across the month (a day's fair share is 1/daysInMonth) + hourly billable
+// hours × rate - same methodology as Reports' profitabilityForMonth, just summed to one number
+// instead of broken out per client. Kept server-side only: billing rows (retainer_cents,
+// hourly_rate_cents) never reach the client bundle for non-admin sessions.
 function estimateMonthRevenueCents(
   billingClients: {
     id: string
     retainer_cents: number | null
     billing_mode: string | null
     hourly_rate_cents: number | null
-    billing_day: number | null
     churned_at?: string | null
   }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
   monthStart: string,
+  monthEnd: string,
 ) {
   let total = 0
   for (const c of billingClients) {
@@ -30,7 +30,7 @@ function estimateMonthRevenueCents(
     const isHourly = c.billing_mode === 'hourly'
     total += isHourly
       ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-      : Math.round((c.retainer_cents || 0) * billingCycleElapsedFraction(c.billing_day || 1))
+      : smoothedRetainerRevenueCents(c.retainer_cents || 0, monthStart, monthEnd)
   }
   return total
 }
@@ -207,7 +207,7 @@ export default async function DashboardPage() {
       .lt('created_at', `${tomorrow}T00:00:00`),
   ])
 
-  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? [], monthStart) : 0
+  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? [], monthStart, monthEnd) : 0
   const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
   const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
   const burnAlerts = isAdmin ? clientsOverBudget(billingClients ?? [], cycleEntries ?? [], targetRateCents) : []

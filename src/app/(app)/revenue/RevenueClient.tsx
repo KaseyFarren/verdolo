@@ -14,7 +14,6 @@ import {
   currencySymbol,
   dollarsToCents,
   effectiveRate,
-  formatDate,
   getInitials,
   getStage,
   memberName,
@@ -23,13 +22,12 @@ import {
   type Currency,
 } from '@/lib/agency'
 import {
-  isFullCalendarMonth,
   billingCycleProgress,
-  billingDatesInRange,
   daysUntilRenewal,
   periodBounds,
   clientExistedBy,
   clientChurnedBefore,
+  smoothedRetainerRevenueCents,
   type PeriodValue,
 } from '@/lib/period'
 import { computeClientBurn, burnDrivers, type BurnDriver } from '@/lib/burn'
@@ -149,7 +147,6 @@ export default function RevenueClient({
   useEffect(() => {
     setEntriesState(entries)
   }, [entries])
-  const isFullMonth = isFullCalendarMonth(period)
   const { start: rangeStart, end: rangeEnd } = useMemo(() => periodBounds(period), [period])
 
   // Live-sync revenue inputs so this page never needs a manual refresh: a retainer/billing-mode
@@ -273,17 +270,6 @@ export default function RevenueClient({
   const taskTitleMap = useMemo(() => new Map(Object.entries(taskTitles)), [taskTitles])
 
   const clientRows = useMemo(() => {
-    // Days between rangeStart (inclusive) and rangeEnd (exclusive) - used only to smooth the
-    // retainer for the *rate* calc below, never shown as a $ figure.
-    const rangeDays = (() => {
-      if (!rangeStart || !rangeEnd) return 0
-      const [sy, sm, sd] = rangeStart.split('-').map(Number)
-      const [ey, em, ed] = rangeEnd.split('-').map(Number)
-      return Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd)) / 86400000)
-    })()
-    const rangeMonthDays = rangeStart ? new Date(Number(rangeStart.slice(0, 4)), Number(rangeStart.slice(5, 7)), 0).getDate() : 30
-    const smoothedRetainerFraction = rangeMonthDays > 0 ? rangeDays / rangeMonthDays : 0
-
     // Exclude a client from a range that falls entirely before they were added - otherwise a
     // custom/past range would still show their current retainer as if it always applied, same
     // fix as Reports' profitabilityForMonth/Week. A range entirely after they churned is NOT
@@ -296,47 +282,23 @@ export default function RevenueClient({
         const isHourly = c.billing_mode === 'hourly'
         const churnedByThisRange = clientChurnedBefore(c, rangeStart)
         const billableSeconds = billableHoursByClient.get(c.id) || 0
-        // hourly revenue scales with any period length, unlike a retainer - which is a monthly
-        // figure, so only a full calendar month period can honestly include one; a week or
-        // custom range only counts what was actually billed/logged in it
         const hourlyRevenue = isHourly && !churnedByThisRange ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
-        // A retainer is a full-cycle figure. For a full calendar month, attribute the whole thing
-        // once the cycle's complete, or prorate by how far this client's own billing cycle has
-        // gotten if the current month is still in progress (not assuming everyone renews on the
-        // 1st). For anything narrower (a week, a custom range), a partial slice isn't a real event
-        // - so instead recognize the full retainer on whichever day(s) in that range are actually
-        // this client's renewal date, and nothing otherwise.
-        const cycleProgress = period.period === 'this_month' ? billingCycleProgress(c.billing_day || 1) : null
-        const retainerFraction = cycleProgress ? cycleProgress.fraction : 1
-        const billingDatesThisRange = !isHourly && !isFullMonth && rangeStart && rangeEnd ? billingDatesInRange(c.billing_day || 1, rangeStart, rangeEnd) : []
+        // A retainer's fair share of the selected range, a day at a time - day 1 of the month is
+        // worth 1/daysInMonth, and so on. Same formula everywhere revenue gets attributed
+        // (Reports, Dashboard, here) - no billing-day-specific cliff to explain or disagree on.
         const retainerRevenue =
-          isHourly || churnedByThisRange
-            ? 0
-            : isFullMonth
-              ? Math.round((c.retainer_cents || 0) * retainerFraction)
-              : billingDatesThisRange.length * (c.retainer_cents || 0)
+          isHourly || churnedByThisRange || !rangeStart || !rangeEnd ? 0 : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
-        // The $ figure above is deliberately spiky (full retainer lands on its billing day, $0
-        // otherwise) - accurate for "how much money actually showed up", but divided by hours it
-        // would make a retainer client's rate swing from ~$0/hr to enormous depending on whether
-        // the billing date happens to fall inside the selected range. The rate needs a steadier
-        // proxy, so outside a full month it spreads the retainer evenly across the range instead
-        // of lump-summing it - same fix Reports already applies to its weekly effective-rate line.
-        const rateRetainerRevenue =
-          isHourly || churnedByThisRange
-            ? 0
-            : isFullMonth
-              ? retainerRevenue
-              : Math.round((c.retainer_cents || 0) * smoothedRetainerFraction)
-        const rateRevenueCents = rateRetainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows
         const seconds = hoursByClient.get(c.id) || 0
         const hours = seconds / 3600
-        const rate = effectiveRate(rateRevenueCents, hours)
+        const rate = effectiveRate(totalRevenue, hours)
         const rateDeltaCents = rate !== null && targetRateCents > 0 ? rate - targetRateCents : null
-        // Burn is scoped to this client's own billing cycle (cycleProgress above), not the
-        // selected period's range - only meaningful for "this month", where cycleProgress exists.
+        // Burn tracks usage against the retainer's own billing cycle (cycleProgress), which is a
+        // genuinely different question from "how much revenue happened in the selected range" -
+        // only meaningful for "this month", the one view where "the current cycle" is unambiguous.
+        const cycleProgress = period.period === 'this_month' ? billingCycleProgress(c.billing_day || 1) : null
         const cycleEntriesForClient = cycleProgress
           ? cycleEntries.filter(
               (e) =>
@@ -353,14 +315,11 @@ export default function RevenueClient({
           isHourly,
           chargesTotal,
           totalRevenue,
-          rateRevenueCents,
           seconds,
           hours,
           billableHours: billableSeconds / 3600,
           rate,
           rateDeltaCents,
-          billedThisRange: billingDatesThisRange.length > 0,
-          billingDatesThisRange,
           cycleProgress: !isHourly ? cycleProgress : null,
           retainerRevenue,
           burn,
@@ -369,7 +328,7 @@ export default function RevenueClient({
       })
       .filter((r) => r.totalRevenue > 0 || r.seconds > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [clientsState, chargesByClient, hoursByClient, billableHoursByClient, isFullMonth, targetRateCents, period.period, rangeStart, rangeEnd, cycleEntries, taskTitleMap, today])
+  }, [clientsState, chargesByClient, hoursByClient, billableHoursByClient, targetRateCents, period.period, rangeStart, rangeEnd, cycleEntries, taskTitleMap, today])
 
   const memberRows = useMemo(() => {
     return members
@@ -423,11 +382,7 @@ export default function RevenueClient({
     const revenue = clientRows.reduce((s, r) => s + r.totalRevenue, 0)
     const seconds = clientRows.reduce((s, r) => s + r.seconds, 0)
     const hours = seconds / 3600
-    // Blended rate uses the smoothed rateRevenueCents (see clientRows), not the spiky totalRevenue
-    // - otherwise the org-wide rate would swing wildly depending on how many clients happen to bill
-    // inside the selected week.
-    const rateRevenue = clientRows.reduce((s, r) => s + r.rateRevenueCents, 0)
-    const rate = effectiveRate(rateRevenue, hours)
+    const rate = effectiveRate(revenue, hours)
     return { revenue, hours, rate, rateDeltaCents: rate !== null && targetRateCents > 0 ? rate - targetRateCents : null }
   }, [clientRows, targetRateCents])
 
@@ -493,16 +448,9 @@ export default function RevenueClient({
         presets={['this_month', 'last_month', 'this_week', 'last_week', 'custom']}
         className="mb-4"
       />
-      {!isFullMonth && (
-        <div className="text-xs text-sage/70 mb-5">
-          Retainer clients show revenue here only on the day they renew - showing billables + hours actually logged in this range otherwise.
-        </div>
-      )}
-      {isFullMonth && period.period === 'this_month' && (
-        <div className="text-xs text-sage/70 mb-5">
-          Showing partial-cycle figures - retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
-        </div>
-      )}
+      <div className="text-xs text-sage/70 mb-5">
+        Retainer revenue is spread evenly across the month - each day counts as its fair share, so a still-in-progress period shows the amount accrued so far.
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3" data-tour="revenue-summary">
         <Card>
@@ -595,23 +543,9 @@ export default function RevenueClient({
                         })()}
                       </span>
                     ) : null}
-                    {r.cycleProgress && r.client.retainer_cents ? (
-                      <InfoTooltip
-                        content={`Day ${r.cycleProgress.elapsedDays} of ${r.cycleProgress.cycleLengthDays} in this billing cycle (${formatDate(
-                          r.cycleProgress.cycleStart,
-                        )} – ${formatDate(r.cycleProgress.cycleEnd)}) - ${Math.round(r.cycleProgress.fraction * 100)}% of ${fmtMoney(
-                          r.client.retainer_cents,
-                        )} = ${fmtMoney(r.retainerRevenue)} recognized so far.`}
-                      />
+                    {r.client.retainer_cents ? (
+                      <InfoTooltip content={`${fmtMoney(r.retainerRevenue)} of this month's retainer accrued so far, spread evenly across the month.`} />
                     ) : null}
-                    {r.billedThisRange && (
-                      <span
-                        className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 align-middle"
-                        title={`Renews ${r.billingDatesThisRange.map((d) => formatDate(d)).join(', ')} - full retainer recognized that day`}
-                      >
-                        Billed this period
-                      </span>
-                    )}
                     {r.burn && (
                       <span
                         className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold align-middle"

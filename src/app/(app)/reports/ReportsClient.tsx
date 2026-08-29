@@ -17,10 +17,7 @@ import {
   type Currency,
 } from '@/lib/agency'
 import {
-  monthElapsedFraction,
-  billingDatesInRange,
-  weekElapsedFraction,
-  weeklyRetainerShare,
+  smoothedRetainerRevenueCents,
   monthKeyRange,
   clientExistedBy,
   clientChurnedBefore,
@@ -348,47 +345,44 @@ export default function ReportsClient({
   // Verdolo doesn't track real expenses, so there's no honest "cost"/"margin" in dollars -
   // only hours logged vs. revenue. Effective rate (revenue ÷ hours) compared against the
   // team's target rate gives the same "is this account worth the time it's taking" signal
-  // without pretending to know a real P&L. Shared by the selected-month breakdown below and
-  // by trendBuckets (run once per bucket in the trailing window).
-  function profitabilityForMonth(monthKey: string) {
-    const { start: monthStart, end: monthEnd } = monthKeyRange(monthKey)
-    const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
+  // without pretending to know a real P&L.
+  //
+  // A retainer client's revenue for any range is their fair daily share added up one day at a
+  // time (smoothedRetainerRevenueCents) - day 1 of the month is worth 1/daysInMonth, and so on.
+  // No billing-day cliffs, no separate "spiky $ figure vs smoothed rate proxy" - one number,
+  // used for both the displayed revenue and the rate math, whether the range is a week, a month,
+  // or the trend chart's trailing window. profitabilityForMonth/Week are thin wrappers over this
+  // shared range calc so the rest of the file (which calls them by month-key or week-start) don't
+  // need to change.
+  function profitabilityForRange(rangeStart: string, rangeEnd: string) {
+    const rangeEntries = monthTimeEntries.filter((e) => e.started_at >= rangeStart && e.started_at < rangeEnd)
     // Grouped once per call instead of re-filtering the full charges array per client - this
-    // runs once per trend bucket (up to 12 months), same pattern as chargesByClient on Revenue.
+    // runs once per trend bucket (up to 12 months or 26 weeks), same pattern as Revenue's
+    // chargesByClient.
     const chargesByClient = new Map<string, number>()
     for (const ch of monthClientCharges) {
-      if (ch.charged_on >= monthStart && ch.charged_on < monthEnd) chargesByClient.set(ch.client_id, (chargesByClient.get(ch.client_id) || 0) + ch.amount_cents)
+      if (ch.charged_on >= rangeStart && ch.charged_on < rangeEnd) chargesByClient.set(ch.client_id, (chargesByClient.get(ch.client_id) || 0) + ch.amount_cents)
     }
-    // Without this, a client who signed up last month still shows their full current retainer
-    // as revenue in every earlier trend month too (monthElapsedFraction treats any past month as
-    // 100% elapsed with no idea the client didn't exist yet) - flattening the whole trend to
-    // "today's roster, replayed backward."
+    // Without this, a client who signed up later still shows their full current retainer as
+    // revenue in every earlier trend bucket too - flattening the whole trend to "today's roster,
+    // replayed backward." A range entirely after they churned is NOT excluded here (a charge
+    // billed after they left is still real revenue) - see clientChurnedBefore below instead,
+    // which only zeroes the ongoing retainer/hourly portion.
     return clients
-      .filter((c) => clientExistedBy(c, monthEnd))
+      .filter((c) => clientExistedBy(c, rangeEnd))
       .map((c) => {
-        const clientEntries = monthEntries.filter((e) => e.client_id === c.id)
+        const clientEntries = rangeEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const isHourly = c.billing_mode === 'hourly'
-        // Revenue and hours must describe the same window - the calendar month being viewed -
-        // or a retainer client billed mid-month (billing_day != 1) shows a revenue cliff at
-        // their renewal date with no matching change in hours: hours are always summed by
-        // calendar month, but a per-client billing-cycle fraction can span two calendar months,
-        // so the two would disagree on which days even count. billing_day still drives exact
-        // renewal-date precision elsewhere (dashboard, Revenue page) where that IS the thing
-        // being measured; here it's only an estimate to compare against calendar-month hours.
-        const retainerFraction = monthElapsedFraction(monthKey)
-        // A month entirely after a client's churned_at earns $0 retainer/hourly - their
-        // retainer_cents reflects what they paid while active, not $0, so without this every
-        // month after they left would phantom-bill their old retainer again. The month they
-        // actually churned in still counts in full - that revenue and those hours were real.
-        const baseRevenueCents = clientChurnedBefore(c, monthStart)
+        const churnedByThisRange = clientChurnedBefore(c, rangeStart)
+        const baseRevenueCents = churnedByThisRange
           ? 0
           : isHourly
             ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-            : Math.round((c.retainer_cents || 0) * retainerFraction)
+            : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
         // Extra billables (client_charges) count as revenue same as the Revenue page - a client
-        // with a one-off fee that month otherwise reads as less profitable than they actually
-        // are, and a final invoice charged after they churned is still real revenue that month.
+        // with a one-off fee that period otherwise reads as less profitable than they actually
+        // are, and a final invoice charged after they churned is still real revenue.
         const chargesCents = chargesByClient.get(c.id) || 0
         const revenueCents = baseRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
@@ -398,8 +392,11 @@ export default function ReportsClient({
         // nominal one. That's a genuine "are we over-serving this account" signal, not a tautology,
         // so every client with a computable rate gets a delta.
         const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        const isPartialMonth = retainerFraction < 1
-        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isEstimatedRevenue: true, isPartialMonth }
+        // Whether the retainer portion shown is less than one full month's amount - true for any
+        // week, custom range, or still-in-progress month; false only for a fully-elapsed month
+        // that actually earned the whole retainer.
+        const isPartialMonth = !isHourly && baseRevenueCents < (c.retainer_cents || 0)
+        return { client: c, isHourly, hours, revenueCents, effectiveRateCents, rateDeltaCents, isPartialMonth }
       })
       .filter((r) => r.revenueCents > 0 || r.hours > 0)
       .sort((a, b) => {
@@ -409,61 +406,13 @@ export default function ReportsClient({
       })
   }
 
-  // A single week is never a full billing cycle, so - matching the Revenue page's isFullMonth
-  // rule - a retainer only contributes *actual* revenue here on the day it renews; no fictional
-  // even slice of the retainer. But "effective rate" answers a different question (was this
-  // account worth the time this week?), and that needs *some* revenue proxy to divide by every
-  // week, not just the renewal week - a retainer client with real logged hours but a $0
-  // non-renewal week would otherwise read as a terrible rate, even in a month where the
-  // full-month view shows them comfortably above target. So rateRevenueCents keeps spreading
-  // the monthly retainer evenly across that month's weeks, used only for the effective-rate
-  // line - never surfaced as an actual $ figure.
+  function profitabilityForMonth(monthKey: string) {
+    const { start, end } = monthKeyRange(monthKey)
+    return profitabilityForRange(start, end)
+  }
+
   function profitabilityForWeek(weekStart: string) {
-    const weekEnd = addDays(weekStart, 7)
-    const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
-    const weeklyRetainerFraction = weeklyRetainerShare(weekStart) * weekElapsedFraction(weekStart)
-    const chargesByClient = new Map<string, number>()
-    for (const ch of monthClientCharges) {
-      if (ch.charged_on >= weekStart && ch.charged_on < weekEnd) chargesByClient.set(ch.client_id, (chargesByClient.get(ch.client_id) || 0) + ch.amount_cents)
-    }
-    // Same reasoning as profitabilityForMonth - exclude a client from weeks entirely before
-    // they were added; a week entirely after they churned still counts if there's a charge in it.
-    return clients
-      .filter((c) => clientExistedBy(c, weekEnd))
-      .map((c) => {
-        const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
-        const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
-        const isHourly = c.billing_mode === 'hourly'
-        const churnedByThisWeek = clientChurnedBefore(c, weekStart)
-        const hourlyEstimateCents = churnedByThisWeek
-          ? 0
-          : Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-        const billingLumpCents =
-          isHourly || churnedByThisWeek ? 0 : billingDatesInRange(c.billing_day || 1, weekStart, weekEnd).length * (c.retainer_cents || 0)
-        // Same reasoning as profitabilityForMonth - extra billables count as revenue here too,
-        // both for the $ figure and the effective-rate proxy (matching the Revenue page), and
-        // still count in a week after the client churned (a late final invoice is still real).
-        const chargesCents = chargesByClient.get(c.id) || 0
-        const baseRevenueCents = isHourly ? hourlyEstimateCents : billingLumpCents
-        const revenueCents = baseRevenueCents + chargesCents
-        const baseRateRevenueCents = churnedByThisWeek ? 0 : isHourly ? hourlyEstimateCents : Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
-        const rateRevenueCents = baseRateRevenueCents + chargesCents
-        const effectiveRateCents = effectiveRate(rateRevenueCents, hours)
-        const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
-        return {
-          client: c,
-          isHourly,
-          hours,
-          revenueCents,
-          rateRevenueCents,
-          effectiveRateCents,
-          rateDeltaCents,
-          isEstimatedRevenue: true,
-          isPartialMonth: false,
-          billedThisRange: billingLumpCents > 0,
-        }
-      })
-      .filter((r) => r.revenueCents > 0 || r.hours > 0)
+    return profitabilityForRange(weekStart, addDays(weekStart, 7))
   }
 
   const profitability = useMemo(
@@ -507,17 +456,14 @@ export default function ReportsClient({
     return buildWeekKeys(anchorMonday, weekCount).map((weekStart) => {
       const perClient = profitabilityForWeek(weekStart)
       const totalRevenueCents = perClient.reduce((s, r) => s + r.revenueCents, 0)
-      const totalRateRevenueCents = perClient.reduce((s, r) => s + r.rateRevenueCents, 0)
       const totalHours = perClient.reduce((s, r) => s + r.hours, 0)
       return {
         key: weekStart,
         label: weekTick(weekStart),
         fullLabel: `Week of ${formatDate(weekStart)}`,
         totalRevenueCents,
-        // Uses totalRateRevenueCents (retainer spread across the month's weeks), not
-        // totalRevenueCents (actual $ only) - see profitabilityForWeek's comment.
-        blendedRateCents: effectiveRate(totalRateRevenueCents, totalHours),
-        hasData: effectiveRate(totalRateRevenueCents, totalHours) !== null,
+        blendedRateCents: effectiveRate(totalRevenueCents, totalHours),
+        hasData: effectiveRate(totalRevenueCents, totalHours) !== null,
       }
     })
   }, [trendGranularity, monthCount, weekCount, trendMonthKeys, clients, monthTimeEntries, monthClientCharges, targetRateCents, pMonth, weekAnchor])
@@ -1024,11 +970,9 @@ export default function ReportsClient({
                           {currencySign}
                           {centsToDollars(r.revenueCents)}
                         </div>
-                        {r.isEstimatedRevenue && (
-                          <div className="text-[10px] text-sage/60">
-                            {r.isHourly ? 'hourly, est.' : r.isPartialMonth ? 'retainer, est., prorated' : 'retainer, est.'}
-                          </div>
-                        )}
+                        <div className="text-[10px] text-sage/60">
+                          {r.isHourly ? 'hourly, est.' : r.isPartialMonth ? 'retainer, est., prorated' : 'retainer, est.'}
+                        </div>
                       </div>
                       <div className="w-16 text-right text-xs text-sage tabular-nums shrink-0">{r.hours.toFixed(1)}h</div>
                       <div className="w-32 text-right shrink-0">

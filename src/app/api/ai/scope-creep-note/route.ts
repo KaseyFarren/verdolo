@@ -4,7 +4,7 @@ import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
 import { buildScopeCreepPrompt, callClaude, extractText } from '@/lib/ai'
 import { currencySymbol, effectiveRate, todayKey } from '@/lib/agency'
-import { monthElapsedFraction } from '@/lib/period'
+import { smoothedRetainerRevenueCents } from '@/lib/period'
 import { burnDrivers } from '@/lib/burn'
 
 export const maxDuration = 60
@@ -91,20 +91,28 @@ export async function POST(request: Request) {
     : { data: [] }
   const taskTitleMap = new Map((driverTasks || []).map((t) => [t.id, t.title]))
   const drivers = burnDrivers(entries || [], taskTitleMap)
-  // Mirrors profitabilityForMonth in ReportsClient.tsx - revenue and hours must describe the
-  // same window (the calendar month), or a retainer client billed mid-month looks like it
-  // made its full monthly revenue already, pushing effectiveRateCents above target even when
-  // the header (which prorates by calendar month too) shows the client below it.
+  // Mirrors profitabilityForMonth/profitabilityForRange in ReportsClient.tsx via the same shared
+  // smoothedRetainerRevenueCents - revenue and hours must describe the same window (the calendar
+  // month so far), or a retainer client billed mid-month looks like it made its full monthly
+  // revenue already, pushing effectiveRateCents above target even when the header (which uses
+  // the same function) shows the client below it.
   //
   // "today" must come from the browser, not `new Date()` on the server: todayKey() reads
   // local calendar fields, and a serverless function's local clock is UTC while the caller's
   // browser is in their own timezone - for hours around midnight in any zone ahead of UTC the
-  // two disagree on which calendar day it is, which shifts the elapsed-month fraction by a
-  // full day and produces a revenue figure that doesn't match what the header just rendered.
+  // two disagree on which calendar day it is, which shifts the elapsed-month fraction by a full
+  // day and produces a revenue figure that doesn't match what the header just rendered.
   const today = /^\d{4}-\d{2}-\d{2}$/.test(clientToday ?? '') ? clientToday : todayKey()
+  const dayOfMonth = Number(today.slice(8, 10))
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const daysRemaining = Math.max(0, daysInMonth - dayOfMonth)
+  // Fraction of *this* month elapsed as of today - used only to pace-project hours below, not
+  // for revenue (smoothedRetainerRevenueCents owns that). 1 if the month's already fully past,
+  // 0 if it hasn't started yet.
   const monthKey = `${y}-${String(m).padStart(2, '0')}`
-  const retainerFraction = monthElapsedFraction(monthKey, today)
-  const revenueCents = Math.round((client.retainer_cents || 0) * retainerFraction)
+  const todayMonthKey = today.slice(0, 7)
+  const paceFraction = monthKey < todayMonthKey ? 1 : monthKey > todayMonthKey ? 0 : dayOfMonth / daysInMonth
+  const revenueCents = smoothedRetainerRevenueCents(client.retainer_cents || 0, monthStart, monthEnd, today)
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
   // revenueCents and hours are already matched to the same elapsed window (both cover only
   // the days so far this month), so effectiveRateCents is a fair current-pace signal - if hours
@@ -121,13 +129,10 @@ export async function POST(request: Request) {
   // how many hours the retainer can absorb at target rate, how many it's projected to actually
   // hit by month end at the current daily pace, and the gap between them are all deterministic
   // and handed to the model as facts rather than arithmetic it has to get right itself.
-  const dayOfMonth = Number(today.slice(8, 10))
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const daysRemaining = Math.max(0, daysInMonth - dayOfMonth)
   // Honors an explicit "included hours" figure (clients.retainer_hours) over the derived one,
   // for agencies that sold a specific hour block rather than an implied target-rate conversion.
   const hoursBudgetAtTarget = client.retainer_hours || (targetRateCents > 0 ? (client.retainer_cents || 0) / targetRateCents : 0)
-  const projectedFullMonthHours = retainerFraction > 0 ? hours / retainerFraction : hours
+  const projectedFullMonthHours = paceFraction > 0 ? hours / paceFraction : hours
   const hoursRemainingBudget = hoursBudgetAtTarget - hours
   const projectedOverageHours = Math.max(0, projectedFullMonthHours - hoursBudgetAtTarget)
   const projectedOverageCents = Math.round(projectedOverageHours * targetRateCents)
