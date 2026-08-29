@@ -14,6 +14,7 @@ import {
   currencySymbol,
   dollarsToCents,
   effectiveRate,
+  clientHealthKey,
   getInitials,
   getStage,
   memberName,
@@ -26,7 +27,7 @@ import {
   daysUntilRenewal,
   periodBounds,
   clientExistedBy,
-  clientChurnedBefore,
+  clientPausedBefore,
   smoothedRetainerRevenueCents,
   type PeriodValue,
 } from '@/lib/period'
@@ -46,7 +47,9 @@ type Client = {
   stage: string | null
   status: string | null
   added_date: string | null
-  churned_at: string | null
+  paused_at: string | null
+  last_contacted: string | null
+  cadence_days: number | null
 }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type Entry = { id: string; user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
@@ -272,8 +275,8 @@ export default function RevenueClient({
   const clientRows = useMemo(() => {
     // Exclude a client from a range that falls entirely before they were added - otherwise a
     // custom/past range would still show their current retainer as if it always applied, same
-    // fix as Reports' profitabilityForMonth/Week. A range entirely after they churned is NOT
-    // excluded here (see churnedByThisRange below, gating only the ongoing retainer/hourly
+    // fix as Reports' profitabilityForMonth/Week. A range entirely after they were paused is NOT
+    // excluded here (see pausedByThisRange below, gating only the ongoing retainer/hourly
     // portion) - a charge billed after they left is still real revenue for that range.
     //
     // A Lead is also excluded, same as Reports - no signed contract yet, so pre-sale hours have
@@ -284,14 +287,14 @@ export default function RevenueClient({
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
-        const churnedByThisRange = clientChurnedBefore(c, rangeStart)
+        const pausedByThisRange = clientPausedBefore(c, rangeStart)
         const billableSeconds = billableHoursByClient.get(c.id) || 0
-        const hourlyRevenue = isHourly && !churnedByThisRange ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
+        const hourlyRevenue = isHourly && !pausedByThisRange ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
         // A retainer's fair share of the selected range, a day at a time - day 1 of the month is
         // worth 1/daysInMonth, and so on. Same formula everywhere revenue gets attributed
         // (Reports, Dashboard, here) - no billing-day-specific cliff to explain or disagree on.
         const retainerRevenue =
-          isHourly || churnedByThisRange || !rangeStart || !rangeEnd ? 0 : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
+          isHourly || pausedByThisRange || !rangeStart || !rangeEnd ? 0 : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows
@@ -393,7 +396,13 @@ export default function RevenueClient({
   // MRR and at-risk exposure are current-state snapshots, not scoped to the selected period -
   // a retainer is "at risk" regardless of which week you happen to be looking at.
   const mrrCents = useMemo(() => mrrCentsTotal(clientsState), [clientsState])
-  const atRiskClients = useMemo(() => clientsState.filter((c) => getStage(c) === 'At Risk'), [clientsState])
+  // "At Risk" used to be a manual stage someone had to remember to set - now this is driven by
+  // the same automatic contact-recency health signal as everywhere else (Clients, Dashboard),
+  // so a retainer shows up here purely because it's genuinely overdue for a check-in.
+  const atRiskClients = useMemo(
+    () => clientsState.filter((c) => getStage(c) !== 'Paused' && clientHealthKey(c, today) === 'red'),
+    [clientsState, today],
+  )
   const atRiskCents = useMemo(() => atRiskClients.reduce((s, c) => s + (c.retainer_cents || 0), 0), [atRiskClients])
   const utilization = useMemo(() => {
     const totalSeconds = entriesState.reduce((s, e) => s + (e.duration_seconds || 0), 0)
@@ -509,9 +518,9 @@ export default function RevenueClient({
           <div className="rounded-lg px-3 py-1.5 text-xs bg-red-100 inline-flex items-center">
             <span className="font-semibold text-red-600">{fmtMoney(atRiskCents)}</span>&nbsp;<span className="text-red-600">MRR at risk</span>
             <InfoTooltip
-              content={`Combined monthly retainer of ${atRiskClients.length} client${atRiskClients.length === 1 ? '' : 's'} in the At Risk stage${
+              content={`Combined monthly retainer of ${atRiskClients.length} client${atRiskClients.length === 1 ? '' : 's'} overdue for a check-in${
                 atRiskClients.length ? `: ${atRiskClients.map((c) => c.name).join(', ')}` : ''
-              }. This retainer walks if they churn - reach out, then move them out of At Risk in Clients to clear it.`}
+              }. This retainer walks if they leave - reach out to clear it.`}
             />
           </div>
         )}

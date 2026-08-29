@@ -21,7 +21,7 @@ import {
   smoothedRetainerRevenueCents,
   monthKeyRange,
   clientExistedBy,
-  clientChurnedBefore,
+  clientPausedBefore,
   addDays,
   periodBounds,
   type Period,
@@ -52,7 +52,7 @@ type Client = {
   last_contacted: string | null
   cadence_days: number | null
   added_date: string | null
-  churned_at: string | null
+  paused_at: string | null
 }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
@@ -366,28 +366,28 @@ export default function ReportsClient({
     }
     // Without this, a client who signed up later still shows their full current retainer as
     // revenue in every earlier trend bucket too - flattening the whole trend to "today's roster,
-    // replayed backward." A range entirely after they churned is NOT excluded here (a charge
-    // billed after they left is still real revenue) - see clientChurnedBefore below instead,
+    // replayed backward." A range entirely after they were paused is NOT excluded here (a charge
+    // billed after they left is still real revenue) - see clientPausedBefore below instead,
     // which only zeroes the ongoing retainer/hourly portion.
     //
     // A Lead is also excluded - there's no signed contract yet, so any hours logged (discovery
     // calls, prospecting) are pre-sale by definition and have no retainer to be "over-servicing"
-    // relative to. Same convention mrrCentsTotal already uses for MRR (excludes Churned and Lead).
+    // relative to. Same convention mrrCentsTotal already uses for MRR (excludes Paused and Lead).
     return clients
       .filter((c) => clientExistedBy(c, rangeEnd) && getStage(c) !== 'Lead')
       .map((c) => {
         const clientEntries = rangeEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const isHourly = c.billing_mode === 'hourly'
-        const churnedByThisRange = clientChurnedBefore(c, rangeStart)
-        const baseRevenueCents = churnedByThisRange
+        const pausedByThisRange = clientPausedBefore(c, rangeStart)
+        const baseRevenueCents = pausedByThisRange
           ? 0
           : isHourly
             ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
             : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
         // Extra billables (client_charges) count as revenue same as the Revenue page - a client
         // with a one-off fee that period otherwise reads as less profitable than they actually
-        // are, and a final invoice charged after they churned is still real revenue.
+        // are, and a final invoice charged after they were paused is still real revenue.
         const chargesCents = chargesByClient.get(c.id) || 0
         const revenueCents = baseRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)

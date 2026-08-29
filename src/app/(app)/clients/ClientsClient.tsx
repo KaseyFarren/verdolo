@@ -37,7 +37,6 @@ import {
   HEALTH_LABEL,
   memberName,
   stageColor,
-  stageLabel,
   todayKey,
   type Currency,
 } from '@/lib/agency'
@@ -60,7 +59,7 @@ type Client = {
   hourly_rate_cents: number | null
   billing_day: number | null
   contract_ends: string | null
-  churned_at: string | null
+  paused_at: string | null
   last_contacted: string | null
   quick_note: string | null
   awaiting_reply: boolean
@@ -72,7 +71,7 @@ type Note = { id: string; client_id: string; text: string; created_at: string; a
 type CompletedTask = { id: string; client_id: string | null; title: string; completed_at: string; assigned_to: string | null }
 type AiMessage = { id: string; client_id: string | null; message: string | null; created_at: string; generated_by: string | null }
 type Member = { user_id: string; invited_email: string | null; display_name?: string | null; avatar_url?: string | null }
-type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'churned' }
+type HealthSnapshot = { client_id: string; snapshot_date: string; health: 'green' | 'amber' | 'red' | 'paused' }
 type ClientBurn = { hoursBudget: number; hoursLogged: number; percent: number; status: 'ok' | 'warn' | 'high' | 'over' }
 
 const STAGE_TOOLTIP = 'Pipeline stage - where this client sits in your funnel. Set manually, doesn’t change on its own.'
@@ -233,7 +232,7 @@ export default function ClientsClient({
       primary_contact_id: (form.owner as string) || null,
       added_date: today,
     }
-    const optimisticClient: Client = { ...insertRow, status: null, churned_at: null, last_contacted: null, quick_note: null, awaiting_reply: false }
+    const optimisticClient: Client = { ...insertRow, status: null, paused_at: null, last_contacted: null, quick_note: null, awaiting_reply: false }
     setClients((prev) => [...prev, optimisticClient].sort((a, b) => a.name.localeCompare(b.name)))
     setForm(emptyForm)
     setShowAdd(false)
@@ -341,7 +340,7 @@ export default function ClientsClient({
 
   if (selected) {
     const stage = getStage(selected)
-    const isChurned = stage === 'Churned'
+    const isPaused = stage === 'Paused'
     const health = clientHealthKey(selected, today)
     const dotColor = HEALTH_COLOR[health]
     const sColor = stageColor(stage)
@@ -415,10 +414,10 @@ export default function ClientsClient({
                       className="text-xs font-semibold rounded-full px-2 py-0.5"
                       style={{ color: sColor, background: `${sColor}22` }}
                     >
-                      {stageLabel(stage)}
+                      {stage}
                     </span>
                   </Tooltip>
-                  {!isChurned && (
+                  {!isPaused && (
                     <Tooltip content={HEALTH_TOOLTIP}>
                       <span
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded border px-2 py-0.5"
@@ -501,20 +500,20 @@ export default function ClientsClient({
                 <div className="flex gap-1.5 shrink-0 items-center">
                   <button
                     className={`text-xs rounded-lg px-2.5 py-1.5 font-medium border shadow-sm transition-colors inline-flex items-center gap-1 ${
-                      isChurned ? 'border-green/40 text-green hover:bg-green/10' : 'border-red-600/30 text-red-600 hover:bg-red-600/10'
+                      isPaused ? 'border-green/40 text-green hover:bg-green/10' : 'border-red-600/30 text-red-600 hover:bg-red-600/10'
                     }`}
                     onClick={() =>
                       updateClient(selected.id, {
-                        stage: isChurned ? 'Active' : 'Churned',
-                        status: isChurned ? 'active' : 'inactive',
+                        stage: isPaused ? 'Active' : 'Paused',
+                        status: isPaused ? 'active' : 'inactive',
                         // Revenue/Reports use this to stop counting retainer revenue from here
                         // on without touching retainer_cents itself, so past months (while this
                         // client was actually paying) stay accurate. Cleared on reactivation.
-                        churned_at: isChurned ? null : todayKey(),
+                        paused_at: isPaused ? null : todayKey(),
                       })
                     }
                   >
-                    {isChurned ? <><PlayIcon size={11} /> Activate</> : <><PauseIcon size={11} /> Pause</>}
+                    {isPaused ? <><PlayIcon size={11} /> Activate</> : <><PauseIcon size={11} /> Pause</>}
                   </button>
                   <button
                     className="text-xs rounded-lg px-2.5 py-1.5 font-medium border border-ink/15 text-ink hover:bg-sand shadow-sm inline-flex items-center gap-1"
@@ -784,7 +783,7 @@ export default function ClientsClient({
           <CustomSelect
             value={stageFilter}
             onChange={setStageFilter}
-            options={[{ value: '', label: 'All stages' }, ...STAGES.map((s) => ({ value: s, label: stageLabel(s) }))]}
+            options={[{ value: '', label: 'All stages' }, ...STAGES.map((s) => ({ value: s, label: s }))]}
             className="w-36"
           />
         </div>
@@ -817,10 +816,10 @@ export default function ClientsClient({
                     className="text-xs font-semibold rounded-full px-1.5 py-0.5"
                     style={{ color: stageColor(stage), background: `${stageColor(stage)}18` }}
                   >
-                    {stageLabel(stage)}
+                    {stage}
                   </span>
                 </Tooltip>
-                {stage !== 'Churned' && (
+                {stage !== 'Paused' && (
                   <Tooltip content={HEALTH_TOOLTIP}>
                     <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: dotColor }}>
                       <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
@@ -1005,7 +1004,7 @@ function ClientForm({
                 : { borderColor: 'rgba(255,255,255,0.15)', color: '#a3a3a3' }
             }
           >
-            {stageLabel(st)}
+            {st}
           </button>
         ))}
       </div>

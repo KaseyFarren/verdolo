@@ -51,7 +51,7 @@ export async function ensureAutoAndRecurringTasks(
 
   for (const date of dates) {
     for (const c of clients) {
-      if (getStage(c) === 'Churned') continue
+      if (getStage(c) === 'Paused') continue
       for (const d of defaultTemplates) {
         if (d.paused) continue
         defaultRows.push({

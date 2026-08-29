@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     .gt('retainer_cents', 0)
     .not('primary_contact_id', 'is', null)
 
-  const activeClients = (clients || []).filter((c) => getStage(c) !== 'Churned')
+  const activeClients = (clients || []).filter((c) => getStage(c) !== 'Paused')
   if (!activeClients.length) return NextResponse.json({ created: 0 })
 
   const orgIds = [...new Set(activeClients.map((c) => c.org_id))]

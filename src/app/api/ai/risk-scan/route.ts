@@ -48,7 +48,7 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
         admin.from('time_entries').select('client_id, started_at').eq('org_id', orgId).gte('started_at', `${fourteenDaysAgo}T00:00:00`),
       ])
 
-      const activeClients = (clients || []).filter((c) => getStage(c) !== 'Churned')
+      const activeClients = (clients || []).filter((c) => getStage(c) !== 'Paused')
 
       const signalsByClient = new Map<string, RiskSignals>()
       for (const c of activeClients) {
@@ -64,7 +64,6 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
           contactOverdueDays: health === 'red' ? overdueDays : null,
           contractEndsInDays: contractDays !== null && contractDays <= 30 ? contractDays : null,
           overdueTaskCount,
-          manuallyFlagged: getStage(c) === 'At Risk',
           stalled: !hasRecentActivity,
         }
 
@@ -72,7 +71,6 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
           signals.contactOverdueDays !== null ||
           signals.contractEndsInDays !== null ||
           signals.overdueTaskCount > 0 ||
-          signals.manuallyFlagged ||
           signals.stalled
 
         if (hasSignal) signalsByClient.set(c.id, signals)

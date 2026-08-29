@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const stage = getStage(c)
     const msgCount = (messages || []).filter((m) => m.client_id === c.id).length
     const done = (doneTasks || []).filter((t) => t.client_id === c.id).length
-    const health = stage === 'Churned' ? 'Churned' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
+    const health = stage === 'Paused' ? 'Paused' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
     return `- ${c.name} (${stage}): ${msgCount} msgs, ${done} tasks done, health: ${health}, last: ${c.last_contacted || 'never'}`
   })
 

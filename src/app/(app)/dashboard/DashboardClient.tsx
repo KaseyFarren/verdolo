@@ -77,7 +77,7 @@ type Member = { user_id: string; invited_email: string | null; display_name?: st
 type RiskClient = { clientId: string; name: string; riskLevel: 'high' | 'medium'; reason: string; action: string }
 type BurnAlert = { clientId: string; name: string; percent: number; status: 'ok' | 'warn' | 'high' | 'over' }
 
-const HEALTH_ORDER = ['green', 'amber', 'red', 'churned'] as const
+const HEALTH_ORDER = ['green', 'amber', 'red', 'paused'] as const
 const MotionLink = motion.create(Link)
 
 function formatHoursMins(seconds: number) {
@@ -220,17 +220,17 @@ export default function DashboardClient({
   const dashIsToday = dashDate === today
   const dashLabel = dashIsToday ? 'Today' : dashDate === yesterday ? 'Yesterday' : 'Tomorrow'
 
-  const activeClients = clients.filter((c) => getStage(c) !== 'Churned')
-  const pausedClients = clients.filter((c) => getStage(c) === 'Churned')
+  const activeClients = clients.filter((c) => getStage(c) !== 'Paused')
+  const pausedClients = clients.filter((c) => getStage(c) === 'Paused')
   // Header count is deliberately stricter than `activeClients` (which feeds check-in messaging
-  // below and just means "not paused") - Lead/Trial clients aren't active client relationships yet.
+  // below and just means "not paused") - Leads aren't active client relationships yet.
   const activeStageClients = clients.filter((c) => getStage(c) === 'Active')
   const thirtyDaysOut = getOffsetDate(30)
-  const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Churned')
+  const expiringContracts = clients.filter((c) => c.contract_ends && c.contract_ends <= thirtyDaysOut && c.contract_ends >= today && getStage(c) !== 'Paused')
 
-  // Same scope as the header count above - Lead/Trial clients aren't active relationships yet,
-  // so they shouldn't pad the "on track" bucket. At Risk/Active/Churned all still count.
-  const clientsForHealth = clients.filter((c) => !['Lead', 'Trial'].includes(getStage(c)))
+  // Same scope as the header count above - Leads aren't active relationships yet, so they
+  // shouldn't pad the "on track" bucket. Active/Paused both still count.
+  const clientsForHealth = clients.filter((c) => getStage(c) !== 'Lead')
   const clientHealth = HEALTH_ORDER.map((key) => ({
     key,
     count: clientsForHealth.filter((c) => clientHealthKey(c, today) === key).length,

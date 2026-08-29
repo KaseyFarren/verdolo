@@ -193,14 +193,12 @@ export type RiskSignals = {
   contactOverdueDays: number | null
   contractEndsInDays: number | null
   overdueTaskCount: number
-  manuallyFlagged: boolean
   stalled: boolean
 }
 
 export function buildRiskScanPrompt(clients: RiskSignals[]) {
   const lines = clients.map((c, i) => {
     const facts = [
-      c.manuallyFlagged ? 'manually marked At Risk' : '',
       c.contactOverdueDays !== null ? `${c.contactOverdueDays} day(s) overdue for a check-in` : '',
       c.contractEndsInDays !== null
         ? c.contractEndsInDays < 0

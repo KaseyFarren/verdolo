@@ -4,7 +4,7 @@ import { isAuthorizedCronRequest } from '@/lib/cronAuth'
 import { getStage, getOffsetDate, todayKey } from '@/lib/agency'
 
 // Runs daily (see vercel.json). Mirrors the Dashboard's "Contract expiring soon" banner window
-// (contract_ends within the next 30 days, not yet past, client not Churned) but turns it into an
+// (contract_ends within the next 30 days, not yet past, client not Paused) but turns it into an
 // actionable task assigned to the client's point of contact instead of a read-only banner.
 // due_date = contract_ends (not "today") so the unique constraint in migration 0068 dedupes
 // against the expiry cycle itself, not the day the cron happened to run - if the contract is
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     .gte('contract_ends', today)
 
   const rows = (clients || [])
-    .filter((c) => getStage(c) !== 'Churned')
+    .filter((c) => getStage(c) !== 'Paused')
     .map((c) => ({
       org_id: c.org_id,
       client_id: c.id,

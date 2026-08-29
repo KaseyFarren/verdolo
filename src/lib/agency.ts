@@ -1,17 +1,15 @@
 export const PLATFORMS = ['WhatsApp', 'Email', 'Instagram DM', 'Slack', 'SMS', 'Telegram', 'Other'] as const
 export const PRIORITY = ['High', 'Medium', 'Low'] as const
 export const TONES = ['Casual', 'Friendly', 'Professional', 'Motivational'] as const
-export const STAGES = ['Lead', 'Trial', 'Active', 'At Risk', 'Churned'] as const
+export const STAGES = ['Lead', 'Active', 'Paused'] as const
 export const AVATAR_COLORS = ['#1f3320', '#dd6b2c', '#e98a4f', '#5d6b5c', '#8a6a3c', '#6b8a6e']
 
 export type Stage = (typeof STAGES)[number]
 
 export function stageColor(stage: string) {
   if (stage === 'Lead') return '#c9973c'
-  if (stage === 'Trial') return '#cc9a3c'
   if (stage === 'Active') return '#2db87a'
-  if (stage === 'At Risk') return '#e05070'
-  if (stage === 'Churned') return '#5d6b5c'
+  if (stage === 'Paused') return '#5d6b5c'
   return '#2db87a'
 }
 
@@ -24,12 +22,7 @@ export function priorityColor(priority: string) {
 }
 
 export function getStage(client: { stage?: string | null; status?: string | null }): Stage {
-  return (client.stage as Stage) || (client.status === 'inactive' ? 'Churned' : 'Active')
-}
-
-/** Display-only relabel - the stored/compared value stays 'Churned', users just read "Paused". */
-export function stageLabel(stage: string) {
-  return stage === 'Churned' ? 'Paused' : stage
+  return (client.stage as Stage) || (client.status === 'inactive' ? 'Paused' : 'Active')
 }
 
 export function todayKey(d = new Date()) {
@@ -105,23 +98,23 @@ export function getHealthScore(lastContacted: string | null | undefined, today: 
 }
 
 /** How overdue a client is for contact - independent of `stage`, which is a manually-set
- * pipeline status (Lead/Trial/Active/At Risk/Churned) and says nothing about contact recency.
- * A client can be "At Risk" and contacted today, or "Active" and long overdue - this is the
- * other axis. Single source of truth so Dashboard/Reports/Clients render the same labels. */
-export type HealthKey = 'green' | 'amber' | 'red' | 'churned'
-export const HEALTH_LABEL: Record<HealthKey, string> = { green: 'On track', amber: 'Check in soon', red: 'Overdue', churned: 'Paused' }
-export const HEALTH_COLOR: Record<HealthKey, string> = { green: '#2db87a', amber: '#cc9a3c', red: '#e05070', churned: '#6060a0' }
+ * pipeline status (Lead/Active/Paused) and says nothing about contact recency. A client can be
+ * "Active" and long overdue - this is the other axis. Single source of truth so Dashboard/
+ * Reports/Clients render the same labels. */
+export type HealthKey = 'green' | 'amber' | 'red' | 'paused'
+export const HEALTH_LABEL: Record<HealthKey, string> = { green: 'On track', amber: 'Check in soon', red: 'Overdue', paused: 'Paused' }
+export const HEALTH_COLOR: Record<HealthKey, string> = { green: '#2db87a', amber: '#cc9a3c', red: '#e05070', paused: '#6060a0' }
 
 export function clientHealthKey(
   client: { stage?: string | null; status?: string | null; last_contacted?: string | null; cadence_days?: number | null },
   today: string,
 ): HealthKey {
-  return getStage(client) === 'Churned' ? 'churned' : getHealthScore(client.last_contacted, today, client.cadence_days || 7)
+  return getStage(client) === 'Paused' ? 'paused' : getHealthScore(client.last_contacted, today, client.cadence_days || 7)
 }
 
 export function mrrCentsTotal(clients: { stage?: string | null; status?: string | null; retainer_cents?: number | null }[]) {
   return clients
-    .filter((c) => !['Churned', 'Lead'].includes(getStage(c)))
+    .filter((c) => !['Paused', 'Lead'].includes(getStage(c)))
     .reduce((sum, c) => sum + (Number(c.retainer_cents) || 0), 0)
 }
 

@@ -1,6 +1,6 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
 import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { billingCycleProgress, clientChurnedBefore, smoothedRetainerRevenueCents } from '@/lib/period'
+import { billingCycleProgress, clientPausedBefore, smoothedRetainerRevenueCents } from '@/lib/period'
 import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import { weekStats } from '@/lib/stats'
 import DashboardClient from './DashboardClient'
@@ -15,7 +15,7 @@ function estimateMonthRevenueCents(
     retainer_cents: number | null
     billing_mode: string | null
     hourly_rate_cents: number | null
-    churned_at?: string | null
+    paused_at?: string | null
   }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
   monthStart: string,
@@ -23,9 +23,9 @@ function estimateMonthRevenueCents(
 ) {
   let total = 0
   for (const c of billingClients) {
-    // A client who churned before this month started isn't billing it - same churned_at cutoff
+    // A client who was paused before this month started isn't billing it - same paused_at cutoff
     // as Reports' profitabilityForMonth, so the two don't disagree on the same client/month.
-    if (clientChurnedBefore(c, monthStart)) continue
+    if (clientPausedBefore(c, monthStart)) continue
     const clientEntries = entries.filter((e) => e.client_id === c.id)
     const isHourly = c.billing_mode === 'hourly'
     total += isHourly
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
     // billing rows entirely for members rather than fetching-then-hiding, since retainer/hourly
     // rate cents must never reach a non-admin session's RSC payload (see stripBillingInfo).
     isAdmin
-      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, churned_at').eq('org_id', orgId)
+      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, paused_at').eq('org_id', orgId)
       : Promise.resolve({ data: [] }),
     isAdmin
       ? supabase

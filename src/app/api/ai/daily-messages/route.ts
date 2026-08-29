@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   const { data: clients } = await supabase.from('clients').select('*').eq('org_id', orgId)
-  const active = (clients || []).filter((c) => getStage(c) !== 'Churned')
+  const active = (clients || []).filter((c) => getStage(c) !== 'Paused')
   if (!active.length) return NextResponse.json({ messages: [] })
 
   const today = todayKey()
