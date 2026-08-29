@@ -58,7 +58,7 @@ function getCachedReportsData(orgId: string, keyParts: string[]) {
       ] = await Promise.all([
         supabase
           .from('clients')
-          .select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status, last_contacted, cadence_days')
+          .select('id, name, retainer_cents, billing_mode, hourly_rate_cents, billing_day, stage, status, last_contacted, cadence_days, added_date')
           .eq('org_id', orgId)
           .order('name'),
         supabase

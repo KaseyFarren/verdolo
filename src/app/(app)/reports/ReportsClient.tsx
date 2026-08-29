@@ -41,6 +41,7 @@ type Client = {
   status: string | null
   last_contacted: string | null
   cadence_days: number | null
+  added_date: string | null
 }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
@@ -335,7 +336,12 @@ export default function ReportsClient({
   // by trendBuckets (run once per bucket in the trailing window).
   function profitabilityForMonth(monthKey: string) {
     const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
+    // Without this, a client who signed up last month still shows their full current retainer
+    // as revenue in every earlier trend month too (monthElapsedFraction treats any past month as
+    // 100% elapsed with no idea the client didn't exist yet) - flattening the whole trend to
+    // "today's roster, replayed backward."
     return clients
+      .filter((c) => !c.added_date || c.added_date.slice(0, 7) <= monthKey)
       .map((c) => {
         const clientEntries = monthEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
@@ -382,7 +388,10 @@ export default function ReportsClient({
     const weekEnd = addDays(weekStart, 7)
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
     const weeklyRetainerFraction = weeklyRetainerShare(weekStart) * weekElapsedFraction(weekStart)
+    // Same reasoning as profitabilityForMonth - exclude a client from weeks entirely before
+    // they were added.
     return clients
+      .filter((c) => !c.added_date || c.added_date < weekEnd)
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
