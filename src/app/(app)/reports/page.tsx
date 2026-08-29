@@ -55,6 +55,7 @@ function getCachedReportsData(orgId: string, keyParts: string[]) {
         { data: openTasks },
         { data: weekTimeEntries },
         { data: monthTimeEntries },
+        { data: monthClientCharges },
       ] = await Promise.all([
         supabase
           .from('clients')
@@ -96,9 +97,15 @@ function getCachedReportsData(orgId: string, keyParts: string[]) {
           .not('duration_seconds', 'is', null)
           .gte('started_at', keyParts[4])
           .lt('started_at', keyParts[5]),
+        supabase
+          .from('client_charges')
+          .select('client_id, amount_cents, charged_on')
+          .eq('org_id', orgId)
+          .gte('charged_on', keyParts[4])
+          .lt('charged_on', keyParts[5]),
       ])
 
-      return { clients, tasks, entries, members, reports, openTasks, weekTimeEntries, monthTimeEntries }
+      return { clients, tasks, entries, members, reports, openTasks, weekTimeEntries, monthTimeEntries, monthClientCharges }
     },
     ['reports', orgId, ...keyParts],
     { revalidate: 60, tags: [`reports:${orgId}`] }
@@ -133,7 +140,7 @@ export default async function ReportsPage({
   const pMonth = /^\d{4}-\d{2}$/.test(pMonthParam ?? '') ? (pMonthParam as string) : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const { start: trendStart, end: trendEnd, monthKeys } = trendWindow(pMonth)
 
-  const { clients, tasks, entries, members, reports, openTasks, weekTimeEntries, monthTimeEntries } = await getCachedReportsData(
+  const { clients, tasks, entries, members, reports, openTasks, weekTimeEntries, monthTimeEntries, monthClientCharges } = await getCachedReportsData(
     orgId,
     [start, end, weekAnchor, weekEnd, trendStart, trendEnd]
   )
@@ -152,6 +159,7 @@ export default async function ReportsPage({
       openTasks={openTasks ?? []}
       weekTimeEntries={weekTimeEntries ?? []}
       monthTimeEntries={monthTimeEntries ?? []}
+      monthClientCharges={monthClientCharges ?? []}
       targetRateCents={org?.settings?.hourly_cost_cents ?? 0}
       pMonth={pMonth}
       trendMonthKeys={monthKeys}

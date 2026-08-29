@@ -48,6 +48,7 @@ type OpenTask = { id: string; assigned_to: string | null }
 type TimeEntry = { client_id: string | null; user_id: string; duration_seconds: number | null }
 type WeekTimeEntry = { user_id: string; duration_seconds: number | null }
 type MonthTimeEntry = { client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
+type ClientCharge = { client_id: string; amount_cents: number; charged_on: string }
 type Member = {
   user_id: string
   invited_email: string | null
@@ -124,6 +125,7 @@ export default function ReportsClient({
   openTasks,
   weekTimeEntries,
   monthTimeEntries,
+  monthClientCharges,
   targetRateCents,
   pMonth,
   trendMonthKeys,
@@ -141,6 +143,7 @@ export default function ReportsClient({
   openTasks: OpenTask[]
   weekTimeEntries: WeekTimeEntry[]
   monthTimeEntries: MonthTimeEntry[]
+  monthClientCharges: ClientCharge[]
   targetRateCents: number
   pMonth: string
   trendMonthKeys: string[]
@@ -354,9 +357,15 @@ export default function ReportsClient({
         // renewal-date precision elsewhere (dashboard, Revenue page) where that IS the thing
         // being measured; here it's only an estimate to compare against calendar-month hours.
         const retainerFraction = monthElapsedFraction(monthKey)
-        const revenueCents = isHourly
+        const baseRevenueCents = isHourly
           ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
           : Math.round((c.retainer_cents || 0) * retainerFraction)
+        // Extra billables (client_charges) count as revenue same as the Revenue page - a client
+        // with a one-off fee that month otherwise reads as less profitable than they actually are.
+        const chargesCents = monthClientCharges
+          .filter((ch) => ch.client_id === c.id && ch.charged_on.slice(0, 7) === monthKey)
+          .reduce((s, ch) => s + ch.amount_cents, 0)
+        const revenueCents = baseRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
         // Hourly clients used to be excluded here on the theory that their rate is tautologically
         // their contracted hourly_rate_cents - but `hours` is ALL logged hours while `revenueCents`
@@ -400,8 +409,15 @@ export default function ReportsClient({
           (clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0),
         )
         const billingLumpCents = isHourly ? 0 : billingDatesInRange(c.billing_day || 1, weekStart, weekEnd).length * (c.retainer_cents || 0)
-        const revenueCents = isHourly ? hourlyEstimateCents : billingLumpCents
-        const rateRevenueCents = isHourly ? revenueCents : Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
+        // Same reasoning as profitabilityForMonth - extra billables count as revenue here too,
+        // both for the $ figure and the effective-rate proxy (matching the Revenue page).
+        const chargesCents = monthClientCharges
+          .filter((ch) => ch.client_id === c.id && ch.charged_on >= weekStart && ch.charged_on < weekEnd)
+          .reduce((s, ch) => s + ch.amount_cents, 0)
+        const baseRevenueCents = isHourly ? hourlyEstimateCents : billingLumpCents
+        const revenueCents = baseRevenueCents + chargesCents
+        const baseRateRevenueCents = isHourly ? hourlyEstimateCents : Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
+        const rateRevenueCents = baseRateRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null
         return {
@@ -422,7 +438,7 @@ export default function ReportsClient({
 
   const profitability = useMemo(
     () => profitabilityForMonth(pMonth),
-    [clients, monthTimeEntries, targetRateCents, pMonth],
+    [clients, monthTimeEntries, monthClientCharges, targetRateCents, pMonth],
   )
 
   const [trendGranularity, setTrendGranularity] = useState<TrendGranularity>('month')
@@ -474,7 +490,7 @@ export default function ReportsClient({
         hasData: effectiveRate(totalRateRevenueCents, totalHours) !== null,
       }
     })
-  }, [trendGranularity, monthCount, weekCount, trendMonthKeys, clients, monthTimeEntries, targetRateCents, pMonth, weekAnchor])
+  }, [trendGranularity, monthCount, weekCount, trendMonthKeys, clients, monthTimeEntries, monthClientCharges, targetRateCents, pMonth, weekAnchor])
 
   function onMonthChange(next: string) {
     router.push(`/reports?pMonth=${next}`)
