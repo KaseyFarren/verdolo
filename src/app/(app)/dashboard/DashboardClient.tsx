@@ -193,6 +193,7 @@ export default function DashboardClient({
   const [analyzingRisk, setAnalyzingRisk] = useState(false)
   const [riskResults, setRiskResults] = useState<RiskClient[] | null>(null)
   const [riskGeneratedAt, setRiskGeneratedAt] = useState<string | null>(null)
+  const [statsTab, setStatsTab] = useState('team')
 
   const [note, setNote] = useState(initialNote)
   const [noteSaved, setNoteSaved] = useState(true)
@@ -515,12 +516,14 @@ export default function DashboardClient({
 
   const msgTasksDone = activeClients.filter((c) => isSentToday(c.id)).length
 
-  const rawStatBlocks: ({ key: string; node: React.ReactNode } | null)[] = [
+  // Passive context, not action items - grouped as tabs so they take up one card's worth of
+  // space instead of one card each competing for attention alongside "Needs attention"/revenue.
+  const rawStatsTabs: ({ key: string; label: string; node: React.ReactNode } | null)[] = [
     {
       key: 'team',
+      label: isAdmin ? 'Team today' : 'My time today',
       node: (
         <>
-          <div className="text-sm font-medium text-ink/60 uppercase tracking-wide mb-2">{isAdmin ? 'Team today' : 'My time today'}</div>
           {teamToday.length === 0 ? (
             <div className="text-sm text-sage">No time logged yet today.</div>
           ) : (
@@ -536,16 +539,16 @@ export default function DashboardClient({
     },
     {
       key: 'yourWeek',
+      label: 'Your week',
       node: (
         <>
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">Your week</div>
-            {yourWeekStats.streakDays > 0 && (
+          {yourWeekStats.streakDays > 0 && (
+            <div className="flex justify-end mb-1">
               <span className="inline-flex items-center gap-1 text-xs font-medium text-ink">
                 <TrophyIcon size={14} className="shrink-0" /> {yourWeekStats.streakDays} day streak
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <div className="flex justify-between items-center py-1 text-sm">
             <span className="text-ink">Tasks completed</span>
             <span className="font-medium text-ink">{yourWeekStats.tasksCompleted}</span>
@@ -568,9 +571,9 @@ export default function DashboardClient({
     isAdmin && (topHoursLabel || topTasksLabel)
       ? {
           key: 'week',
+          label: 'This week',
           node: (
             <>
-              <div className="text-sm font-medium text-ink/60 uppercase tracking-wide mb-2">This week</div>
               {topHoursLabel && (
                 <div className="flex justify-between items-start gap-2 py-1 text-sm">
                   <span className="text-ink min-w-0 pr-2 inline-flex items-center gap-1.5">
@@ -591,118 +594,11 @@ export default function DashboardClient({
           ),
         }
       : null,
-    isAdmin
-      ? {
-          key: 'revenue',
-          node: (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide">Revenue</div>
-                <MotionLink {...BUTTON_MOTION} href="/revenue" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
-                  See more
-                </MotionLink>
-              </div>
-              <div className="flex gap-6">
-                <div>
-                  <div className="text-xs text-sage mb-0.5">This month</div>
-                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(monthRevenueCents)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-sage mb-0.5">MRR</div>
-                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
-                </div>
-              </div>
-            </>
-          ),
-        }
-      : null,
-    isAdmin && burnAlerts.length > 0
-      ? {
-          key: 'burn',
-          node: (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
-                  Retainer burn
-                  <InfoTooltip content="Hours logged this billing cycle vs. the hours each retainer supports, at your target hourly rate (Settings → General) unless a client has an explicit included-hours figure." />
-                </div>
-                <MotionLink {...BUTTON_MOTION} href="/revenue" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
-                  See more
-                </MotionLink>
-              </div>
-              <div className="flex flex-col gap-1">
-                {burnAlerts.slice(0, 4).map((b) => (
-                  <div key={b.clientId} className="flex justify-between items-center py-1 text-sm">
-                    <span className="text-ink">{b.name}</span>
-                    <span className="font-medium" style={{ color: b.status === 'over' ? '#e05070' : '#cc9a3c' }}>
-                      {Math.round(b.percent)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ),
-        }
-      : null,
-    isAdmin
-      ? {
-          key: 'risk',
-          node: (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
-                  At risk
-                  <InfoTooltip content="AI-ranked clients with a warning sign - overdue contact, an expiring contract, overdue tasks, or no recent activity." />
-                </div>
-                <Button variant="ghost" size="sm" onClick={analyzeRisk} disabled={analyzingRisk} className="!px-0">
-                  {analyzingRisk ? 'Analyzing…' : riskResults === null ? 'Analyze risk' : 'Re-analyze'}
-                </Button>
-              </div>
-              {riskGeneratedAt && (
-                <div className="text-xs text-sage/70 mb-2">
-                  As of {formatNoteTime(riskGeneratedAt)} - refreshes automatically after a few hours
-                </div>
-              )}
-              {riskResults === null ? (
-                <div className="text-sm text-sage">Not analyzed yet.</div>
-              ) : riskResults.length === 0 ? (
-                <div className="text-sm text-sage">No clients need attention right now.</div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {riskResults.map((r) => (
-                    <div key={r.clientId} className="rounded-lg border border-ink/10 p-2.5">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-sm font-medium text-ink">{r.name}</span>
-                        <span
-                          className="text-xs rounded-full px-2 py-0.5 font-medium shrink-0"
-                          style={{ color: r.riskLevel === 'high' ? '#e05070' : '#cc9a3c', background: r.riskLevel === 'high' ? '#e0507015' : '#cc9a3c15' }}
-                        >
-                          {r.riskLevel === 'high' ? 'High risk' : 'Medium risk'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-sage">{r.reason}</div>
-                      <div className="text-xs text-sage mt-1">→ {r.action}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          ),
-        }
-      : null,
     {
       key: 'health',
+      label: 'Client health',
       node: (
         <>
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
-              Client health
-              <InfoTooltip content="How overdue each client is for a check-in, based on last contact vs. their cadence - separate from pipeline stage (Lead/Trial/Active/etc.)." />
-            </div>
-            <MotionLink {...BUTTON_MOTION} href="/clients" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink">
-              See more
-            </MotionLink>
-          </div>
           {clientHealth.length === 0 ? (
             <div className="text-sm text-sage">No clients yet.</div>
           ) : (
@@ -724,7 +620,13 @@ export default function DashboardClient({
       ),
     },
   ]
-  const statBlocks = rawStatBlocks.filter((block): block is { key: string; node: React.ReactNode } => block !== null)
+  const statsTabs = rawStatsTabs.filter((tab): tab is { key: string; label: string; node: React.ReactNode } => tab !== null)
+  const activeStatsTab = statsTabs.some((t) => t.key === statsTab) ? statsTab : statsTabs[0]?.key
+
+  // Everything that actually demands action today, ranked ahead of the passive stats above -
+  // contract expiry applies to everyone, burn/AI risk are admin-only (same gating as before).
+  const hasAttentionItems = expiringContracts.length > 0 || (isAdmin && burnAlerts.length > 0) || (isAdmin && !!riskResults?.length)
+  const showAttentionCard = expiringContracts.length > 0 || isAdmin
 
   return (
     <div>
@@ -763,30 +665,16 @@ export default function DashboardClient({
         ))}
       </div>
 
-      {(expiringContracts.length > 0 || burnAlerts.length > 0 || (dashIsToday && isAdmin)) && (
-        <div className="flex flex-col gap-2 mb-6 text-sm">
-          {expiringContracts.length > 0 && (
-            <span className="text-amber-700">
-              Contract{expiringContracts.length !== 1 ? 's' : ''} expiring soon: {expiringContracts.map((c) => `${c.name} (${formatDate(c.contract_ends)})`).join(', ')}
-            </span>
-          )}
-          {burnAlerts.length > 0 && (
-            <span className="text-amber-700">
-              {burnAlerts.length} client{burnAlerts.length !== 1 ? 's' : ''} over 75% of retainer hours this cycle:{' '}
-              {burnAlerts.map((b) => `${b.name} (${Math.round(b.percent)}%)`).join(', ')}
-            </span>
-          )}
-          {dashIsToday && isAdmin && (
-            <MotionLink
-              {...BUTTON_MOTION}
-              href="/reports"
-              className="inline-flex items-center gap-1.5 w-fit rounded-full border border-sage/15 bg-sage/8 pl-2.5 pr-3 py-1.5 text-xs font-medium text-sage hover:text-ink hover:bg-sage/12 transition-colors"
-            >
-              <BarChartIcon size={12} className="shrink-0" />
-              {hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'}
-             
-            </MotionLink>
-          )}
+      {dashIsToday && isAdmin && (
+        <div className="mb-6">
+          <MotionLink
+            {...BUTTON_MOTION}
+            href="/reports"
+            className="inline-flex items-center gap-1.5 w-fit rounded-full border border-sage/15 bg-sage/8 pl-2.5 pr-3 py-1.5 text-xs font-medium text-sage hover:text-ink hover:bg-sage/12 transition-colors"
+          >
+            <BarChartIcon size={12} className="shrink-0" />
+            {hasRecapThisWeek ? "This week's recap" : 'No recap yet this week'}
+          </MotionLink>
         </div>
       )}
 
@@ -934,18 +822,104 @@ export default function DashboardClient({
         </Card>
 
         <div className="flex flex-col gap-4">
-          <div className="@container">
-            <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
-              {statBlocks.map((block, i) => {
-                const isOddOut = statBlocks.length % 2 === 1 && i === statBlocks.length - 1
-                return (
-                  <Card key={block.key} className={isOddOut ? '@lg:col-span-2' : ''}>
-                    {block.node}
-                  </Card>
-                )
-              })}
+          {showAttentionCard && (
+            <Card>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-ink/60 uppercase tracking-wide flex items-center">
+                  Needs attention
+                  <InfoTooltip content="Contracts expiring soon, retainers running over their hours, and AI-ranked at-risk clients - the things worth checking before anything else." />
+                </div>
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" onClick={analyzeRisk} disabled={analyzingRisk} className="!px-0">
+                    {analyzingRisk ? 'Analyzing…' : riskResults === null ? 'Analyze risk' : 'Re-analyze'}
+                  </Button>
+                )}
+              </div>
+
+              {!hasAttentionItems && (
+                <div className="text-sm text-sage">{isAdmin && riskResults === null ? 'Not analyzed yet.' : 'Nothing needs attention right now.'}</div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {expiringContracts.map((c) => (
+                  <div key={`contract-${c.id}`} className="flex justify-between items-center gap-2 py-1 text-sm">
+                    <span className="text-ink">
+                      {c.name} - contract renews {formatDate(c.contract_ends)}
+                    </span>
+                    <span className="text-xs rounded-full px-2 py-0.5 font-medium shrink-0" style={{ color: '#cc9a3c', background: '#cc9a3c15' }}>
+                      Expiring
+                    </span>
+                  </div>
+                ))}
+                {isAdmin &&
+                  burnAlerts.map((b) => (
+                    <div key={`burn-${b.clientId}`} className="flex justify-between items-center gap-2 py-1 text-sm">
+                      <span className="text-ink">{b.name} - retainer burn</span>
+                      <span className="font-medium shrink-0" style={{ color: b.status === 'over' ? '#e05070' : '#cc9a3c' }}>
+                        {Math.round(b.percent)}%
+                      </span>
+                    </div>
+                  ))}
+                {isAdmin &&
+                  riskResults?.map((r) => (
+                    <div key={`risk-${r.clientId}`} className="rounded-lg border border-ink/10 p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-sm font-medium text-ink">{r.name}</span>
+                        <span
+                          className="text-xs rounded-full px-2 py-0.5 font-medium shrink-0"
+                          style={{ color: r.riskLevel === 'high' ? '#e05070' : '#cc9a3c', background: r.riskLevel === 'high' ? '#e0507015' : '#cc9a3c15' }}
+                        >
+                          {r.riskLevel === 'high' ? 'High risk' : 'Medium risk'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-sage">{r.reason}</div>
+                      <div className="text-xs text-sage mt-1">→ {r.action}</div>
+                    </div>
+                  ))}
+              </div>
+
+              {isAdmin && riskGeneratedAt && (
+                <div className="text-xs text-sage/70 mt-2">As of {formatNoteTime(riskGeneratedAt)} - refreshes automatically after a few hours</div>
+              )}
+            </Card>
+          )}
+
+          {isAdmin && (
+            <Card className="flex items-center justify-between">
+              <div className="flex gap-8">
+                <div>
+                  <div className="text-xs text-sage mb-0.5">This month</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(monthRevenueCents)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-sage mb-0.5">MRR</div>
+                  <div className="text-xl font-heading font-bold text-ink">{fmtMoney(mrrCents)}</div>
+                </div>
+              </div>
+              <MotionLink {...BUTTON_MOTION} href="/revenue" className="inline-flex items-center gap-0.5 text-xs font-medium text-sage hover:text-ink shrink-0">
+                See more
+              </MotionLink>
+            </Card>
+          )}
+
+          {statsTabs.length > 0 && (
+            <div className="rounded-2xl bg-sand/60 border border-ink/8 overflow-hidden">
+              <div className="flex gap-1 flex-wrap p-2">
+                {statsTabs.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setStatsTab(t.key)}
+                    className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                      activeStatsTab === t.key ? 'bg-white text-ink shadow-md' : 'text-sage hover:text-ink'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl mx-1.5 mb-1.5 p-4">{statsTabs.find((t) => t.key === activeStatsTab)?.node}</div>
             </div>
-          </div>
+          )}
 
           <Card className="flex flex-col flex-1 min-h-[160px]">
             <div className="flex items-center justify-between mb-2">
