@@ -25,7 +25,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
     await Promise.all([
       supabase
         .from('clients')
-        .select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status')
+        .select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, added_date, churned_at')
         .eq('org_id', orgId)
         .order('name'),
       supabase

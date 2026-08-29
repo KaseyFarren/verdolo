@@ -1,5 +1,5 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { getOffsetDate, getStage, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
 import { billingCycleElapsedFraction, billingCycleProgress } from '@/lib/period'
 import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import { weekStats } from '@/lib/stats'
@@ -10,11 +10,22 @@ import DashboardClient from './DashboardClient'
 // Kept server-side only: billing rows (retainer_cents, hourly_rate_cents) never reach the
 // client bundle for non-admin sessions.
 function estimateMonthRevenueCents(
-  billingClients: { id: string; retainer_cents: number | null; billing_mode: string | null; hourly_rate_cents: number | null; billing_day: number | null }[],
+  billingClients: {
+    id: string
+    retainer_cents: number | null
+    billing_mode: string | null
+    hourly_rate_cents: number | null
+    billing_day: number | null
+    stage?: string | null
+    status?: string | null
+  }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
 ) {
   let total = 0
-  for (const c of billingClients) {
+  // Same reasoning as mrrCentsTotal - a Churned client isn't billing this month regardless of
+  // what its retainer_cents still says, which now reflects what they paid while active rather
+  // than 0 (see churned_at).
+  for (const c of billingClients.filter((c) => getStage(c) !== 'Churned')) {
     const clientEntries = entries.filter((e) => e.client_id === c.id)
     const isHourly = c.billing_mode === 'hourly'
     total += isHourly

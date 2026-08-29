@@ -42,6 +42,7 @@ type Client = {
   last_contacted: string | null
   cadence_days: number | null
   added_date: string | null
+  churned_at: string | null
 }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
@@ -343,8 +344,12 @@ export default function ReportsClient({
     // as revenue in every earlier trend month too (monthElapsedFraction treats any past month as
     // 100% elapsed with no idea the client didn't exist yet) - flattening the whole trend to
     // "today's roster, replayed backward."
+    // A month entirely after a client's churned_at is also excluded - their retainer_cents
+    // reflects what they paid while active, not $0, so without this every month after they left
+    // would phantom-bill their old retainer again. Months up to and including the one they
+    // churned in still count - that revenue and those hours were real.
     return clients
-      .filter((c) => !c.added_date || c.added_date.slice(0, 7) <= monthKey)
+      .filter((c) => (!c.added_date || c.added_date.slice(0, 7) <= monthKey) && (!c.churned_at || monthKey <= c.churned_at.slice(0, 7)))
       .map((c) => {
         const clientEntries = monthEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
@@ -398,9 +403,9 @@ export default function ReportsClient({
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
     const weeklyRetainerFraction = weeklyRetainerShare(weekStart) * weekElapsedFraction(weekStart)
     // Same reasoning as profitabilityForMonth - exclude a client from weeks entirely before
-    // they were added.
+    // they were added, or entirely after the week they churned in.
     return clients
-      .filter((c) => !c.added_date || c.added_date < weekEnd)
+      .filter((c) => (!c.added_date || c.added_date < weekEnd) && (!c.churned_at || weekStart <= c.churned_at))
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600

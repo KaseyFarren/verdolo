@@ -38,6 +38,8 @@ type Client = {
   billing_day: number | null
   stage: string | null
   status: string | null
+  added_date: string | null
+  churned_at: string | null
 }
 type Charge = { id: string; client_id: string; description: string; amount_cents: number; charged_on: string }
 type Entry = { id: string; user_id: string; client_id: string | null; duration_seconds: number | null; started_at: string; billable: boolean }
@@ -273,7 +275,11 @@ export default function RevenueClient({
     const rangeMonthDays = rangeStart ? new Date(Number(rangeStart.slice(0, 4)), Number(rangeStart.slice(5, 7)), 0).getDate() : 30
     const smoothedRetainerFraction = rangeMonthDays > 0 ? rangeDays / rangeMonthDays : 0
 
+    // Exclude a client from a range that falls entirely before they were added or entirely
+    // after they churned - otherwise a custom/past range would still show their current
+    // retainer as if it always applied, same fix as Reports' profitabilityForMonth/Week.
     return clientsState
+      .filter((c) => (!c.added_date || !rangeEnd || c.added_date < rangeEnd) && (!c.churned_at || !rangeStart || c.churned_at >= rangeStart))
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'

@@ -60,6 +60,7 @@ type Client = {
   hourly_rate_cents: number | null
   billing_day: number | null
   contract_ends: string | null
+  churned_at: string | null
   last_contacted: string | null
   quick_note: string | null
   awaiting_reply: boolean
@@ -232,7 +233,7 @@ export default function ClientsClient({
       primary_contact_id: (form.owner as string) || null,
       added_date: today,
     }
-    const optimisticClient: Client = { ...insertRow, status: null, last_contacted: null, quick_note: null, awaiting_reply: false }
+    const optimisticClient: Client = { ...insertRow, status: null, churned_at: null, last_contacted: null, quick_note: null, awaiting_reply: false }
     setClients((prev) => [...prev, optimisticClient].sort((a, b) => a.name.localeCompare(b.name)))
     setForm(emptyForm)
     setShowAdd(false)
@@ -502,7 +503,16 @@ export default function ClientsClient({
                     className={`text-xs rounded-lg px-2.5 py-1.5 font-medium border shadow-sm transition-colors inline-flex items-center gap-1 ${
                       isChurned ? 'border-green/40 text-green hover:bg-green/10' : 'border-red-600/30 text-red-600 hover:bg-red-600/10'
                     }`}
-                    onClick={() => updateClient(selected.id, { stage: isChurned ? 'Active' : 'Churned', status: isChurned ? 'active' : 'inactive' })}
+                    onClick={() =>
+                      updateClient(selected.id, {
+                        stage: isChurned ? 'Active' : 'Churned',
+                        status: isChurned ? 'active' : 'inactive',
+                        // Revenue/Reports use this to stop counting retainer revenue from here
+                        // on without touching retainer_cents itself, so past months (while this
+                        // client was actually paying) stay accurate. Cleared on reactivation.
+                        churned_at: isChurned ? null : todayKey(),
+                      })
+                    }
                   >
                     {isChurned ? <><PlayIcon size={11} /> Activate</> : <><PauseIcon size={11} /> Pause</>}
                   </button>
