@@ -1,6 +1,6 @@
 import { isAdminRole, requireOrgContext } from '@/lib/org'
-import { getOffsetDate, getStage, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
-import { billingCycleElapsedFraction, billingCycleProgress } from '@/lib/period'
+import { getOffsetDate, getWeekAnchor, mrrCentsTotal, todayKey } from '@/lib/agency'
+import { billingCycleElapsedFraction, billingCycleProgress, clientChurnedBefore } from '@/lib/period'
 import { computeClientBurn, type ClientBurn } from '@/lib/burn'
 import { weekStats } from '@/lib/stats'
 import DashboardClient from './DashboardClient'
@@ -16,16 +16,16 @@ function estimateMonthRevenueCents(
     billing_mode: string | null
     hourly_rate_cents: number | null
     billing_day: number | null
-    stage?: string | null
-    status?: string | null
+    churned_at?: string | null
   }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
+  monthStart: string,
 ) {
   let total = 0
-  // Same reasoning as mrrCentsTotal - a Churned client isn't billing this month regardless of
-  // what its retainer_cents still says, which now reflects what they paid while active rather
-  // than 0 (see churned_at).
-  for (const c of billingClients.filter((c) => getStage(c) !== 'Churned')) {
+  for (const c of billingClients) {
+    // A client who churned before this month started isn't billing it - same churned_at cutoff
+    // as Reports' profitabilityForMonth, so the two don't disagree on the same client/month.
+    if (clientChurnedBefore(c, monthStart)) continue
     const clientEntries = entries.filter((e) => e.client_id === c.id)
     const isHourly = c.billing_mode === 'hourly'
     total += isHourly
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
     // billing rows entirely for members rather than fetching-then-hiding, since retainer/hourly
     // rate cents must never reach a non-admin session's RSC payload (see stripBillingInfo).
     isAdmin
-      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status').eq('org_id', orgId)
+      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, churned_at').eq('org_id', orgId)
       : Promise.resolve({ data: [] }),
     isAdmin
       ? supabase
@@ -207,7 +207,7 @@ export default async function DashboardPage() {
       .lt('created_at', `${tomorrow}T00:00:00`),
   ])
 
-  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? []) : 0
+  const monthRevenueCents = isAdmin ? estimateMonthRevenueCents(billingClients ?? [], monthEntries ?? [], monthStart) : 0
   const mrrCents = isAdmin ? mrrCentsTotal(billingClients ?? []) : 0
   const targetRateCents = org?.settings?.hourly_cost_cents ?? 0
   const burnAlerts = isAdmin ? clientsOverBudget(billingClients ?? [], cycleEntries ?? [], targetRateCents) : []

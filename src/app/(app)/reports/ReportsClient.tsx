@@ -16,7 +16,19 @@ import {
   currencySymbol,
   type Currency,
 } from '@/lib/agency'
-import { monthElapsedFraction, billingDatesInRange, weekElapsedFraction, weeklyRetainerShare, addDays, periodBounds, type Period, type PeriodValue } from '@/lib/period'
+import {
+  monthElapsedFraction,
+  billingDatesInRange,
+  weekElapsedFraction,
+  weeklyRetainerShare,
+  monthKeyRange,
+  clientExistedBy,
+  clientChurnedBefore,
+  addDays,
+  periodBounds,
+  type Period,
+  type PeriodValue,
+} from '@/lib/period'
 import BarChart from '@/components/charts/BarChart'
 import Card from '@/components/ui/Card'
 import DatePicker from '@/components/ui/DatePicker'
@@ -339,17 +351,20 @@ export default function ReportsClient({
   // without pretending to know a real P&L. Shared by the selected-month breakdown below and
   // by trendBuckets (run once per bucket in the trailing window).
   function profitabilityForMonth(monthKey: string) {
+    const { start: monthStart, end: monthEnd } = monthKeyRange(monthKey)
     const monthEntries = monthTimeEntries.filter((e) => e.started_at.slice(0, 7) === monthKey)
+    // Grouped once per call instead of re-filtering the full charges array per client - this
+    // runs once per trend bucket (up to 12 months), same pattern as chargesByClient on Revenue.
+    const chargesByClient = new Map<string, number>()
+    for (const ch of monthClientCharges) {
+      if (ch.charged_on >= monthStart && ch.charged_on < monthEnd) chargesByClient.set(ch.client_id, (chargesByClient.get(ch.client_id) || 0) + ch.amount_cents)
+    }
     // Without this, a client who signed up last month still shows their full current retainer
     // as revenue in every earlier trend month too (monthElapsedFraction treats any past month as
     // 100% elapsed with no idea the client didn't exist yet) - flattening the whole trend to
     // "today's roster, replayed backward."
-    // A month entirely after a client's churned_at is also excluded - their retainer_cents
-    // reflects what they paid while active, not $0, so without this every month after they left
-    // would phantom-bill their old retainer again. Months up to and including the one they
-    // churned in still count - that revenue and those hours were real.
     return clients
-      .filter((c) => (!c.added_date || c.added_date.slice(0, 7) <= monthKey) && (!c.churned_at || monthKey <= c.churned_at.slice(0, 7)))
+      .filter((c) => clientExistedBy(c, monthEnd))
       .map((c) => {
         const clientEntries = monthEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
@@ -362,14 +377,19 @@ export default function ReportsClient({
         // renewal-date precision elsewhere (dashboard, Revenue page) where that IS the thing
         // being measured; here it's only an estimate to compare against calendar-month hours.
         const retainerFraction = monthElapsedFraction(monthKey)
-        const baseRevenueCents = isHourly
-          ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-          : Math.round((c.retainer_cents || 0) * retainerFraction)
+        // A month entirely after a client's churned_at earns $0 retainer/hourly - their
+        // retainer_cents reflects what they paid while active, not $0, so without this every
+        // month after they left would phantom-bill their old retainer again. The month they
+        // actually churned in still counts in full - that revenue and those hours were real.
+        const baseRevenueCents = clientChurnedBefore(c, monthStart)
+          ? 0
+          : isHourly
+            ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
+            : Math.round((c.retainer_cents || 0) * retainerFraction)
         // Extra billables (client_charges) count as revenue same as the Revenue page - a client
-        // with a one-off fee that month otherwise reads as less profitable than they actually are.
-        const chargesCents = monthClientCharges
-          .filter((ch) => ch.client_id === c.id && ch.charged_on.slice(0, 7) === monthKey)
-          .reduce((s, ch) => s + ch.amount_cents, 0)
+        // with a one-off fee that month otherwise reads as less profitable than they actually
+        // are, and a final invoice charged after they churned is still real revenue that month.
+        const chargesCents = chargesByClient.get(c.id) || 0
         const revenueCents = baseRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(revenueCents, hours)
         // Hourly clients used to be excluded here on the theory that their rate is tautologically
@@ -402,26 +422,31 @@ export default function ReportsClient({
     const weekEnd = addDays(weekStart, 7)
     const weekEntries = monthTimeEntries.filter((e) => e.started_at >= weekStart && e.started_at < weekEnd)
     const weeklyRetainerFraction = weeklyRetainerShare(weekStart) * weekElapsedFraction(weekStart)
+    const chargesByClient = new Map<string, number>()
+    for (const ch of monthClientCharges) {
+      if (ch.charged_on >= weekStart && ch.charged_on < weekEnd) chargesByClient.set(ch.client_id, (chargesByClient.get(ch.client_id) || 0) + ch.amount_cents)
+    }
     // Same reasoning as profitabilityForMonth - exclude a client from weeks entirely before
-    // they were added, or entirely after the week they churned in.
+    // they were added; a week entirely after they churned still counts if there's a charge in it.
     return clients
-      .filter((c) => (!c.added_date || c.added_date < weekEnd) && (!c.churned_at || weekStart <= c.churned_at))
+      .filter((c) => clientExistedBy(c, weekEnd))
       .map((c) => {
         const clientEntries = weekEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
         const isHourly = c.billing_mode === 'hourly'
-        const hourlyEstimateCents = Math.round(
-          (clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0),
-        )
-        const billingLumpCents = isHourly ? 0 : billingDatesInRange(c.billing_day || 1, weekStart, weekEnd).length * (c.retainer_cents || 0)
+        const churnedByThisWeek = clientChurnedBefore(c, weekStart)
+        const hourlyEstimateCents = churnedByThisWeek
+          ? 0
+          : Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
+        const billingLumpCents =
+          isHourly || churnedByThisWeek ? 0 : billingDatesInRange(c.billing_day || 1, weekStart, weekEnd).length * (c.retainer_cents || 0)
         // Same reasoning as profitabilityForMonth - extra billables count as revenue here too,
-        // both for the $ figure and the effective-rate proxy (matching the Revenue page).
-        const chargesCents = monthClientCharges
-          .filter((ch) => ch.client_id === c.id && ch.charged_on >= weekStart && ch.charged_on < weekEnd)
-          .reduce((s, ch) => s + ch.amount_cents, 0)
+        // both for the $ figure and the effective-rate proxy (matching the Revenue page), and
+        // still count in a week after the client churned (a late final invoice is still real).
+        const chargesCents = chargesByClient.get(c.id) || 0
         const baseRevenueCents = isHourly ? hourlyEstimateCents : billingLumpCents
         const revenueCents = baseRevenueCents + chargesCents
-        const baseRateRevenueCents = isHourly ? hourlyEstimateCents : Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
+        const baseRateRevenueCents = churnedByThisWeek ? 0 : isHourly ? hourlyEstimateCents : Math.round((c.retainer_cents || 0) * weeklyRetainerFraction)
         const rateRevenueCents = baseRateRevenueCents + chargesCents
         const effectiveRateCents = effectiveRate(rateRevenueCents, hours)
         const rateDeltaCents = effectiveRateCents !== null ? effectiveRateCents - targetRateCents : null

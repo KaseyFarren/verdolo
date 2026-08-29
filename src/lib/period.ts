@@ -207,3 +207,36 @@ export function billingDatesInRange(billingDay: number, rangeStart: string, rang
   }
   return dates
 }
+
+/** [start, end) as YYYY-MM-DD for a 'YYYY-MM' month key - end is exclusive, the 1st of the
+ * following month. Lets any month-bucketed caller reuse the same day-granularity range checks
+ * (clientExistedBy/clientChurnedBefore below) as week/custom-range callers, instead of a second
+ * month-key-string comparison with its own boundary rules. */
+export function monthKeyRange(monthKey: string): { start: string; end: string } {
+  const [y, m] = monthKey.split('-').map(Number)
+  const next = new Date(y, m, 1)
+  return {
+    start: `${monthKey}-01`,
+    end: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`,
+  }
+}
+
+/** Whether a client could have been billing at all before `rangeEnd` (exclusive, YYYY-MM-DD) -
+ * false only if they were added on or after it. Used to decide whether a client belongs in a
+ * period's breakdown at all, independent of whether they've since churned (a client who churned
+ * mid-period can still have real revenue - see clientChurnedBefore, which callers should use to
+ * zero *ongoing* retainer/hourly revenue without dropping the client's charges/hours for that
+ * period too). One shared definition - Reports (by month and by week) and the Revenue page had
+ * each grown a slightly different reimplementation of this, which is how a client got counted in
+ * one and silently dropped from another for the same period. */
+export function clientExistedBy(client: { added_date?: string | null }, rangeEnd?: string | null): boolean {
+  return !client.added_date || !rangeEnd || client.added_date < rangeEnd
+}
+
+/** Whether a client had already churned before `rangeStart` (inclusive, YYYY-MM-DD) - true only
+ * once churned_at predates the period entirely, so the period they actually churned in still
+ * counts. Gates retainer/hourly revenue specifically; never gates client_charges or hours, which
+ * are real regardless of billing_mode status (see clientExistedBy doc). */
+export function clientChurnedBefore(client: { churned_at?: string | null }, rangeStart?: string | null): boolean {
+  return !!client.churned_at && !!rangeStart && client.churned_at < rangeStart
+}

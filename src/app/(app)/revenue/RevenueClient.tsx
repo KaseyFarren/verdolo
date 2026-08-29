@@ -22,7 +22,16 @@ import {
   todayKey,
   type Currency,
 } from '@/lib/agency'
-import { isFullCalendarMonth, billingCycleProgress, billingDatesInRange, daysUntilRenewal, periodBounds, type PeriodValue } from '@/lib/period'
+import {
+  isFullCalendarMonth,
+  billingCycleProgress,
+  billingDatesInRange,
+  daysUntilRenewal,
+  periodBounds,
+  clientExistedBy,
+  clientChurnedBefore,
+  type PeriodValue,
+} from '@/lib/period'
 import { computeClientBurn, burnDrivers, type BurnDriver } from '@/lib/burn'
 import { AlertTriangleIcon, XIcon } from '@/components/ui/icons'
 import DatePicker from '@/components/ui/DatePicker'
@@ -275,19 +284,22 @@ export default function RevenueClient({
     const rangeMonthDays = rangeStart ? new Date(Number(rangeStart.slice(0, 4)), Number(rangeStart.slice(5, 7)), 0).getDate() : 30
     const smoothedRetainerFraction = rangeMonthDays > 0 ? rangeDays / rangeMonthDays : 0
 
-    // Exclude a client from a range that falls entirely before they were added or entirely
-    // after they churned - otherwise a custom/past range would still show their current
-    // retainer as if it always applied, same fix as Reports' profitabilityForMonth/Week.
+    // Exclude a client from a range that falls entirely before they were added - otherwise a
+    // custom/past range would still show their current retainer as if it always applied, same
+    // fix as Reports' profitabilityForMonth/Week. A range entirely after they churned is NOT
+    // excluded here (see churnedByThisRange below, gating only the ongoing retainer/hourly
+    // portion) - a charge billed after they left is still real revenue for that range.
     return clientsState
-      .filter((c) => (!c.added_date || !rangeEnd || c.added_date < rangeEnd) && (!c.churned_at || !rangeStart || c.churned_at >= rangeStart))
+      .filter((c) => clientExistedBy(c, rangeEnd))
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'
+        const churnedByThisRange = clientChurnedBefore(c, rangeStart)
         const billableSeconds = billableHoursByClient.get(c.id) || 0
         // hourly revenue scales with any period length, unlike a retainer - which is a monthly
         // figure, so only a full calendar month period can honestly include one; a week or
         // custom range only counts what was actually billed/logged in it
-        const hourlyRevenue = isHourly ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
+        const hourlyRevenue = isHourly && !churnedByThisRange ? Math.round((billableSeconds / 3600) * (c.hourly_rate_cents || 0)) : 0
         // A retainer is a full-cycle figure. For a full calendar month, attribute the whole thing
         // once the cycle's complete, or prorate by how far this client's own billing cycle has
         // gotten if the current month is still in progress (not assuming everyone renews on the
@@ -297,11 +309,12 @@ export default function RevenueClient({
         const cycleProgress = period.period === 'this_month' ? billingCycleProgress(c.billing_day || 1) : null
         const retainerFraction = cycleProgress ? cycleProgress.fraction : 1
         const billingDatesThisRange = !isHourly && !isFullMonth && rangeStart && rangeEnd ? billingDatesInRange(c.billing_day || 1, rangeStart, rangeEnd) : []
-        const retainerRevenue = isHourly
-          ? 0
-          : isFullMonth
-            ? Math.round((c.retainer_cents || 0) * retainerFraction)
-            : billingDatesThisRange.length * (c.retainer_cents || 0)
+        const retainerRevenue =
+          isHourly || churnedByThisRange
+            ? 0
+            : isFullMonth
+              ? Math.round((c.retainer_cents || 0) * retainerFraction)
+              : billingDatesThisRange.length * (c.retainer_cents || 0)
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
         // The $ figure above is deliberately spiky (full retainer lands on its billing day, $0
         // otherwise) - accurate for "how much money actually showed up", but divided by hours it
@@ -309,11 +322,12 @@ export default function RevenueClient({
         // the billing date happens to fall inside the selected range. The rate needs a steadier
         // proxy, so outside a full month it spreads the retainer evenly across the range instead
         // of lump-summing it - same fix Reports already applies to its weekly effective-rate line.
-        const rateRetainerRevenue = isHourly
-          ? 0
-          : isFullMonth
-            ? retainerRevenue
-            : Math.round((c.retainer_cents || 0) * smoothedRetainerFraction)
+        const rateRetainerRevenue =
+          isHourly || churnedByThisRange
+            ? 0
+            : isFullMonth
+              ? retainerRevenue
+              : Math.round((c.retainer_cents || 0) * smoothedRetainerFraction)
         const rateRevenueCents = rateRetainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows
