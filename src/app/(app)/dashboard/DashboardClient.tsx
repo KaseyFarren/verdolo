@@ -927,7 +927,7 @@ export default function DashboardClient({
               <span className="text-xs text-sage">{noteSaved ? 'Saved' : 'Saving…'}</span>
             </div>
             <textarea
-              className="flex-1 w-full min-h-[160px] resize-none bg-transparent text-sm text-ink outline-none placeholder:text-sage/60"
+              className="flex-1 w-full min-h-[160px] resize-none bg-transparent text-sm text-ink placeholder:text-sage/60 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
               placeholder="Jot something down…"
               value={note}
               onChange={(e) => updateNote(e.target.value)}
