@@ -555,7 +555,7 @@ export default function ReportsClient({
                 {recapPeriod.type === 'week' ? 'Weekly' : 'Monthly'} recap
               </div>
               {displayedRecap ? (
-                <div className="rounded-2xl bg-white shadow-md border-l-4 border-accent p-4">
+                <div className="rounded-2xl bg-white border border-ink/8 border-l-4 border-l-accent p-4">
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-xs font-semibold text-sage">{recapPeriod.label}</div>
                     <button className="text-xs text-sage hover:text-ink inline-flex items-center gap-1" onClick={generateRecap} disabled={loadingRecap}>
@@ -767,7 +767,7 @@ export default function ReportsClient({
                       <div
                         key={key}
                         id={`report-${key}`}
-                        className={`rounded-2xl bg-white shadow-md overflow-hidden transition-shadow ${
+                        className={`rounded-2xl bg-white border border-ink/8 overflow-hidden transition-shadow ${
                           isJustGenerated ? 'ring-2 ring-accent' : ''
                         }`}
                       >
@@ -858,8 +858,8 @@ export default function ReportsClient({
             />
           </div>
 
-          <div className="mb-8">
-            <div className="text-xs font-semibold tracking-wide text-sage mb-2">
+          <Card className="mb-6">
+            <div className="font-heading text-base font-bold text-ink mb-1">
               Revenue <InfoTooltip content="Total revenue across all clients in each period" />
             </div>
             {trendGranularity === 'week' && (
@@ -870,35 +870,33 @@ export default function ReportsClient({
             {trendBuckets.every((b) => b.totalRevenueCents === 0) ? (
               <div className="text-sm text-sage py-3">No revenue yet in this range.</div>
             ) : (
-              <div className="rounded-2xl bg-white shadow-md p-5">
-                <BarChart
-                  labels={trendBuckets.map((b) => b.label)}
-                  values={trendBuckets.map((b) => b.totalRevenueCents)}
-                  formatValue={(cents) => fmtRevenueAxis(cents)}
-                />
-              </div>
+              <BarChart
+                labels={trendBuckets.map((b) => b.label)}
+                values={trendBuckets.map((b) => b.totalRevenueCents)}
+                formatValue={(cents) => fmtRevenueAxis(cents)}
+              />
             )}
-          </div>
+          </Card>
 
-          <div className="mb-8">
-            <div className="text-xs font-semibold tracking-wide text-sage mb-2">
-              Effective rate <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
-            </div>
-            {trendGranularity === 'month' && pMonth === todayKey().slice(0, 7) && (
-              <div className="text-xs text-sage mb-2">
-                This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
+          <div className="rounded-2xl bg-sand/40 p-3 mb-6 flex flex-col gap-3">
+            <Card>
+              <div className="text-xs font-semibold tracking-wide text-sage mb-2">
+                Effective rate <InfoTooltip content="Revenue divided by hours logged, compared to your target hourly rate" />
               </div>
-            )}
-            {trendGranularity === 'week' && (
-              <div className="text-xs text-sage mb-2">
-                Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in - unlike
-                the Revenue chart above, so a week showing $0 revenue there can still show a healthy rate here.
-              </div>
-            )}
-            {trendBuckets.every((b) => !b.hasData) ? (
-              <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
-            ) : (
-              <div className="rounded-2xl bg-white shadow-md p-5">
+              {trendGranularity === 'month' && pMonth === todayKey().slice(0, 7) && (
+                <div className="text-xs text-sage mb-2">
+                  This month&apos;s retainer revenue is prorated to date and will settle as more hours are logged.
+                </div>
+              )}
+              {trendGranularity === 'week' && (
+                <div className="text-xs text-sage mb-2">
+                  Rate spreads each retainer evenly across the month&apos;s weeks, so it isn&apos;t skewed by which week the billing date lands in - unlike
+                  the Revenue chart above, so a week showing $0 revenue there can still show a healthy rate here.
+                </div>
+              )}
+              {trendBuckets.every((b) => !b.hasData) ? (
+                <div className="text-sm text-sage py-3">No revenue or logged time yet.</div>
+              ) : (
                 <TrendLineChart
                   months={trendBuckets.map((b) => b.key)}
                   labels={trendBuckets.map((b) => b.label)}
@@ -917,71 +915,82 @@ export default function ReportsClient({
                     },
                   ]}
                 />
-              </div>
-            )}
-          </div>
-
-          {targetRateCents > 0 && profitability.some((r) => r.rateDeltaCents !== null) && (
-            <div className="mb-8">
-              <div className="text-xs font-semibold tracking-wide text-sage mb-2">
-                Effective rate by client · {monthLabel(`${pMonth}-01`)}{' '}
-                <InfoTooltip content="Each client's revenue divided by hours logged, compared to your target hourly rate" />
-              </div>
-              {pMonth === todayKey().slice(0, 7) && (
-                <div className="text-xs text-sage mb-2">
-                  This month&apos;s retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
-                </div>
               )}
-              <div className="rounded-2xl bg-white shadow-md p-5">
+            </Card>
+
+            {targetRateCents > 0 && profitability.some((r) => r.rateDeltaCents !== null) && (
+              <Card>
+                <div className="text-xs font-semibold tracking-wide text-sage mb-2">
+                  Effective rate by client · {monthLabel(`${pMonth}-01`)}{' '}
+                  <InfoTooltip content="Each client's revenue divided by hours logged, compared to your target hourly rate" />
+                </div>
+                {pMonth === todayKey().slice(0, 7) && (
+                  <div className="text-xs text-sage mb-2">
+                    This month&apos;s retainer revenue is prorated to date within each client&apos;s own billing cycle and will reach full value once that cycle completes.
+                  </div>
+                )}
                 <DivergingBarChart
                   items={profitability
                     .filter((r) => r.rateDeltaCents !== null)
-                    .map((r) => ({ id: r.client.id, label: r.client.name, valueCents: r.rateDeltaCents as number }))}
+                    .map((r) => ({ id: r.client.id, label: r.client.name, valueCents: r.rateDeltaCents as number }))
+                    .sort((a, b) => b.valueCents - a.valueCents)}
                   formatValue={(cents) => formatRateDelta(cents)}
                 />
-              </div>
-            </div>
-          )}
+              </Card>
+            )}
+          </div>
 
           <div className="text-xs font-semibold tracking-wide text-sage mb-2">Client detail · {monthLabel(`${pMonth}-01`)}</div>
           {profitability.length === 0 ? (
             <div className="text-sm text-sage py-3">No revenue or logged time in {monthLabel(`${pMonth}-01`)} yet.</div>
           ) : (
-            <div className="space-y-3">
-              {profitability.map((r) => {
+            <div className="rounded-2xl bg-white border border-ink/8 overflow-hidden">
+              <div className="hidden md:flex items-center gap-4 px-5 py-2.5 border-b border-ink/8 text-[11px] font-semibold uppercase tracking-wide text-sage/70">
+                <div className="flex-1">Client</div>
+                <div className="w-28 text-right">Revenue</div>
+                <div className="w-16 text-right">Hours</div>
+                <div className="w-32 text-right">Rate</div>
+              </div>
+              {profitability.map((r, i) => {
                 const isBelowTarget = targetRateCents > 0 && r.rateDeltaCents !== null && r.rateDeltaCents < 0
                 return (
-                  <div key={r.client.id} className={`rounded-2xl bg-white shadow-md p-5 ${isBelowTarget ? 'border-l-4 border-red-400' : ''}`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-semibold text-ink">{r.client.name}</div>
+                  <div key={r.client.id} className={`px-5 py-3.5 ${i > 0 ? 'border-t border-ink/8' : ''} ${isBelowTarget ? 'bg-red-50/40' : ''}`}>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      <div className="flex-1 min-w-[160px] flex items-center gap-2">
+                        <span className="text-sm font-semibold text-ink">{r.client.name}</span>
                         {isBelowTarget && (
-                          <span className="text-xs rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold inline-flex items-center gap-1">
+                          <span className="text-xs rounded-full bg-red-50 text-red-600 px-2 py-0.5 font-semibold inline-flex items-center gap-1 shrink-0">
                             <AlertTriangleIcon size={12} /> Scope creep
                           </span>
                         )}
                       </div>
-                      <div className={`text-sm font-semibold ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
-                        {r.isHourly
-                          ? `Hourly @ ${currencySign}${centsToDollars(r.client.hourly_rate_cents || 0)}/hr`
-                          : r.effectiveRateCents !== null
-                            ? formatRate(r.effectiveRateCents)
-                            : 'No hours logged'}
+                      <div className="w-28 text-right shrink-0">
+                        <div className="text-xs text-sage tabular-nums">
+                          {currencySign}
+                          {centsToDollars(r.revenueCents)}
+                        </div>
+                        {r.isEstimatedRevenue && (
+                          <div className="text-[10px] text-sage/60">
+                            {r.isHourly ? 'hourly, est.' : r.isPartialMonth ? 'retainer, est., prorated' : 'retainer, est.'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-16 text-right text-xs text-sage tabular-nums shrink-0">{r.hours.toFixed(1)}h</div>
+                      <div className="w-32 text-right shrink-0">
+                        <div className={`text-sm font-semibold tabular-nums ${isBelowTarget ? 'text-red-600' : 'text-ink'}`}>
+                          {r.isHourly
+                            ? `${currencySign}${centsToDollars(r.client.hourly_rate_cents || 0)}/hr`
+                            : r.effectiveRateCents !== null
+                              ? formatRate(r.effectiveRateCents)
+                              : 'No hours logged'}
+                        </div>
                         {!r.isHourly && targetRateCents > 0 && r.rateDeltaCents !== null && (
-                          <span className="text-xs font-normal text-sage ml-1">({formatRateDelta(r.rateDeltaCents)} vs target)</span>
+                          <div className="text-[10px] text-sage/60">{formatRateDelta(r.rateDeltaCents)} vs target</div>
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sage">
-                      <span>
-                        Revenue {currencySign}{centsToDollars(r.revenueCents)}
-                        {r.isEstimatedRevenue &&
-                          (r.isHourly ? ' (hourly, est.)' : r.isPartialMonth ? ' (retainer, est., prorated)' : ' (retainer, est.)')}
-                      </span>
-                      <span>{r.hours.toFixed(1)}h logged</span>
-                    </div>
                     {isBelowTarget && (
-                      <div className="mt-2">
+                      <div className="mt-2.5">
                         {scopeNotes[r.client.id] ? (
                           <div className="space-y-2">
                             <div className="text-xs text-ink bg-red-50/60 rounded-lg p-2">{scopeNotes[r.client.id].note}</div>
@@ -1020,28 +1029,26 @@ export default function ReportsClient({
       {view === 'capacity' && (
         <div>
           {capacity.some((r) => r.targetHours !== null && r.targetHours > 0) && (
-            <div className="mb-8">
-              <div className="text-xs font-semibold tracking-wide text-sage mb-2">Hours vs. target · this week</div>
-              <div className="rounded-2xl bg-white shadow-md p-5">
-                <DivergingBarChart
-                  items={capacity
-                    .filter((r) => r.targetHours !== null && r.targetHours > 0)
-                    .map((r) => ({
-                      id: r.member.user_id,
-                      label: memberName(r.member),
-                      // Target hours is a utilization floor, not a capacity ceiling - falling
-                      // short is the problem case (red), meeting/exceeding it is fine (blue).
-                      valueCents: (r.hours - (r.targetHours as number)) * 100,
-                    }))}
-                  formatValue={(cents) => {
-                    const hrs = cents / 100
-                    return hrs >= 0 ? `+${hrs.toFixed(1)}h over` : `${Math.abs(hrs).toFixed(1)}h under`
-                  }}
-                  positiveLabel="On track"
-                  negativeLabel="Under target"
-                />
-              </div>
-            </div>
+            <Card className="mb-6">
+              <div className="font-heading text-base font-bold text-ink mb-3">Hours vs. target · this week</div>
+              <DivergingBarChart
+                items={capacity
+                  .filter((r) => r.targetHours !== null && r.targetHours > 0)
+                  .map((r) => ({
+                    id: r.member.user_id,
+                    label: memberName(r.member),
+                    // Target hours is a utilization floor, not a capacity ceiling - falling
+                    // short is the problem case (red), meeting/exceeding it is fine (blue).
+                    valueCents: (r.hours - (r.targetHours as number)) * 100,
+                  }))}
+                formatValue={(cents) => {
+                  const hrs = cents / 100
+                  return hrs >= 0 ? `+${hrs.toFixed(1)}h over` : `${Math.abs(hrs).toFixed(1)}h under`
+                }}
+                positiveLabel="On track"
+                negativeLabel="Under target"
+              />
+            </Card>
           )}
 
           <div className="text-xs font-semibold tracking-wide text-sage mb-2">Open workload · this week</div>
@@ -1050,7 +1057,7 @@ export default function ReportsClient({
           ) : (
             <div className="space-y-3">
               {capacity.map((r) => (
-                <div key={r.member.user_id} className="rounded-2xl bg-white shadow-md p-5">
+                <Card key={r.member.user_id}>
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-sm font-semibold text-ink">{memberName(r.member)}</div>
                     <div className="flex gap-3 text-xs text-sage">
@@ -1082,7 +1089,7 @@ export default function ReportsClient({
                       </div>
                     </div>
                   )}
-                </div>
+                </Card>
               ))}
             </div>
           )}
