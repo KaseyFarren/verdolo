@@ -275,8 +275,12 @@ export default function RevenueClient({
     // fix as Reports' profitabilityForMonth/Week. A range entirely after they churned is NOT
     // excluded here (see churnedByThisRange below, gating only the ongoing retainer/hourly
     // portion) - a charge billed after they left is still real revenue for that range.
+    //
+    // A Lead is also excluded, same as Reports - no signed contract yet, so pre-sale hours have
+    // no retainer to judge a rate against, and would otherwise drag down the org-wide blended
+    // rate above for a client who isn't really being billed at all.
     return clientsState
-      .filter((c) => clientExistedBy(c, rangeEnd))
+      .filter((c) => clientExistedBy(c, rangeEnd) && getStage(c) !== 'Lead')
       .map((c) => {
         const chargesTotal = (chargesByClient.get(c.id) || []).reduce((s, ch) => s + ch.amount_cents, 0)
         const isHourly = c.billing_mode === 'hourly'

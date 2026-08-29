@@ -8,6 +8,7 @@ import {
   formatDate,
   todayKey,
   getWeekAnchor,
+  getStage,
   clientHealthKey,
   HEALTH_COLOR,
   HEALTH_LABEL,
@@ -368,8 +369,12 @@ export default function ReportsClient({
     // replayed backward." A range entirely after they churned is NOT excluded here (a charge
     // billed after they left is still real revenue) - see clientChurnedBefore below instead,
     // which only zeroes the ongoing retainer/hourly portion.
+    //
+    // A Lead is also excluded - there's no signed contract yet, so any hours logged (discovery
+    // calls, prospecting) are pre-sale by definition and have no retainer to be "over-servicing"
+    // relative to. Same convention mrrCentsTotal already uses for MRR (excludes Churned and Lead).
     return clients
-      .filter((c) => clientExistedBy(c, rangeEnd))
+      .filter((c) => clientExistedBy(c, rangeEnd) && getStage(c) !== 'Lead')
       .map((c) => {
         const clientEntries = rangeEntries.filter((e) => e.client_id === c.id)
         const hours = clientEntries.reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600
