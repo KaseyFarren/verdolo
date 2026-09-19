@@ -28,6 +28,12 @@ export default async function OnboardingPage() {
 
   if (clientMemberships && clientMemberships.length > 0) redirect('/portal')
 
+  // Someone who verified an invite link but never finished the password step has a pending row that
+  // RLS hides above, so they looked like a brand-new user and were offered their own workspace.
+  // A pending invite (team or client) must be finished, not bypassed by creating another org.
+  const { data: hasPendingInvite } = await supabase.rpc('has_pending_invite')
+  if (hasPendingInvite === true) redirect('/accept-invite')
+
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-5 bg-cream text-ink">
       <div className="mb-2 flex justify-center">
