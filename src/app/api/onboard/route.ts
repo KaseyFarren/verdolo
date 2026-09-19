@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { timingSafeEqual } from 'crypto'
+import { randomUUID, timingSafeEqual } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError } from '@/lib/apiError'
 
@@ -18,8 +18,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 const PRIORITIES = ['High', 'Medium', 'Low']
 const MAX_PHASES = 20
 const MAX_TASKS = 300
+const MAX_SUBTASKS = 15
+const MAX_ROWS = 600
 
-type PlanTask = { title: string; phase: number | null; due_date: string; priority: string; notes: string | null; estimated_hours: number | null; internal: boolean }
+type PlanTask = { title: string; phase: number | null; due_date: string; priority: string; notes: string | null; estimated_hours: number | null; internal: boolean; subtasks: { title: string; notes: string | null }[] }
 type Plan = {
   dryRun: boolean
   client: { name: string; business: string | null; contact_email: string | null; stage: string; retainer_cents: number; billing_day: number; contract_ends: string | null; service: string | null; notes: string | null }
@@ -101,8 +103,18 @@ function parsePlan(body: unknown): { plan?: Plan; error?: string } {
     }
     const hours = t.estimated_hours == null ? null : Number(t.estimated_hours)
     if (hours != null && (!Number.isFinite(hours) || hours < 0 || hours > 1000)) return { error: `tasks[${i}].estimated_hours is invalid` }
-    tasks.push({ title, phase, due_date: t.due_date, priority, notes: optStr(t.notes, 500), estimated_hours: hours, internal })
+    const subsIn = Array.isArray(t.subtasks) ? t.subtasks : []
+    if (subsIn.length > MAX_SUBTASKS) return { error: `tasks[${i}] has more than ${MAX_SUBTASKS} subtasks` }
+    const subtasks: PlanTask['subtasks'] = []
+    for (const [j, sraw] of subsIn.entries()) {
+      const st = (sraw ?? {}) as Record<string, unknown>
+      const stitle = str(st.title, 200)
+      if (!stitle) return { error: `tasks[${i}].subtasks[${j}].title is required` }
+      subtasks.push({ title: stitle, notes: optStr(st.notes, 500) })
+    }
+    tasks.push({ title, phase, due_date: t.due_date, priority, notes: optStr(t.notes, 2000), estimated_hours: hours, internal, subtasks })
   }
+  if (tasks.reduce((n, t) => n + 1 + t.subtasks.length, 0) > MAX_ROWS) return { error: `At most ${MAX_ROWS} tasks and subtasks in total` }
 
   return {
     plan: {
@@ -149,13 +161,14 @@ export async function POST(request: Request) {
     charge: plan.charge,
     project: { name: plan.project.name, start_date: plan.project.start_date, due_date: plan.project.due_date },
     phases: plan.phases.length,
-    tasks: { total: plan.tasks.length, portal_visible: plan.tasks.filter((t) => !t.internal).length, internal: plan.tasks.filter((t) => t.internal).length, first_due: plan.tasks.map((t) => t.due_date).sort()[0] ?? null, last_due: plan.tasks.map((t) => t.due_date).sort().pop() ?? null },
+    tasks: { total: plan.tasks.length, subtasks: plan.tasks.reduce((n, t) => n + t.subtasks.length, 0), portal_visible: plan.tasks.filter((t) => !t.internal).length, internal: plan.tasks.filter((t) => t.internal).length, first_due: plan.tasks.map((t) => t.due_date).sort()[0] ?? null, last_due: plan.tasks.map((t) => t.due_date).sort().pop() ?? null },
   }
   if (plan.dryRun) return NextResponse.json({ dryRun: true, wouldCreate: summary })
 
   // Sequential inserts with compensating cleanup: if anything fails, remove what this call created.
-  const created = { clientId: null as string | null, chargeId: null as string | null, projectId: null as string | null }
+  const created = { clientId: null as string | null, chargeId: null as string | null, projectId: null as string | null, taskIds: [] as string[] }
   const rollback = async () => {
+    if (created.taskIds.length) await admin.from('tasks').delete().in('id', created.taskIds)
     if (created.chargeId) await admin.from('client_charges').delete().eq('id', created.chargeId)
     if (created.projectId) {
       await admin.from('tasks').delete().eq('org_id', orgId).eq('project_id', created.projectId)
@@ -206,9 +219,10 @@ export async function POST(request: Request) {
     }
 
     if (plan.tasks.length) {
+      const base = { org_id: orgId, client_id: clientId, assignee_ids: [ownerId], assigned_to: ownerId, status: 'todo', quick: false, done: false }
       const rows = plan.tasks.map((t, i) => ({
-        org_id: orgId,
-        client_id: clientId,
+        ...base,
+        id: randomUUID(),
         project_id: t.internal ? null : project.id,
         phase_id: t.phase == null ? null : phaseIds[t.phase],
         title: t.title,
@@ -216,15 +230,22 @@ export async function POST(request: Request) {
         priority: t.priority,
         notes: t.notes ?? '',
         estimated_hours: t.estimated_hours,
-        assignee_ids: [ownerId],
-        assigned_to: ownerId,
-        status: 'todo',
-        quick: false,
-        done: false,
         sort_order: i,
       }))
+      created.taskIds.push(...rows.map((r) => r.id))
       const { error } = await admin.from('tasks').insert(rows)
       if (error) throw error
+
+      // Subtasks: one level, same project/phase/priority/due date as the parent. The portal only lists
+      // top-level tasks, so subtasks (and notes) stay internal.
+      const subRows = rows.flatMap((parent, i) =>
+        plan.tasks[i].subtasks.map((st, j) => ({ ...base, id: randomUUID(), parent_task_id: parent.id, project_id: parent.project_id, phase_id: parent.phase_id, title: st.title, due_date: parent.due_date, priority: parent.priority, notes: st.notes ?? '', sort_order: j })),
+      )
+      if (subRows.length) {
+        created.taskIds.push(...subRows.map((r) => r.id))
+        const { error: subError } = await admin.from('tasks').insert(subRows)
+        if (subError) throw subError
+      }
     }
 
     return NextResponse.json({ ok: true, clientId, projectId: project.id, created: summary })
