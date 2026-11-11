@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import { XIcon } from '@/components/ui/icons'
 import TaskComments from '@/components/tasks/TaskComments'
+import DatePicker from '@/components/ui/DatePicker'
+import Switch from '@/components/ui/Switch'
 import { formatDate, todayKey } from '@/lib/agency'
 import { notifyOther } from '@/lib/notifyClient'
 
@@ -40,6 +42,20 @@ function DueTag({ due, done, today }: { due: string | null; done?: boolean; toda
   if (due < today) return <span className="text-xs font-medium text-red-600 shrink-0">Overdue · {formatDate(due)}</span>
   if (due === today) return <span className="text-xs font-medium text-accent shrink-0">Today</span>
   return <span className="text-xs text-sage shrink-0">{formatDate(due)}</span>
+}
+
+/** Small app-styled show/hide (instead of a native <details> disclosure). */
+function Reveal({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs text-sage hover:text-ink outline-none flex items-center gap-1">
+        <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        {label}
+      </button>
+      {open && children}
+    </div>
+  )
 }
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -201,10 +217,9 @@ export default function PortalHome({
           <ul>{waiting.map((t) => <Row key={t.id} t={t} tickable />)}</ul>
         )}
         {waitingDoneRecently.length > 0 && (
-          <details className="mt-2">
-            <summary className="text-xs text-sage cursor-pointer select-none">Done this week ({waitingDoneRecently.length})</summary>
+          <Reveal label={`Done this week (${waitingDoneRecently.length})`}>
             <ul className="mt-1">{waitingDoneRecently.map((t) => <Row key={t.id} t={t} tickable showDue={false} />)}</ul>
-          </details>
+          </Reveal>
         )}
       </Card>
 
@@ -226,10 +241,10 @@ export default function PortalHome({
             </button>
           )}
           <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-xs text-sage flex items-center gap-2">
+            <div className="text-xs text-sage flex items-center gap-2">
               Needed by
-              <input type="date" className="rounded-[10px] border border-ink/10 bg-white px-2 py-1.5 text-sm outline-none focus:outline-none" value={due} min={today} onChange={(e) => setDue(e.target.value)} />
-            </label>
+              <DatePicker value={due} onChange={setDue} min={today} placeholder="Any time" />
+            </div>
             <div className="flex-1" />
             <Button variant="primary" disabled={!title.trim() || adding} onClick={addRequest}>
               {adding ? 'Sending…' : 'Send'}
@@ -265,10 +280,9 @@ export default function PortalHome({
       <Card title={`What ${teamName} is working on`} subtitle="Due in the next 7 days">
         {teamWeek.length === 0 ? <p className="text-sm text-sage">Nothing due this week.</p> : <ul>{teamWeek.map((t) => <Row key={t.id} t={t} />)}</ul>}
         {teamDoneRecently.length > 0 && (
-          <details className="mt-2">
-            <summary className="text-xs text-sage cursor-pointer select-none">Done in the last 7 days ({teamDoneRecently.length})</summary>
+          <Reveal label={`Done in the last 7 days (${teamDoneRecently.length})`}>
             <ul className="mt-1">{teamDoneRecently.map((t) => <Row key={t.id} t={t} showDue={false} />)}</ul>
-          </details>
+          </Reveal>
         )}
       </Card>
 
@@ -338,10 +352,7 @@ export default function PortalHome({
         <p className="text-sm text-sage px-1">Nothing here yet. Once {teamName} adds your project, it’ll show up on this page.</p>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-sage px-1 pb-4 cursor-pointer select-none">
-        <input type="checkbox" checked={digest} onChange={(e) => setDigestPref(e.target.checked)} />
-        Email me a short summary each morning
-      </label>
+      <Switch className="px-1 pb-4 text-sage" checked={digest} onChange={setDigestPref} label="Email me a short summary each morning" />
 
       {detail && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-start sm:justify-center sm:pt-[8vh]" onClick={() => setDetailId(null)}>

@@ -15,6 +15,7 @@ import Pager from '@/components/ui/Pager'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import PeriodSelector from '@/components/ui/PeriodSelector'
 import { useConfirm } from '@/components/ConfirmDialog'
+import Switch from '@/components/ui/Switch'
 
 // Sentinel task-select value that reveals the inline "new task" title field, instead of picking
 // an existing task.
@@ -683,10 +684,7 @@ export default function TimeClient({
                       value={editHours}
                       onChange={(ev) => setEditHours(ev.target.value)}
                     />
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={editBillable} onChange={(ev) => setEditBillable(ev.target.checked)} />
-                      Billable
-                    </label>
+                    <Switch checked={editBillable} onChange={setEditBillable} label="Billable" />
                   </div>
                   <input
                     className="w-full rounded border border-ink/10 bg-white px-3 py-2 text-sm mb-2"
@@ -898,10 +896,7 @@ export default function TimeClient({
           value={manualNote}
           onChange={(e) => setManualNote(e.target.value)}
         />
-        <label className="flex items-center gap-2 text-sm mb-3">
-          <input type="checkbox" checked={manualBillable} onChange={(e) => setManualBillable(e.target.checked)} />
-          Billable
-        </label>
+        <Switch className="mb-3" checked={manualBillable} onChange={setManualBillable} label="Billable" />
         <button
           className="rounded bg-accent text-white shadow-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
           onClick={addManualEntry}

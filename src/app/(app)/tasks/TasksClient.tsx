@@ -19,6 +19,7 @@ import { UploadCloudIcon } from '@/components/ui/icons'
 import { PRIORITY, formatDate, getOffsetDate, memberName, recurringFrequencyLabel, sortTasks, todayKey } from '@/lib/agency'
 import TaskRow, { TaskListHeader } from '@/components/tasks/TaskRow'
 import BoardView from '@/components/tasks/BoardView'
+import Switch from '@/components/ui/Switch'
 
 export type Client = { id: string; name: string }
 export type Member = {
@@ -1558,15 +1559,14 @@ function RecurringPortalFlags({
   onChange: (v: { clientVisible: boolean; forClient: boolean }) => void
 }) {
   return (
-    <div className="rounded border border-ink/10 bg-sand/40 px-3 py-2 mb-2 flex flex-col gap-1.5">
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="checkbox" checked={clientVisible || forClient} disabled={forClient} onChange={(e) => onChange({ clientVisible: e.target.checked, forClient })} />
-        Show each one in the client’s portal
-      </label>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="checkbox" checked={forClient} onChange={(e) => onChange({ clientVisible: clientVisible || e.target.checked, forClient: e.target.checked })} />
-        It’s the client’s to-do (they tick it off)
-      </label>
+    <div className="rounded border border-ink/10 bg-sand/40 px-3 py-2 mb-2 flex flex-col gap-2.5">
+      <Switch checked={clientVisible || forClient} disabled={forClient} onChange={(v) => onChange({ clientVisible: v, forClient })} label="Show each one in the client’s portal" />
+      <Switch
+        checked={forClient}
+        onChange={(v) => onChange({ clientVisible: clientVisible || v, forClient: v })}
+        label="It’s the client’s to-do"
+        hint="They tick it off in their portal"
+      />
     </div>
   )
 }

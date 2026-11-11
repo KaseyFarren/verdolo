@@ -85,13 +85,18 @@ export default function SignupPage() {
           required
           className="rounded border border-ink/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <label className="flex items-start gap-2 text-xs text-sage">
-          <input
-            type="checkbox"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-0.5"
-          />
+        <div className="flex items-start gap-2 text-xs text-sage">
+          {/* App-styled tick box (not a native checkbox) - same behaviour, still required below. */}
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={agreed}
+            aria-label="I agree to the Terms of Service and Privacy Policy"
+            onClick={() => setAgreed((v) => !v)}
+            className={`mt-0.5 w-4 h-4 rounded-[4px] border shrink-0 flex items-center justify-center outline-none ${agreed ? 'bg-accent border-accent text-white' : 'bg-white border-ink/25'}`}
+          >
+            {agreed && <span className="text-[10px] leading-none">✓</span>}
+          </button>
           <span>
             I agree to the{' '}
             <Link href="/terms" target="_blank" className="underline hover:text-sage">
@@ -103,7 +108,7 @@ export default function SignupPage() {
             </Link>
             .
           </span>
-        </label>
+        </div>
         <Button type="submit" variant="primary" disabled={loading} className="w-full">
           {loading ? 'Creating…' : 'Sign up'}
         </Button>

@@ -10,6 +10,7 @@ import { XIcon } from '@/components/ui/icons'
 import { PRIORITY, memberName } from '@/lib/agency'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import TaskComments from '@/components/tasks/TaskComments'
+import Switch from '@/components/ui/Switch'
 import type { Budget, Client, Member, Phase, Project, Task } from '@/app/(app)/tasks/TasksClient'
 
 // Full view/edit surface for a single task, opened by clicking the task name in the list. Every
@@ -193,26 +194,21 @@ export default function TaskDetailModal({
           </div>
 
           {clientId && (
-            <div className="rounded-[8px] border border-ink/10 bg-sand/40 px-3 py-2 mb-3 flex flex-col gap-1.5">
+            <div className="rounded-[8px] border border-ink/10 bg-sand/40 px-3 py-2 mb-3 flex flex-col gap-2.5">
               {task.requested_by && <div className="text-xs text-sage">Added by the client from their portal.</div>}
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={forClient} onChange={(e) => setForClient(e.target.checked)} />
-                <span>
-                  Client’s to-do <span className="text-xs text-sage">- shows as “waiting on you” in their portal and morning email</span>
-                </span>
-              </label>
-              <label className={`flex items-center gap-2 text-sm ${inPortalViaProject || forClient || task.requested_by ? 'text-sage' : 'cursor-pointer'}`}>
-                <input
-                  type="checkbox"
-                  checked={inPortalViaProject || forClient || !!task.requested_by || clientVisible}
-                  disabled={inPortalViaProject || forClient || !!task.requested_by}
-                  onChange={(e) => setClientVisible(e.target.checked)}
-                />
-                <span>
-                  Show in the client’s portal
-                  {inPortalViaProject && <span className="text-xs"> - always, it’s in their project</span>}
-                </span>
-              </label>
+              <Switch
+                checked={forClient}
+                onChange={setForClient}
+                label="Client’s to-do"
+                hint="Shows as “waiting on you” in their portal and morning email"
+              />
+              <Switch
+                checked={inPortalViaProject || forClient || !!task.requested_by || clientVisible}
+                disabled={inPortalViaProject || forClient || !!task.requested_by}
+                onChange={setClientVisible}
+                label="Show in the client’s portal"
+                hint={inPortalViaProject ? 'Always - it’s in their project' : undefined}
+              />
             </div>
           )}
 

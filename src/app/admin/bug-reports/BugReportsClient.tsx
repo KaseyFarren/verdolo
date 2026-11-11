@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import CustomSelect from '@/components/ui/CustomSelect'
 
 export type BugReportRow = {
   id: string
@@ -58,15 +59,17 @@ export default function BugReportsClient({ reports }: { reports: BugReportRow[] 
                 {' · '}
                 {formatDate(r.createdAt)}
               </div>
-              <select
-                value={r.status}
-                onChange={(e) => setStatus(r.id, e.target.value as BugReportRow['status'])}
-                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium border-0 ${STATUS_STYLES[r.status]}`}
-              >
-                <option value="new">New</option>
-                <option value="acknowledged">Acknowledged</option>
-                <option value="resolved">Resolved</option>
-              </select>
+              <div className={`shrink-0 rounded-full text-xs font-medium ${STATUS_STYLES[r.status]}`}>
+                <CustomSelect
+                  value={r.status}
+                  onChange={(v) => setStatus(r.id, v as BugReportRow['status'])}
+                  options={[
+                    { value: 'new', label: 'New' },
+                    { value: 'acknowledged', label: 'Acknowledged' },
+                    { value: 'resolved', label: 'Resolved' },
+                  ]}
+                />
+              </div>
             </div>
             <div className="text-sm whitespace-pre-wrap">{r.description}</div>
           </div>
