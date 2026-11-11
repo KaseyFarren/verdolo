@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button'
 import { PencilIcon } from '@/components/ui/icons'
 
 const TABS = [
-  { href: '/portal', label: 'Projects' },
+  { href: '/portal', label: 'Home' },
   { href: '/portal/files', label: 'Files' },
   { href: '/portal/messages', label: 'Messages' },
 ]

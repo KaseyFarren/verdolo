@@ -11,6 +11,8 @@ type RecurringTemplate = {
   notes?: string | null
   assigned_to?: string | null
   paused?: boolean
+  client_visible?: boolean
+  for_client?: boolean
 }
 type DefaultTemplate = {
   id: string
@@ -82,6 +84,8 @@ export async function ensureAutoAndRecurringTasks(
         notes: r.notes || '',
         done: false,
         recurring_id: r.id,
+        client_visible: !!r.client_visible,
+        for_client: !!r.for_client,
       })
     }
   }

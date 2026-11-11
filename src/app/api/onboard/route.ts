@@ -186,7 +186,9 @@ export async function POST(request: Request) {
       const today = new Date().toISOString().slice(0, 10)
       const { data, error } = await admin
         .from('clients')
-        .insert({ org_id: orgId, name: plan.client.name, business: plan.client.business, service: plan.client.service, notes: plan.client.notes, tone: 'Friendly', cadence_days: 7, stage: plan.client.stage, billing_mode: 'retainer', retainer_cents: plan.client.retainer_cents, hourly_rate_cents: 0, billing_day: plan.client.billing_day, contract_ends: plan.client.contract_ends, contact_email: plan.client.contact_email, added_date: today })
+        .insert({ org_id: orgId, name: plan.client.name, business: plan.client.business, service: plan.client.service, notes: plan.client.notes, tone: 'Friendly', cadence_days: 7, stage: plan.client.stage, billing_mode: 'retainer', retainer_cents: plan.client.retainer_cents, hourly_rate_cents: 0, billing_day: plan.client.billing_day, contract_ends: plan.client.contract_ends, contact_email: plan.client.contact_email, added_date: today,
+          // retainer revenue shouldn't count before work actually kicks off (the project start date)
+          retainer_starts_on: plan.project.start_date })
         .select('id')
         .single()
       if (error || !data) throw error ?? new Error('client insert failed')

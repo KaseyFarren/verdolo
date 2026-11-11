@@ -59,6 +59,8 @@ type Client = {
   hourly_rate_cents: number | null
   billing_day: number | null
   contract_ends: string | null
+  added_date?: string | null
+  retainer_starts_on?: string | null
   paused_at: string | null
   last_contacted: string | null
   quick_note: string | null
@@ -93,6 +95,7 @@ const emptyForm = {
   hourly_rate: '',
   billing_day: 1,
   contract_ends: '',
+  retainer_starts_on: '',
   contact_email: '',
   contact_domain: '',
   owner: '',
@@ -227,6 +230,7 @@ export default function ClientsClient({
       hourly_rate_cents: isHourly ? dollarsToCents((form.hourly_rate as string) || '0') : 0,
       billing_day: Math.min(31, Math.max(1, Number(form.billing_day) || 1)),
       contract_ends: (form.contract_ends as string) || null,
+      retainer_starts_on: (form.retainer_starts_on as string) || null,
       contact_email: (form.contact_email as string) || null,
       contact_domain: (form.contact_domain as string) || null,
       primary_contact_id: (form.owner as string) || null,
@@ -391,6 +395,7 @@ export default function ClientsClient({
                 hourly_rate_cents: isHourly ? dollarsToCents((editForm.hourly_rate as string) || '0') : 0,
                 billing_day: Math.min(31, Math.max(1, Number(editForm.billing_day) || 1)),
                 contract_ends: editForm.contract_ends || null,
+                retainer_starts_on: editForm.retainer_starts_on || null,
                 contact_email: editForm.contact_email || null,
                 contact_domain: editForm.contact_domain || null,
                 primary_contact_id: editForm.owner || null,
@@ -541,6 +546,7 @@ export default function ClientsClient({
                         hourly_rate: selected.hourly_rate_cents ? centsToDollars(selected.hourly_rate_cents) : '',
                         billing_day: selected.billing_day || 1,
                         contract_ends: selected.contract_ends || '',
+                        retainer_starts_on: selected.retainer_starts_on || '',
                         contact_email: selected.contact_email || '',
                         contact_domain: selected.contact_domain || '',
                         owner: selected.primary_contact_id || '',
@@ -624,7 +630,7 @@ export default function ClientsClient({
 
         {canEdit && (
           <div className="rounded-2xl border border-ink/8 bg-white p-5">
-            <ClientPortalAccess supabase={supabase} clientId={selected.id} />
+            <ClientPortalAccess key={selected.id} supabase={supabase} clientId={selected.id} defaultEmail={selected.contact_email} />
           </div>
         )}
 
@@ -1075,6 +1081,19 @@ function ClientForm({
           <div className="text-xs text-sage/70 mt-1">
             Day the retainer renews - drives how &quot;this month&quot; is prorated in Reports and Revenue. For a day that
             doesn&apos;t exist in a given month (e.g. 31 in April), the last day of that month is used instead.
+          </div>
+        </div>
+      )}
+      {form.billing_mode !== 'hourly' && (
+        <div className="mb-3">
+          <label className="block text-xs text-sage mb-1">Retainer starts</label>
+          <DatePicker
+            value={(form.retainer_starts_on as string) || ''}
+            onChange={(v) => setForm((f) => ({ ...f, retainer_starts_on: v }))}
+            placeholder="When the client is added"
+          />
+          <div className="text-xs text-sage/70 mt-1">
+            Revenue and Reports don&apos;t count the retainer before this date. Leave empty to count from the day the client was added.
           </div>
         </div>
       )}

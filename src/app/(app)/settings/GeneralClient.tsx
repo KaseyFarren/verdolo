@@ -13,6 +13,8 @@ type Settings = {
   eod_hour?: number
   exclude_weekends?: boolean
   notifications?: boolean
+  team_digest?: boolean
+  client_digest?: boolean
   hourly_cost_cents?: number
   brand_voice?: string
   currency?: Currency
@@ -31,6 +33,8 @@ export default function GeneralClient({
   const [eodHour, setEodHour] = useState(settings.eod_hour ?? 17)
   const [excludeWeekends, setExcludeWeekends] = useState(settings.exclude_weekends ?? true)
   const [notifications, setNotifications] = useState(settings.notifications ?? true)
+  const [teamDigest, setTeamDigest] = useState(!!settings.team_digest)
+  const [clientDigest, setClientDigest] = useState(!!settings.client_digest)
   const [hourlyCost, setHourlyCost] = useState(String((settings.hourly_cost_cents ?? 0) / 100))
   const [currency, setCurrency] = useState<Currency>(settings.currency ?? 'usd')
   const [saved, setSaved] = useState(false)
@@ -116,6 +120,12 @@ export default function GeneralClient({
         }
       >
         <Toggle checked={notifications} disabled={!isAdmin} onChange={(v) => { setNotifications(v); saveSettings({ notifications: v }) }} />
+      </Row>
+      <Row title="Morning email for the team" subtitle="Each weekday morning: what's due, overdue and new from clients, per person">
+        <Toggle checked={teamDigest} disabled={!isAdmin} onChange={(v) => { setTeamDigest(v); saveSettings({ team_digest: v }) }} />
+      </Row>
+      <Row title="Morning email for clients" subtitle="Each portal contact gets what's waiting on them, what's being worked on and what's done. They can switch it off themselves">
+        <Toggle checked={clientDigest} disabled={!isAdmin} onChange={(v) => { setClientDigest(v); saveSettings({ client_digest: v }) }} />
       </Row>
       <Row dataTour="currency-row" title="Client billing currency" subtitle="What your clients actually pay you in - changes the currency symbol throughout Reports, Revenue, and Clients">
         <div className="w-32">

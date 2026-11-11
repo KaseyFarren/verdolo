@@ -8,6 +8,8 @@ import DatePicker from '@/components/ui/DatePicker'
 import Button from '@/components/ui/Button'
 import { XIcon } from '@/components/ui/icons'
 import { PRIORITY, memberName } from '@/lib/agency'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import TaskComments from '@/components/tasks/TaskComments'
 import type { Budget, Client, Member, Phase, Project, Task } from '@/app/(app)/tasks/TasksClient'
 
 // Full view/edit surface for a single task, opened by clicking the task name in the list. Every
@@ -26,6 +28,7 @@ export default function TaskDetailModal({
   onSave,
   onDelete,
   onClose,
+  comments,
 }: {
   task: Task
   clients: Client[]
@@ -47,9 +50,13 @@ export default function TaskDetailModal({
     priority: string
     notes: string
     estimated_hours: number | null
+    client_visible: boolean
+    for_client: boolean
   }) => void
   onDelete: () => void
   onClose: () => void
+  /** Enables the comment thread (shared with the client when the task is in their portal). */
+  comments?: { supabase: SupabaseClient; orgId: string; userId: string }
 }) {
   const [title, setTitle] = useState(task.title)
   const [clientId, setClientId] = useState(task.client_id || '')
@@ -61,6 +68,11 @@ export default function TaskDetailModal({
   const [priority, setPriority] = useState(task.priority)
   const [notes, setNotes] = useState(task.notes || '')
   const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours != null ? String(task.estimated_hours) : '')
+  const [clientVisible, setClientVisible] = useState(!!task.client_visible)
+  const [forClient, setForClient] = useState(!!task.for_client)
+  const projectClientId = projects.find((p) => p.id === projectId)?.client_id ?? null
+  // Project tasks of the client's own project are always in their portal; anything else needs the switch.
+  const inPortalViaProject = !!clientId && !!projectId && projectClientId === clientId
 
   const clientBudgets = budgets.filter((b) => b.client_id === clientId)
   const projectPhases = phases.filter((p) => p.project_id === projectId)
@@ -78,6 +90,8 @@ export default function TaskDetailModal({
       priority,
       notes,
       estimated_hours: estimatedHours ? Number(estimatedHours) : null,
+      client_visible: clientId ? clientVisible : false,
+      for_client: clientId ? forClient : false,
     })
     onClose()
   }
@@ -178,6 +192,30 @@ export default function TaskDetailModal({
             </div>
           </div>
 
+          {clientId && (
+            <div className="rounded-[8px] border border-ink/10 bg-sand/40 px-3 py-2 mb-3 flex flex-col gap-1.5">
+              {task.requested_by && <div className="text-xs text-sage">Added by the client from their portal.</div>}
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={forClient} onChange={(e) => setForClient(e.target.checked)} />
+                <span>
+                  Client’s to-do <span className="text-xs text-sage">- shows as “waiting on you” in their portal and morning email</span>
+                </span>
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${inPortalViaProject || forClient || task.requested_by ? 'text-sage' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={inPortalViaProject || forClient || !!task.requested_by || clientVisible}
+                  disabled={inPortalViaProject || forClient || !!task.requested_by}
+                  onChange={(e) => setClientVisible(e.target.checked)}
+                />
+                <span>
+                  Show in the client’s portal
+                  {inPortalViaProject && <span className="text-xs"> - always, it’s in their project</span>}
+                </span>
+              </label>
+            </div>
+          )}
+
           <div className="text-[10px] font-semibold tracking-wide text-sage/70 mb-1">Notes</div>
           <textarea
             className="w-full rounded-[8px] border border-ink/10 bg-white px-3 py-2 text-sm mb-3 min-h-[90px]"
@@ -185,6 +223,15 @@ export default function TaskDetailModal({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
+
+          {comments && (
+            <div className="mb-3 border-t border-ink/8 pt-3">
+              <TaskComments supabase={comments.supabase} taskId={task.id} orgId={comments.orgId} userId={comments.userId} />
+              {clientId && !(inPortalViaProject || forClient || clientVisible || task.requested_by) && (
+                <p className="text-[11px] text-sage mt-1">This task isn’t in the client’s portal, so comments stay with the team.</p>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2">
             <Button variant="danger" onClick={onDelete}>

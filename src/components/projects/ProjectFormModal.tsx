@@ -93,6 +93,9 @@ export default function ProjectFormModal({
 
   function save() {
     if (!name.trim()) return
+    // The editor starts with a placeholder "Phase 1". If the user added their own phases and left
+    // the placeholder untouched, drop it so their project doesn't get an unwanted extra phase.
+    const phases = phaseNames.length > 1 && phaseNames[0] === 'Phase 1' ? phaseNames.slice(1) : phaseNames
     onSave(
       {
         name: name.trim(),
@@ -103,7 +106,7 @@ export default function ProjectFormModal({
         start_date: startDate || null,
         due_date: dueDate || null,
       },
-      phaseNames,
+      phases,
     )
   }
 

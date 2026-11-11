@@ -53,6 +53,7 @@ type Client = {
   cadence_days: number | null
   added_date: string | null
   paused_at: string | null
+  retainer_starts_on?: string | null
 }
 type Task = { id: string; client_id: string | null; assigned_to: string | null; title: string; completed_at: string | null }
 type OpenTask = { id: string; assigned_to: string | null }
@@ -384,7 +385,7 @@ export default function ReportsClient({
           ? 0
           : isHourly
             ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-            : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
+            : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd, undefined, c.retainer_starts_on)
         // Extra billables (client_charges) count as revenue same as the Revenue page - a client
         // with a one-off fee that period otherwise reads as less profitable than they actually
         // are, and a final invoice charged after they were paused is still real revenue.

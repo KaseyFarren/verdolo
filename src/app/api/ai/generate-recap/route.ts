@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const { start, end } = resolvePeriod(periodType, rawPeriodStart)
   const today = todayKey()
   const [{ data: clients }, { data: messages }, { data: doneTasks }] = await Promise.all([
-    supabase.from('clients').select('id, name, stage, status, cadence_days, last_contacted').eq('org_id', orgId),
+    supabase.from('clients').select('id, name, stage, status, cadence_days, last_contacted, added_date').eq('org_id', orgId),
     supabase.from('ai_message_log').select('client_id, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end),
     supabase.from('tasks').select('client_id').eq('org_id', orgId).eq('done', true).gte('completed_at', start).lt('completed_at', end),
   ])
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const stage = getStage(c)
     const msgCount = (messages || []).filter((m) => m.client_id === c.id).length
     const done = (doneTasks || []).filter((t) => t.client_id === c.id).length
-    const health = stage === 'Paused' ? 'Paused' : getHealthScore(c.last_contacted, today, c.cadence_days || 7)
+    const health = stage === 'Paused' ? 'Paused' : getHealthScore(c.last_contacted, today, c.cadence_days || 7, c.added_date)
     return `- ${c.name} (${stage}): ${msgCount} msgs, ${done} tasks done, health: ${health}, last: ${c.last_contacted || 'never'}`
   })
 

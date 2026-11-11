@@ -48,6 +48,7 @@ type Client = {
   status: string | null
   added_date: string | null
   paused_at: string | null
+  retainer_starts_on?: string | null
   last_contacted: string | null
   cadence_days: number | null
 }
@@ -294,7 +295,7 @@ export default function RevenueClient({
         // worth 1/daysInMonth, and so on. Same formula everywhere revenue gets attributed
         // (Reports, Dashboard, here) - no billing-day-specific cliff to explain or disagree on.
         const retainerRevenue =
-          isHourly || pausedByThisRange || !rangeStart || !rangeEnd ? 0 : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd)
+          isHourly || pausedByThisRange || !rangeStart || !rangeEnd ? 0 : smoothedRetainerRevenueCents(c.retainer_cents || 0, rangeStart, rangeEnd, undefined, c.retainer_starts_on)
         const totalRevenue = retainerRevenue + hourlyRevenue + chargesTotal
         // "hours logged" stays every hour (billable + non-billable) regardless of billing mode,
         // consistent with the rest of this page - not swapped to billable-only for hourly rows

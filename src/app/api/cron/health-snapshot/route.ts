@@ -12,13 +12,13 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   const today = todayKey()
 
-  const { data: clients } = await admin.from('clients').select('id, org_id, stage, status, last_contacted, cadence_days')
+  const { data: clients } = await admin.from('clients').select('id, org_id, stage, status, last_contacted, cadence_days, added_date')
 
   const rows = (clients || []).map((c) => ({
     org_id: c.org_id,
     client_id: c.id,
     snapshot_date: today,
-    health: getStage(c) === 'Paused' ? 'paused' : getHealthScore(c.last_contacted, today, c.cadence_days || 7),
+    health: getStage(c) === 'Paused' ? 'paused' : getHealthScore(c.last_contacted, today, c.cadence_days || 7, c.added_date),
   }))
 
   if (rows.length) {

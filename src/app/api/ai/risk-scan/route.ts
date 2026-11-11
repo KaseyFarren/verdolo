@@ -36,7 +36,7 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
     async () => {
       const admin = createAdminClient()
       const [{ data: clients }, { data: tasks }] = await Promise.all([
-        admin.from('clients').select('id, name, stage, status, last_contacted, cadence_days, contract_ends').eq('org_id', orgId),
+        admin.from('clients').select('id, name, stage, status, last_contacted, cadence_days, contract_ends, added_date').eq('org_id', orgId),
         admin.from('tasks').select('client_id, due_date, done, archived').eq('org_id', orgId).eq('done', false).eq('archived', false),
       ])
 
@@ -52,7 +52,7 @@ function getCachedRiskScan(orgId: string, apiKey: string) {
 
       const signalsByClient = new Map<string, RiskSignals>()
       for (const c of activeClients) {
-        const health = getHealthScore(c.last_contacted, today, c.cadence_days || 7)
+        const health = getHealthScore(c.last_contacted, today, c.cadence_days || 7, c.added_date)
         const overdueDays = c.last_contacted ? daysBetween(c.last_contacted, today) : null
         const contractDays = c.contract_ends ? daysBetween(today, c.contract_ends) : null
         const overdueTaskCount = (tasks || []).filter((t) => t.client_id === c.id && t.due_date && t.due_date < today).length

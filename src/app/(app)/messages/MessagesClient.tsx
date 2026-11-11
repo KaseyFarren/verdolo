@@ -9,6 +9,7 @@ import { CheckSquareIcon, FileIcon, ImageFileIcon, MessageCircleIcon, PaperclipI
 import CustomSelect from '@/components/ui/CustomSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import Button from '@/components/ui/Button'
+import { notifyOther } from '@/lib/notifyClient'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -1049,6 +1050,8 @@ export default function MessagesClient({
         toast.error('Message failed to send')
         return null
       }
+      // Emails the client when this is their thread (the server ignores team/DM threads).
+      notifyOther('message', (data as { id: string }).id)
       return { ...(data as Omit<Message, 'reactions'>), reactions: [] }
     },
     [supabase, activeIsTeam, members, userId, activeContactId, orgId]

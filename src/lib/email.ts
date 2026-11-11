@@ -11,17 +11,20 @@ export async function sendEmail({
   text,
   html,
   from,
+  replyTo,
 }: {
   to: string | string[]
   subject: string
   text?: string
   html?: string
   from?: string
+  /** Where replies go - a real inbox (the person behind the email), never a no-reply. */
+  replyTo?: string
 }) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
     console.error('[email] RESEND_API_KEY not configured - skipping send')
-    return
+    return false
   }
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -33,9 +36,12 @@ export async function sendEmail({
       subject,
       text,
       html,
+      ...(replyTo ? { reply_to: replyTo } : {}),
     }),
   })
   if (!res.ok) {
     console.error('[email] Resend send failed:', res.status, await res.text())
+    return false
   }
+  return true
 }

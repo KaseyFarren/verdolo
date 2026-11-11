@@ -51,6 +51,9 @@ export type Task = {
   skipped: boolean
   status: TaskStatus
   sort_order: number
+  client_visible?: boolean
+  for_client?: boolean
+  requested_by?: string | null
 }
 export type Budget = { id: string; client_id: string; name: string }
 export type Project = { id: string; name: string; client_id: string | null }
@@ -65,6 +68,8 @@ type Recurring = {
   frequency: string
   notes: string | null
   paused: boolean
+  client_visible?: boolean
+  for_client?: boolean
 }
 type Default = {
   id: string
@@ -94,6 +99,8 @@ const emptyRecurringForm = {
   frequency: 'daily',
   notes: '',
   subtasks: [] as string[],
+  clientVisible: false,
+  forClient: false,
 }
 const emptyDefaultForm = {
   title: '',
@@ -199,7 +206,8 @@ export default function TasksClient({
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
   const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null)
   const [subtaskForm, setSubtaskForm] = useState(emptyTaskForm)
-  const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
+  // ?task=<id> (links in notification emails) opens that task's details straight away.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(searchParams.get('task'))
   const [showAddRecurring, setShowAddRecurring] = useState(false)
   const [recurringForm, setRecurringForm] = useState(emptyRecurringForm)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null)
@@ -503,6 +511,8 @@ export default function TasksClient({
         priority: recurringForm.priority,
         frequency: recurringForm.frequency,
         notes: recurringForm.notes,
+        client_visible: !!recurringForm.clientId && (recurringForm.clientVisible || recurringForm.forClient),
+        for_client: !!recurringForm.clientId && recurringForm.forClient,
       })
       .select()
       .single()
@@ -543,6 +553,12 @@ export default function TasksClient({
     const { subtasks, ...normalized } = fields
     if (normalized.client_id === '') normalized.client_id = null
     if (normalized.assigned_to === '') normalized.assigned_to = null
+    if (!normalized.client_id) {
+      normalized.client_visible = false
+      normalized.for_client = false
+    } else if (normalized.for_client) {
+      normalized.client_visible = true
+    }
     const { data } = await supabase.from('recurring_templates').update(normalized).eq('id', id).select().single()
     if (data) setRecurring((prev) => prev.map((r) => (r.id === id ? (data as Recurring) : r)))
     if (Array.isArray(subtasks)) await saveRecurringSubtasks(id, subtasks as string[])
@@ -1041,6 +1057,7 @@ export default function TasksClient({
                 setDetailTaskId(null)
               }}
               onClose={() => setDetailTaskId(null)}
+              comments={{ supabase, orgId, userId }}
             />
           )}
 
@@ -1199,7 +1216,7 @@ export default function TasksClient({
 
           {view === 'recurring' && (
             <div>
-              <p className="text-sm text-sage mb-4">Repeats on a schedule you choose - daily, weekdays, or a specific day each week.</p>
+              <p className="text-sm text-sage mb-4">Repeats on a schedule you choose - daily, weekdays, weekly, every 2 weeks or monthly.</p>
               {showAddRecurring && (
                 <div className="rounded-2xl border border-ink/8 bg-white p-5 mb-3">
                   <input
@@ -1213,14 +1230,7 @@ export default function TasksClient({
                     <CustomSelect
                       value={recurringForm.frequency}
                       onChange={(v) => setRecurringForm((f) => ({ ...f, frequency: v }))}
-                      options={[
-                        { value: 'daily', label: 'Daily' },
-                        { value: 'weekdays', label: 'Weekdays' },
-                        ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({
-                          value: `weekly:${(i + 1) % 7}`,
-                          label: `Weekly – ${d}`,
-                        })),
-                      ]}
+                      options={frequencyOptions(recurringForm.frequency)}
                     />
                     <CustomSelect value={recurringForm.priority} onChange={(v) => setRecurringForm((f) => ({ ...f, priority: v }))} options={PRIORITY.map((p) => ({ value: p, label: p }))} />
                     <CustomSelect
@@ -1240,6 +1250,13 @@ export default function TasksClient({
                       ]}
                     />
                   </div>
+                  {recurringForm.clientId && (
+                    <RecurringPortalFlags
+                      clientVisible={recurringForm.clientVisible}
+                      forClient={recurringForm.forClient}
+                      onChange={(v) => setRecurringForm((f) => ({ ...f, ...v }))}
+                    />
+                  )}
                   <SubtaskListEditor titles={recurringForm.subtasks} onChange={(subtasks) => setRecurringForm((f) => ({ ...f, subtasks }))} />
                   <div className="flex gap-2">
                     <button className="rounded border border-ink/10 px-3 py-1.5 text-sm" onClick={() => setShowAddRecurring(false)}>
@@ -1275,14 +1292,7 @@ export default function TasksClient({
                               frequency: v,
                             }))
                           }
-                          options={[
-                            { value: 'daily', label: 'Daily' },
-                            { value: 'weekdays', label: 'Weekdays' },
-                            ...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({
-                              value: `weekly:${(i + 1) % 7}`,
-                              label: `Weekly – ${d}`,
-                            })),
-                          ]}
+                          options={frequencyOptions((editRecurringForm.frequency as string) || 'daily')}
                         />
                         <CustomSelect
                           value={(editRecurringForm.priority as string) || 'Medium'}
@@ -1303,6 +1313,13 @@ export default function TasksClient({
                           options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: memberName(m) }))]}
                         />
                       </div>
+                      {!!editRecurringForm.client_id && (
+                        <RecurringPortalFlags
+                          clientVisible={!!editRecurringForm.client_visible}
+                          forClient={!!editRecurringForm.for_client}
+                          onChange={(v) => setEditRecurringForm((f) => ({ ...f, client_visible: v.clientVisible, for_client: v.forClient }))}
+                        />
+                      )}
                       <SubtaskListEditor
                         titles={(editRecurringForm.subtasks as string[]) || []}
                         onChange={(subtasks) => setEditRecurringForm((f) => ({ ...f, subtasks }))}
@@ -1327,6 +1344,7 @@ export default function TasksClient({
                           {recurringFrequencyLabel(r.frequency)}
                           {r.client_id ? ` · ${clientName(r.client_id)}` : ''}
                           {r.assigned_to ? ` · ${memberEmail(r.assigned_to)}` : ''} · {r.priority}
+                          {r.for_client ? ' · Client’s to-do' : r.client_visible ? ' · In client portal' : ''}
                           {recurringSubtasks.filter((s) => s.template_id === r.id).length > 0
                             ? ` · ${recurringSubtasks.filter((s) => s.template_id === r.id).length} subtask${recurringSubtasks.filter((s) => s.template_id === r.id).length !== 1 ? 's' : ''}`
                             : ''}
@@ -1346,6 +1364,8 @@ export default function TasksClient({
                             frequency: r.frequency,
                             client_id: r.client_id || '',
                             assigned_to: r.assigned_to || '',
+                            client_visible: !!r.client_visible,
+                            for_client: !!r.for_client,
                             subtasks: recurringSubtasks.filter((s) => s.template_id === r.id).map((s) => s.title),
                           })
                         }}
@@ -1494,6 +1514,59 @@ export default function TasksClient({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+
+const DOWS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** Frequency choices for recurring templates. "Every 2 weeks" anchors on the next such weekday
+ * (from today) so the fortnight lines up with when you set it up; an existing anchored value is
+ * kept as-is so editing a template doesn't shift its rhythm. */
+function frequencyOptions(current: string) {
+  const today = todayKey()
+  const nextDow = (dow: number) => {
+    for (let i = 0; i < 7; i++) {
+      const d = getOffsetDate(i)
+      if (new Date(`${d}T12:00:00`).getDay() === dow) return d
+    }
+    return today
+  }
+  const fortnightly = DOWS.map((d, i) => {
+    const dow = (i + 1) % 7
+    const existing = current.startsWith(`fortnightly:${dow}:`) ? current : null
+    return { value: existing ?? `fortnightly:${dow}:${nextDow(dow)}`, label: `Every 2 weeks - ${d}` }
+  })
+  const monthly = Array.from({ length: 31 }, (_, i) => ({ value: `monthly:${i + 1}`, label: `Monthly - day ${i + 1}${i + 1 > 28 ? ' (or last day)' : ''}` }))
+  return [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekdays', label: 'Weekdays' },
+    ...DOWS.map((d, i) => ({ value: `weekly:${(i + 1) % 7}`, label: `Weekly - ${d}` })),
+    ...fortnightly,
+    ...monthly,
+  ]
+}
+
+function RecurringPortalFlags({
+  clientVisible,
+  forClient,
+  onChange,
+}: {
+  clientVisible: boolean
+  forClient: boolean
+  onChange: (v: { clientVisible: boolean; forClient: boolean }) => void
+}) {
+  return (
+    <div className="rounded border border-ink/10 bg-sand/40 px-3 py-2 mb-2 flex flex-col gap-1.5">
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={clientVisible || forClient} disabled={forClient} onChange={(e) => onChange({ clientVisible: e.target.checked, forClient })} />
+        Show each one in the client’s portal
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={forClient} onChange={(e) => onChange({ clientVisible: clientVisible || e.target.checked, forClient: e.target.checked })} />
+        It’s the client’s to-do (they tick it off)
+      </label>
     </div>
   )
 }

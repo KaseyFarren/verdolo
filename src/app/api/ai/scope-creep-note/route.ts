@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   const { data: client } = await supabase
     .from('clients')
-    .select('id, name, retainer_cents, retainer_hours, billing_mode, business, platform, service, notes, tone, talking_points, last_contacted')
+    .select('id, name, retainer_cents, retainer_hours, billing_mode, business, platform, service, notes, tone, talking_points, last_contacted, retainer_starts_on')
     .eq('id', clientId)
     .eq('org_id', orgId)
     .single()
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   const monthKey = `${y}-${String(m).padStart(2, '0')}`
   const todayMonthKey = today.slice(0, 7)
   const paceFraction = monthKey < todayMonthKey ? 1 : monthKey > todayMonthKey ? 0 : dayOfMonth / daysInMonth
-  const revenueCents = smoothedRetainerRevenueCents(client.retainer_cents || 0, monthStart, monthEnd, today)
+  const revenueCents = smoothedRetainerRevenueCents(client.retainer_cents || 0, monthStart, monthEnd, today, client.retainer_starts_on)
   const effectiveRateCents = effectiveRate(revenueCents, hours) ?? 0
   // revenueCents and hours are already matched to the same elapsed window (both cover only
   // the days so far this month), so effectiveRateCents is a fair current-pace signal - if hours

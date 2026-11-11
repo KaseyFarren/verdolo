@@ -48,7 +48,7 @@ export function renderEmail({
               </td>
             </tr>
             <tr>
-              <td style="padding: 12px 40px 0 40px; font-size:15px; line-height:1.6; color:#1a1a17;">
+              <td style="padding: 12px 40px 0 40px; font-size:16px; line-height:1.6; color:#1a1a17;">
                 ${bodyHtml}
               </td>
             </tr>
@@ -70,3 +70,20 @@ export function renderEmail({
   </body>
 </html>`
 }
+
+/** HTML-escapes user-supplied text (task titles, names, message bodies) before it goes into an email. */
+export function esc(text: string | null | undefined) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** The one clear "details" box the email standards ask for - key info that can't be missed. */
+export function detailsBox(innerHtml: string) {
+  return `<div style="margin:16px 0 0 0; padding:16px 18px; background-color:#ffffff; border-radius:12px; border:1px solid #e6dccf;">${innerHtml}</div>`
+}
+
+export const APP_URL = process.env.APP_URL || 'https://app.verdolo.com'

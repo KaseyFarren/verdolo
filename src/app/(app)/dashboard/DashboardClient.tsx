@@ -50,6 +50,7 @@ type Client = {
   primary_contact_id: string | null
   last_contacted: string | null
   cadence_days: number | null
+  added_date?: string | null
 }
 type Task = {
   id: string

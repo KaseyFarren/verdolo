@@ -85,12 +85,22 @@ function daysInMonthOf(year: number, month1indexed: number) {
  * server caller can be handed the browser's own todayKey() and stay in agreement with a
  * client-rendered figure it needs to match - the server's runtime timezone otherwise disagrees
  * with the caller's near midnight. */
-export function smoothedRetainerRevenueCents(retainerCents: number, rangeStart: string, rangeEnd: string, today: string = todayKey()): number {
+export function smoothedRetainerRevenueCents(
+  retainerCents: number,
+  rangeStart: string,
+  rangeEnd: string,
+  today: string = todayKey(),
+  // clients.retainer_starts_on: no retainer is counted for days before it. Null/undefined means
+  // count from the start of the range (i.e. from creation), as before. Applied here so Reports,
+  // Revenue, Dashboard and the AI note all agree.
+  retainerStartsOn?: string | null,
+): number {
   const tomorrow = addDays(today, 1)
   const cappedEnd = rangeEnd < tomorrow ? rangeEnd : tomorrow
-  if (cappedEnd <= rangeStart) return 0
+  const effectiveStart = retainerStartsOn && retainerStartsOn > rangeStart ? retainerStartsOn : rangeStart
+  if (cappedEnd <= effectiveStart) return 0
   let total = 0
-  for (let cursor = rangeStart; cursor < cappedEnd; cursor = addDays(cursor, 1)) {
+  for (let cursor = effectiveStart; cursor < cappedEnd; cursor = addDays(cursor, 1)) {
     const [y, m] = cursor.split('-').map(Number)
     total += retainerCents / daysInMonthOf(y, m)
   }

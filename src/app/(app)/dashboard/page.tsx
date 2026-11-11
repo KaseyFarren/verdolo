@@ -16,6 +16,7 @@ function estimateMonthRevenueCents(
     billing_mode: string | null
     hourly_rate_cents: number | null
     paused_at?: string | null
+    retainer_starts_on?: string | null
   }[],
   entries: { client_id: string | null; duration_seconds: number | null; billable: boolean }[],
   monthStart: string,
@@ -30,7 +31,7 @@ function estimateMonthRevenueCents(
     const isHourly = c.billing_mode === 'hourly'
     total += isHourly
       ? Math.round((clientEntries.filter((e) => e.billable).reduce((s, e) => s + (e.duration_seconds || 0), 0) / 3600) * (c.hourly_rate_cents || 0))
-      : smoothedRetainerRevenueCents(c.retainer_cents || 0, monthStart, monthEnd)
+      : smoothedRetainerRevenueCents(c.retainer_cents || 0, monthStart, monthEnd, undefined, c.retainer_starts_on)
   }
   return total
 }
@@ -103,7 +104,7 @@ export default async function DashboardPage() {
     // bucketing needs the true full active set, and is now covered by idx_tasks_active.
     supabase
       .from('clients')
-      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id, last_contacted, cadence_days')
+      .select('id, name, business, platform, stage, status, contract_ends, tone, awaiting_reply, primary_contact_id, last_contacted, cadence_days, added_date')
       .eq('org_id', orgId)
       .order('name')
       .limit(2000),
@@ -156,7 +157,7 @@ export default async function DashboardPage() {
     // billing rows entirely for members rather than fetching-then-hiding, since retainer/hourly
     // rate cents must never reach a non-admin session's RSC payload (see stripBillingInfo).
     isAdmin
-      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, paused_at').eq('org_id', orgId)
+      ? supabase.from('clients').select('id, name, retainer_cents, retainer_hours, billing_mode, hourly_rate_cents, billing_day, stage, status, paused_at, retainer_starts_on').eq('org_id', orgId)
       : Promise.resolve({ data: [] }),
     isAdmin
       ? supabase

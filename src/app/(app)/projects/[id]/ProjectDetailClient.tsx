@@ -661,6 +661,7 @@ export default function ProjectDetailClient({
             setDetailTaskId(null)
           }}
           onClose={() => setDetailTaskId(null)}
+          comments={{ supabase, orgId, userId }}
         />
       )}
     </div>

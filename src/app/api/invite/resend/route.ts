@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError } from '@/lib/apiError'
+import { inviterDetails, issueSetupLink, sendTeamInviteEmail } from '@/lib/invites'
 
 export async function POST(request: Request) {
-  const { origin } = new URL(request.url)
   const { orgId, memberId } = await request.json()
 
   if (!orgId || !memberId) {
@@ -36,13 +36,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invite not found or already accepted' }, { status: 400 })
   }
 
-  const { error } = await admin.auth.admin.inviteUserByEmail(target.invited_email, {
-    redirectTo: `${origin}/accept-invite`,
-  })
-
-  if (error) {
-    return apiError('Could not resend the invite', 500, error)
+  // inviteUserByEmail can't re-invite an email that already has an auth user (which every
+  // pending invite does), so this used to fail - issueSetupLink falls back to a magic link.
+  const link = await issueSetupLink(admin, target.invited_email)
+  if ('error' in link) {
+    return apiError('Could not resend the invite', 500, link.error)
   }
+  const { data: orgRow } = await admin.from('orgs').select('name').eq('id', orgId).single()
+  const inviter = await inviterDetails(admin, orgId, user.id, user.email)
+  const sent = await sendTeamInviteEmail({ to: target.invited_email, url: link.url, orgName: orgRow?.name ?? 'your team', inviterName: inviter.name, inviterEmail: inviter.email })
+  if (!sent) return NextResponse.json({ error: 'Could not send the email' }, { status: 502 })
 
   return NextResponse.json({ ok: true })
 }

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Button from '@/components/ui/Button'
 import { FileIcon, PaperclipIcon, PdfFileIcon, SheetFileIcon, XIcon } from '@/components/ui/icons'
+import { notifyOther } from '@/lib/notifyClient'
 
 type Message = {
   id: string
@@ -140,12 +141,19 @@ export default function ThreadChat({
       attachment = { attachment_path: path, attachment_name: file.name, attachment_type: file.type || null, attachment_size_bytes: file.size }
     }
 
-    const { error } = await supabase.from('messages').insert({ thread_id: threadId, org_id: orgId, sender_id: userId, body: trimmed, ...(attachment ?? {}) })
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert({ thread_id: threadId, org_id: orgId, sender_id: userId, body: trimmed, ...(attachment ?? {}) })
+      .select('id')
+      .single()
     setSending(false)
     if (error) {
       setBody(trimmed)
       setPendingFile(file)
+      return
     }
+    // Emails the other side (client <-> team) - the server ignores non-client threads.
+    notifyOther('message', inserted?.id)
   }
 
   return (

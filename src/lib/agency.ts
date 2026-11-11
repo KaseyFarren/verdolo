@@ -87,9 +87,13 @@ export function sortTasks<T extends { priority: string; title: string }>(tasks: 
 }
 
 /** green = contacted recently, amber = due for a check-in, red = overdue */
-export function getHealthScore(lastContacted: string | null | undefined, today: string, cadenceDays = 7) {
-  if (!lastContacted) return 'red'
-  const [y, m, d] = lastContacted.split('-').map(Number)
+export function getHealthScore(lastContacted: string | null | undefined, today: string, cadenceDays = 7, createdOn?: string | null) {
+  // A brand-new client has no contact date yet: measure from when they were added so they are
+  // not "Overdue" until a full check-in cadence has passed since creation. No date at all
+  // (and no creation date) keeps the old behaviour of red.
+  const since = lastContacted || (createdOn ? createdOn.slice(0, 10) : null)
+  if (!since) return 'red'
+  const [y, m, d] = since.split('-').map(Number)
   const [ty, tm, td] = today.split('-').map(Number)
   const diff = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000)
   if (diff <= Math.max(1, Math.floor(cadenceDays / 2))) return 'green'
@@ -106,10 +110,12 @@ export const HEALTH_LABEL: Record<HealthKey, string> = { green: 'On track', ambe
 export const HEALTH_COLOR: Record<HealthKey, string> = { green: '#2db87a', amber: '#cc9a3c', red: '#e05070', paused: '#6060a0' }
 
 export function clientHealthKey(
-  client: { stage?: string | null; status?: string | null; last_contacted?: string | null; cadence_days?: number | null },
+  client: { stage?: string | null; status?: string | null; last_contacted?: string | null; cadence_days?: number | null; added_date?: string | null; created_at?: string | null },
   today: string,
 ): HealthKey {
-  return getStage(client) === 'Paused' ? 'paused' : getHealthScore(client.last_contacted, today, client.cadence_days || 7)
+  return getStage(client) === 'Paused'
+    ? 'paused'
+    : getHealthScore(client.last_contacted, today, client.cadence_days || 7, client.added_date || client.created_at)
 }
 
 export function mrrCentsTotal(clients: { stage?: string | null; status?: string | null; retainer_cents?: number | null }[]) {
@@ -170,20 +176,48 @@ export function dayOfWeek(iso: string) {
   return new Date(y, m - 1, d).getDay()
 }
 
-/** old app's recurring frequency values: 'daily' | 'weekdays' | 'weekly:0'..'weekly:6' */
+/** Recurring frequency values:
+ *  'daily' | 'weekdays' | 'weekly:0'..'weekly:6' (old app's values)
+ *  'fortnightly:<dow>:<YYYY-MM-DD anchor>' - every other week on <dow>, in step with the anchor date
+ *  'monthly:<1-31>' - that day each month; a day the month doesn't have falls on its last day */
 export function recurringMatchesDate(frequency: string, iso: string) {
   const d = dayOfWeek(iso)
   if (frequency === 'daily') return true
   if (frequency === 'weekdays') return d > 0 && d < 6
   if (frequency.startsWith('weekly:')) return d === parseInt(frequency.split(':')[1], 10)
+  if (frequency.startsWith('fortnightly:')) {
+    const [, dow, anchor] = frequency.split(':')
+    if (d !== parseInt(dow, 10) || !anchor) return false
+    const weeks = Math.round((isoToUtcMs(iso) - isoToUtcMs(anchor)) / (7 * 86400000))
+    return weeks >= 0 && weeks % 2 === 0
+  }
+  if (frequency.startsWith('monthly:')) {
+    const want = parseInt(frequency.split(':')[1], 10)
+    const [y, m, day] = iso.split('-').map(Number)
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
+    return day === Math.min(want, lastDay)
+  }
   return false
+}
+
+function isoToUtcMs(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return Date.UTC(y, m - 1, d)
+}
+
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function ordinal(n: number) {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
+  return `${n}${s}`
 }
 
 export function recurringFrequencyLabel(frequency: string) {
   if (frequency === 'daily') return 'Daily'
   if (frequency === 'weekdays') return 'Weekdays'
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  return `Weekly – ${days[parseInt(frequency.split(':')[1], 10)] ?? ''}`
+  if (frequency.startsWith('fortnightly:')) return `Every 2 weeks - ${DOW_SHORT[parseInt(frequency.split(':')[1], 10)] ?? ''}`
+  if (frequency.startsWith('monthly:')) return `Monthly - ${ordinal(parseInt(frequency.split(':')[1], 10))}`
+  return `Weekly - ${DOW_SHORT[parseInt(frequency.split(':')[1], 10)] ?? ''}`
 }
 
 export function cadenceLabel(days?: number | null) {

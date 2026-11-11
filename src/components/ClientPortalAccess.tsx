@@ -9,24 +9,47 @@ import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 
 type ClientUser = { id: string; invited_email: string | null; display_name: string | null; status: string; created_at: string }
 
-export default function ClientPortalAccess({ supabase, clientId }: { supabase: SupabaseClient; clientId: string }) {
+export default function ClientPortalAccess({ supabase, clientId, defaultEmail }: { supabase: SupabaseClient; clientId: string; defaultEmail?: string | null }) {
   const [contacts, setContacts] = useState<ClientUser[]>([])
   const [email, setEmail] = useState('')
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [inviting, setInviting] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
 
-  useEffect(() => {
-    supabase
+  async function loadContacts() {
+    const { data, error } = await supabase
       .from('client_users')
       .select('id, invited_email, display_name, status, created_at')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!error) setContacts((data as ClientUser[]) ?? [])
-      })
+    if (error) return
+    const rows = (data as ClientUser[]) ?? []
+    setContacts(rows)
+    // First invite for this client: start from the contact email on the client record.
+    if (!rows.length && defaultEmail) setEmail((e) => e || defaultEmail)
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadContacts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, clientId])
+
+  async function resend(contact: ClientUser) {
+    if (!contact.invited_email) return
+    setResendingId(contact.id)
+    const res = await fetch('/api/invite/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: contact.invited_email, clientId }),
+    })
+    const body = await res.json().catch(() => ({}))
+    setResendingId(null)
+    if (!res.ok) return toast.error(body.error || 'Could not resend the invite')
+    toast.success('New invite link sent')
+  }
 
   async function invite() {
     const trimmedEmail = email.trim()
@@ -44,13 +67,10 @@ export default function ClientPortalAccess({ supabase, clientId }: { supabase: S
       toast.error(body.error || 'Could not send the invite')
       return
     }
-    setContacts((prev) => [
-      { id: crypto.randomUUID(), invited_email: trimmedEmail, display_name: trimmedName || null, status: 'invited', created_at: new Date().toISOString() },
-      ...prev,
-    ])
     setEmail('')
     setName('')
-    toast.success('Invite sent')
+    toast.success(body.resent ? 'New invite link sent' : 'Invite sent')
+    loadContacts()
   }
 
   async function revoke(contact: ClientUser) {
@@ -70,7 +90,7 @@ export default function ClientPortalAccess({ supabase, clientId }: { supabase: S
   return (
     <div>
       <div className="text-xs font-semibold tracking-wide text-sage mb-2">Portal access</div>
-      <p className="text-xs text-sage mb-3">Invite a contact to log in and see this client&rsquo;s projects, tasks, files, and a shared message thread.</p>
+      <p className="text-xs text-sage mb-3">Invite a contact to log in and see this client&rsquo;s projects, their to-dos, files and a shared message thread. Invite links work once; use Resend if one expires.</p>
 
       {contacts.length > 0 && (
         <div className="flex flex-col gap-1 mb-3">
@@ -93,7 +113,12 @@ export default function ClientPortalAccess({ supabase, clientId }: { supabase: S
                 </div>
               )}
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-sage capitalize">{c.status}</span>
+                <span className="text-xs text-sage capitalize">{c.status === 'invited' ? 'Invited' : 'Active'}</span>
+                {c.status === 'invited' && (
+                  <button type="button" onClick={() => resend(c)} disabled={resendingId === c.id} className="text-xs text-accent hover:underline disabled:opacity-50">
+                    {resendingId === c.id ? 'Sending…' : 'Resend'}
+                  </button>
+                )}
                 {editingId !== c.id && (
                   <IconButton
                     label="Edit name"

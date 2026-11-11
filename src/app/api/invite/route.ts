@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError } from '@/lib/apiError'
+import { inviterDetails, issueSetupLink, sendTeamInviteEmail } from '@/lib/invites'
 
 export async function POST(request: Request) {
-  const { origin } = new URL(request.url)
   const { email, orgId, role } = await request.json()
 
   if (!email || !orgId) {
@@ -58,14 +58,12 @@ export async function POST(request: Request) {
     }
   }
 
-  // /accept-invite (not /auth/callback) is where the invite link lands - see that page for why.
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/accept-invite`,
-  })
-
-  if (inviteError || !invited.user) {
-    return apiError('Could not send the invite', 500, inviteError)
+  // Our own invite email (lib/invites.ts) rather than Supabase's generic template - see there.
+  const link = await issueSetupLink(admin, String(email).trim().toLowerCase())
+  if ('error' in link || !link.userId) {
+    return apiError('Could not send the invite', 500, 'error' in link ? link.error : null)
   }
+  const invited = { user: { id: link.userId } }
 
   // Starts 'invited', not 'active' - flips to 'active' (via the accept_own_invite RPC) only once
   // they actually finish setup on /accept-invite, so a pending invite doesn't consume a seat or
@@ -81,6 +79,10 @@ export async function POST(request: Request) {
   if (memberError) {
     return apiError('Could not add the teammate', 500, memberError)
   }
+
+  const { data: orgRow } = await admin.from('orgs').select('name').eq('id', orgId).single()
+  const inviter = await inviterDetails(admin, orgId, user.id, user.email)
+  await sendTeamInviteEmail({ to: email, url: link.url, orgName: orgRow?.name ?? 'your team', inviterName: inviter.name, inviterEmail: inviter.email })
 
   return NextResponse.json({ ok: true })
 }

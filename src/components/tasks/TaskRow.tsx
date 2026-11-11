@@ -18,7 +18,7 @@ import type { Client, Member, Project, Task } from '@/app/(app)/tasks/TasksClien
 // no min-width. Actions get their own reserved (capped) column so they never overlap data columns.
 // Notes are NOT a column (too cramped) - they render in a full-width bar under the row instead.
 export const ROW_GRID_COLS =
-  'grid-cols-[20px_24px_minmax(0,1fr)_minmax(0,60px)_minmax(0,116px)_minmax(0,132px)] lg:grid-cols-[20px_24px_minmax(0,2fr)_minmax(0,64px)_minmax(0,1fr)_minmax(0,60px)_minmax(0,128px)_minmax(0,64px)_minmax(0,132px)]'
+  'grid-cols-[20px_24px_minmax(0,1fr)_minmax(0,60px)_minmax(0,116px)_minmax(0,132px)] lg:grid-cols-[20px_24px_minmax(0,3fr)_minmax(0,64px)_minmax(0,1fr)_minmax(0,60px)_minmax(0,128px)_minmax(0,64px)_minmax(0,132px)]'
 
 export function TaskListHeader() {
   return (
@@ -158,6 +158,16 @@ export default function TaskRow({
           {t.project_id && projects && (
             <span className="text-[10px] text-sage bg-sand rounded-full px-1.5 py-0.5 min-w-0 shrink truncate max-w-[min(90px,40%)]" title={projects.find((p) => p.id === t.project_id)?.name}>
               {projects.find((p) => p.id === t.project_id)?.name}
+            </span>
+          )}
+          {t.for_client && (
+            <span className="text-[10px] font-medium text-amber-800 bg-amber-100 rounded-full px-1.5 py-0.5 shrink-0" title="The client's to-do - in their portal as waiting on them">
+              Client to-do
+            </span>
+          )}
+          {t.requested_by && (
+            <span className="text-[10px] font-medium text-green bg-green/10 rounded-full px-1.5 py-0.5 shrink-0" title="Added by the client from their portal">
+              From client
             </span>
           )}
           {t.estimated_hours != null && (

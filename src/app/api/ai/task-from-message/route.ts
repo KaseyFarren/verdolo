@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { checkAndConsumeAiCredit } from '@/lib/aiCredits'
 import { rateLimit } from '@/lib/rateLimit'
 import { buildTaskFromMessagePrompt, callClaude, extractText } from '@/lib/ai'
-import { todayKey } from '@/lib/agency'
+import { todayKey, isWeekend } from '@/lib/agency'
 
 const MAX_TEXT_CHARS = 4000
 
@@ -60,9 +60,22 @@ export async function POST(request: Request) {
     const txt = extractText(result)
     const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim())
     if (typeof parsed.title !== 'string' || !parsed.title.trim()) throw new Error('no title')
+    let dueDate: string | null = typeof parsed.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.due_date) ? parsed.due_date : null
+    // The model can return a Saturday or Sunday. Fix it in code (never ask the model to do date
+    // maths): move to the Friday before, or the Monday after if that Friday is already past.
+    if (dueDate && isWeekend(dueDate)) {
+      const { data: org } = await supabase.from('orgs').select('settings').eq('id', orgId).maybeSingle()
+      if (org?.settings?.exclude_weekends ?? true) {
+        const [y, m, d] = dueDate.split('-').map(Number)
+        const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 6 = Sat, 0 = Sun
+        const shift = (days: number) => new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+        const friday = shift(dow === 6 ? -1 : -2)
+        dueDate = friday < todayKey() ? shift(dow === 6 ? 2 : 1) : friday
+      }
+    }
     const task = {
       title: parsed.title.slice(0, 200),
-      due_date: typeof parsed.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.due_date) ? parsed.due_date : null,
+      due_date: dueDate,
       priority: ['High', 'Medium', 'Low'].includes(parsed.priority) ? parsed.priority : 'Medium',
       notes: typeof parsed.notes === 'string' ? parsed.notes.slice(0, 500) : '',
     }
