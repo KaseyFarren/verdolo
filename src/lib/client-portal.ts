@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Mirrors getOrgContext() in org.ts, but for the client-portal side: a client_users row scopes
 // the caller to exactly one client (and that client's org), not to org-wide access.
@@ -39,14 +40,23 @@ export const getClientContext = cache(async () => {
     redirect(orgMembership ? '/dashboard' : '/onboarding')
   }
 
+  // A client user can't read the clients row under RLS (it holds private fields - retainer,
+  // notes, AI background), so the embedded clients(name) is always empty for them. Look up just
+  // the name with the service role.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let clientName = (membership.clients as any)?.name as string | undefined
+  if (!clientName) {
+    const { data: c } = await createAdminClient().from('clients').select('name').eq('id', membership.client_id).maybeSingle()
+    clientName = (c?.name as string | undefined) ?? ''
+  }
+
   return {
     supabase,
     user,
     orgId: membership.org_id as string,
     clientId: membership.client_id as string,
     contactName: membership.display_name as string | null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    clientName: (membership.clients as any)?.name as string,
+    clientName,
   }
 })
 

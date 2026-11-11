@@ -104,7 +104,9 @@ export default function PortalHome({
   const teamDoneRecently = tasks
     .filter((t) => !t.for_client && !t.requested_by && t.done && (t.completed_at ?? '') >= recentCutoff)
     .sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
-  const ongoing = tasks.filter((t) => !t.project_id && t.client_visible && !t.for_client && !t.requested_by)
+  const teamWeekIds = new Set(teamWeek.map((t) => t.id))
+  // Regular jobs outside a project, minus anything already listed under "working on" this week.
+  const ongoing = tasks.filter((t) => !t.project_id && t.client_visible && !t.for_client && !t.requested_by && !teamWeekIds.has(t.id))
   const detail = tasks.find((t) => t.id === detailId) ?? null
 
   async function toggleDone(t: PortalTask) {
