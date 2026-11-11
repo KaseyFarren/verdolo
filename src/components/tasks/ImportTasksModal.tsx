@@ -152,6 +152,7 @@ export default function ImportTasksModal({
         toInsert.map((d) => ({
           org_id: orgId,
           client_id: clientId || null,
+          client_visible: !!clientId,
           title: d.title.trim(),
           due_date: d.due_date || todayKey(),
           priority: d.priority,

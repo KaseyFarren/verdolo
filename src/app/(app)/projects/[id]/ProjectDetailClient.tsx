@@ -248,6 +248,8 @@ export default function ProjectDetailClient({
       phase_id: phaseId,
       title: taskForm.title,
       client_id: taskForm.clientId || project.client_id || null,
+      // Client tasks show in that client's portal by default; untick in task details to keep one internal.
+      client_visible: !!(taskForm.clientId || project.client_id),
       assignee_ids: assigneeIds,
       assigned_to: deriveAssignedTo(assigneeIds),
       due_date: taskForm.dueDate || todayKey(),

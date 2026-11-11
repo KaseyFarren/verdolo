@@ -136,6 +136,8 @@ export default function TaskDetailModal({
               <CustomSelect
                 value={clientId}
                 onChange={(v) => {
+                  // Giving a task its first client puts it in that client's portal by default.
+                  if (v && !clientId) setClientVisible(true)
                   setClientId(v)
                   setBudgetId('')
                 }}

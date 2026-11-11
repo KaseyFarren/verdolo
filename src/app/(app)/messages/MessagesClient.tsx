@@ -1255,6 +1255,7 @@ export default function MessagesClient({
       // and to whoever turned the message into a task - otherwise it lands unassigned and
       // detached from the client it came from.
       client_id: activeClientId,
+      client_visible: !!activeClientId,
       assigned_to: userId,
       assignee_ids: [userId],
       title: taskDraft.title.trim(),

@@ -100,7 +100,7 @@ const emptyRecurringForm = {
   frequency: 'daily',
   notes: '',
   subtasks: [] as string[],
-  clientVisible: false,
+  clientVisible: true,
   forClient: false,
 }
 const emptyDefaultForm = {
@@ -329,6 +329,8 @@ export default function TasksClient({
       org_id: orgId,
       title: taskForm.title,
       client_id: taskForm.clientId || null,
+      // Client tasks show in that client's portal by default; untick in task details to keep one internal.
+      client_visible: !!taskForm.clientId,
       assignee_ids: assigneeIds,
       assigned_to: deriveAssignedTo(assigneeIds),
       due_date: taskForm.dueDate,
@@ -415,6 +417,11 @@ export default function TasksClient({
     // Reassigning a task to yourself shouldn't ping you - flag it before the realtime UPDATE echoes.
     if ((Array.isArray(fields.assignee_ids) && (fields.assignee_ids as string[]).includes(userId)) || fields.assigned_to === userId) {
       markSelfAssigned(id)
+    }
+    // Giving a task its first client (e.g. from the list row's client cell) puts it in that
+    // client's portal by default, same as creating it with a client. Task details passes its own.
+    if (fields.client_id && fields.client_visible === undefined && !tasks.find((t) => t.id === id)?.client_id) {
+      fields = { ...fields, client_visible: true }
     }
     // Optimistic: apply the change locally before the round-trip so the UI reacts instantly.
     // Capture the pre-edit row inside the updater (not from the `tasks` closure) so rapid
