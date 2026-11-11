@@ -1248,7 +1248,12 @@ export default function MessagesClient({
     setTaskDraftSaving(true)
     const { error } = await supabase.from('tasks').insert({
       org_id: orgId,
-      client_id: null,
+      // A task drafted from a client's thread belongs to that client (null in team/DM threads),
+      // and to whoever turned the message into a task - otherwise it lands unassigned and
+      // detached from the client it came from.
+      client_id: activeClientId,
+      assigned_to: userId,
+      assignee_ids: [userId],
       title: taskDraft.title.trim(),
       due_date: taskDraft.due_date || todayKey(),
       priority: taskDraft.priority,

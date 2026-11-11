@@ -156,7 +156,7 @@ export default function TaskRow({
             {t.title}
           </button>
           {t.project_id && projects && (
-            <span className="text-[10px] text-sage bg-sand rounded-full px-1.5 py-0.5 shrink-0 truncate max-w-[90px]" title={projects.find((p) => p.id === t.project_id)?.name}>
+            <span className="text-[10px] text-sage bg-sand rounded-full px-1.5 py-0.5 min-w-0 shrink truncate max-w-[min(90px,40%)]" title={projects.find((p) => p.id === t.project_id)?.name}>
               {projects.find((p) => p.id === t.project_id)?.name}
             </span>
           )}

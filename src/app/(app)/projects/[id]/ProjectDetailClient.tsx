@@ -335,7 +335,8 @@ export default function ProjectDetailClient({
         t={t}
         clients={clients}
         members={members}
-        projects={[{ id: project.id, name: project.name, client_id: project.client_id }]}
+        // No `projects` here on purpose: on the project's own page the project pill just repeats
+        // the page title and steals width from the task title.
         updateField={(field, value) => {
           if (field === 'assignee_ids') {
             const assigneeIds = value as string[]

@@ -49,7 +49,7 @@ function ContactName({ contactName }: { contactName: string | null }) {
   }
 
   return (
-    <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-sm text-sage hover:text-ink">
+    <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-sm text-sage hover:text-ink whitespace-nowrap">
       {contactName || 'Add your name'}
       <PencilIcon size={11} />
     </button>
@@ -74,10 +74,12 @@ export default function PortalShell({ clientName, contactName, children }: { cli
     <div className="min-h-screen bg-cream text-ink">
       <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-ink/8 bg-white">
         <Logo size={20} />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <ContactName contactName={contactName} />
-          <span className="text-ink/15">·</span>
-          <span className="text-sm text-sage">{clientName}</span>
+          {/* On a phone there's no room for the business name too - it squeezed to nothing and
+              left a stray dot, and wrapped the contact name onto two lines. */}
+          <span className="hidden sm:inline text-ink/15">·</span>
+          <span className="hidden sm:inline text-sm text-sage truncate">{clientName}</span>
           <Button variant="secondary" size="sm" onClick={logout}>
             Sign out
           </Button>
