@@ -158,12 +158,9 @@ export default function PortalHome({
     setNotes('')
     setShowNotes(false)
     router.refresh()
-    const { data: row } = await supabase
-      .from('tasks')
-      .select('id, title, done, due_date, completed_at, phase_id, project_id, for_client, client_visible, requested_by, notes, created_at')
-      .eq('id', id as string)
-      .maybeSingle()
-    if (row) setTasks((prev) => [...prev, row as PortalTask])
+    const { data: rows } = await supabase.rpc('portal_tasks')
+    const row = ((rows ?? []) as PortalTask[]).find((t) => t.id === id)
+    if (row) setTasks((prev) => [...prev, row])
   }
 
   async function setDigestPref(on: boolean) {

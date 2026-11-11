@@ -2,7 +2,6 @@ import { requireClientContext } from '@/lib/client-portal'
 import { createAdminClient } from '@/lib/supabase/admin'
 import PortalHome, { type PortalPhase, type PortalProject, type PortalTask } from './PortalHome'
 
-const TASK_COLS = 'id, title, done, due_date, completed_at, phase_id, project_id, for_client, client_visible, requested_by, notes, skipped, created_at'
 
 export default async function PortalPage({ searchParams }: { searchParams: Promise<{ digest?: string; task?: string }> }) {
   const { supabase, clientId, orgId, user, contactName, clientName } = await requireClientContext()
@@ -16,10 +15,10 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     digestJustOff = true
   }
 
-  // RLS (tasks_client_select) already limits tasks to this client's portal tasks.
   const [{ data: projects }, { data: tasks }, { data: me }] = await Promise.all([
     supabase.from('projects').select('id, name, description, status, due_date').eq('client_id', clientId).neq('status', 'archived').order('created_at', { ascending: true }),
-    supabase.from('tasks').select(TASK_COLS).eq('client_id', clientId).is('parent_task_id', null).eq('skipped', false).order('due_date').limit(1000),
+    // portal_tasks() (0096): only portal-visible tasks, and notes only on the client's own requests.
+    supabase.rpc('portal_tasks'),
     supabase.from('client_users').select('daily_digest').eq('user_id', user.id).maybeSingle(),
   ])
   const projectIds = (projects ?? []).map((p) => p.id)
@@ -45,7 +44,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       teamName={teamName}
       projects={(projects ?? []) as PortalProject[]}
       phases={(phases ?? []) as PortalPhase[]}
-      tasks={(tasks ?? []) as PortalTask[]}
+      tasks={((tasks ?? []) as (PortalTask & { skipped: boolean })[]).filter((t) => !t.skipped)}
       dailyDigest={me?.daily_digest ?? true}
       digestJustOff={digestJustOff}
       openTaskId={params.task ?? null}
