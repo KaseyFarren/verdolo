@@ -116,9 +116,10 @@ export default function PortalHome({
   const requests = tasks.filter((t) => t.requested_by && !t.for_client)
   const openRequests = requests.filter((t) => !t.done).sort(byDue)
   const doneRequests = requests.filter((t) => t.done).sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')).slice(0, 5)
-  const teamWeek = tasks.filter((t) => !t.for_client && !t.requested_by && !t.done && t.due_date && t.due_date <= weekAhead).sort(byDue)
+  // Everything on the team's plate, including what the client asked for (tagged "You asked").
+  const teamWeek = tasks.filter((t) => !t.for_client && !t.done && t.due_date && t.due_date <= weekAhead).sort(byDue)
   const teamDoneRecently = tasks
-    .filter((t) => !t.for_client && !t.requested_by && t.done && (t.completed_at ?? '') >= recentCutoff)
+    .filter((t) => !t.for_client && t.done && (t.completed_at ?? '') >= recentCutoff)
     .sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
   const teamWeekIds = new Set(teamWeek.map((t) => t.id))
   // Regular jobs outside a project, minus anything already listed under "working on" this week.
@@ -192,6 +193,7 @@ export default function PortalHome({
         <button type="button" onClick={() => setDetailId(t.id)} className={`flex-1 min-w-0 text-left text-[15px] outline-none hover:underline ${t.done ? 'line-through text-sage' : ''}`}>
           {t.title}
         </button>
+        {t.requested_by && !t.for_client && <span className="text-[11px] font-medium text-sage bg-sand rounded-full px-2 py-0.5 shrink-0">You asked</span>}
         {showDue && <DueTag due={t.due_date} done={t.done} today={today} />}
       </li>
     )
